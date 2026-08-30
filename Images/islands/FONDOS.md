@@ -160,6 +160,23 @@ amanecer, islas flotantes a lo lejos.
 Con el molde aprobado, para cada isla se manda **el molde + el `island.webp` de
 esa isla + su `button.webp`**, y se cambia sólo el bloque `TEMA`.
 
+No hace falta armarlo a mano. Esto imprime el prompt entero, ya con el TEMA de
+esa isla puesto y con la lista de archivos que hay que adjuntar:
+
+```bash
+node scripts/prompt-fondo.mjs island7
+```
+
+Y para dejarlos los quince en archivos de texto, listos para abrir y copiar:
+
+```bash
+node scripts/prompt-fondo.mjs --todos
+```
+
+El script LEE este archivo: el bloque de abajo y la tabla de temas son la
+única fuente. Si cambiás el prompt acá, cambia en los quince.
+
+<!-- PROMPT:ISLA -->
 ```
 Te paso tres imágenes: la primera es el MOLDE de composición, las otras dos son
 la isla y el botón de nivel del mundo que hay que hacer ahora.
@@ -184,12 +201,14 @@ intercambiables:
 TEMA: <material de la plataforma> / <vegetación y decoración de los costados> /
 <cielo y hora del día>
 ```
+<!-- /PROMPT:ISLA -->
 
 ### Los quince TEMA
 
 Salen del tema que ya tiene el botón de cada isla, así el fondo y el botón
 hablan del mismo material.
 
+<!-- TABLA:TEMAS -->
 | Isla | Mundo | TEMA sugerido |
 |---|---|---|
 | 1 | Isla de teclas | piedra helada / cristales y florcitas / celeste de amanecer |
@@ -207,6 +226,30 @@ hablan del mismo material.
 | 13 | Isla de los mensajes | aros pastel / pasto y arcoíris / celeste con nubes de algodón |
 | 14 | Isla de atajos | bronce y runas / cristales y aparatos de alquimia / verdeazul de laboratorio |
 | 15 | Isla del gran reto | piedra junto al agua / nenúfares y juncos, laguna / azul de laguna al atardecer |
+<!-- /TABLA:TEMAS -->
+
+---
+
+## 3 bis. Si el generador no da 16:9
+
+ChatGPT genera en 1024×1024, **1536×1024** o 1024×1536. O sea que su formato
+apaisado es **3:2, no 16:9**, y además queda por debajo de los 1920 de ancho
+que pide el prompt. Va a devolver 3:2 casi siempre, y está bien: no hay que
+pelearse con eso.
+
+Lo resuelve el import, que recorta al centro. Pero recorta **arriba y abajo**,
+que es justo donde están las dos zonas que importan, así que hay que componer
+sabiéndolo:
+
+- De un 3:2 a 16:9 se pierde alrededor del **11 % arriba y 11 % abajo**.
+- **Arriba** eso no molesta: es cielo de sobra.
+- **Abajo sí importa.** La plataforma no puede depender de su borde inferior
+  para leerse: tiene que entenderse como mesa aunque se le corte el pie. Si el
+  generador la dibuja apoyada justo contra el borde, pedí que la baje o que
+  deje aire debajo.
+
+Si al mirar el resultado el pedestal quedó demasiado al ras, es más rápido
+volver a generar que recortar a mano.
 
 ---
 
