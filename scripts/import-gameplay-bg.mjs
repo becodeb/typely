@@ -69,7 +69,7 @@ async function importar(id) {
 
   const k = await medirPedestal(`${carpetaDe(id)}/gameplay.webp`);
   const nota = k < 2 ? "SE FUNDE con las teclas, plataforma muy clara"
-    : k < 2.5 ? "flojo" : k > 6 ? "plataforma muy oscura" : "ok";
+    : k < 2.5 ? "flojo" : k > 6 ? "oscura: el teclado salta mucho, bien si el tema lo es" : "ok";
 
   console.log(`-- ${id} --`);
   console.log(`   fuente   ${src}  ${m.width}x${m.height}  (${arFuente.toFixed(3)})`);

@@ -1,10 +1,10 @@
 # Fondos de nivel — cómo generar el de una isla
 
 Cada isla tiene su propio fondo para la pantalla de juego: el escenario sobre
-el que aparecen el teclado flotante y la tarjeta de la actividad. Hoy hay
-quince archivos pero **no quince dibujos**: las islas 1 a 5 comparten el mismo
-placeholder (mismo hash, `8b1350ed…`), así que las que más falta hacen son
-ésas.
+el que aparecen el teclado flotante y la tarjeta de la actividad. Las quince
+están hechas, y son quince dibujos distintos: hasta hace poco las islas 1 a 5
+compartían un mismo placeholder. Este archivo queda para cuando se sume la
+dieciséis, o para rehacer alguno.
 
 Este archivo es el equivalente de `BOTONES.md` para los fondos. Primero se
 genera **un molde** con la isla 1 y se itera hasta que la composición cierre;

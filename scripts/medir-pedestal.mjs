@@ -48,11 +48,11 @@ for (const file of archivos) {
   /* Los umbrales salen de MEDIR los fondos que ya funcionan, no de una regla
      general: la isla 10 da 3.71, la 6 da 4.54 y la 8 da 4.51, y en las tres el
      teclado se lee como un objeto apoyado sobre la plataforma. El placeholder
-     que comparten las islas 1 a 5 da 1.56 y ahi las teclas se funden con el
-     piso. No es contraste de TEXTO — la tecla trae borde y sombra propios —,
+     que compartian las islas 1 a 5 daba 1.56 y ahi las teclas se fundian con
+     el piso. No es contraste de TEXTO — la tecla trae borde y sombra propios —,
      es cuanto se despega el teclado del pedestal. */
   const nota = k < 2 ? "  <-- SE FUNDE, plataforma muy clara"
     : k < 2.5 ? "  (flojo)"
-    : k > 6 ? "  <-- plataforma muy oscura" : "  ok";
+    : k > 6 ? "  oscura: el teclado salta mucho, bien si el tema lo es" : "  ok";
   console.log(`${file.padEnd(46)} rgb(${medio.join(",").padEnd(11)})  ${k.toFixed(2)}:1${nota}`);
 }
