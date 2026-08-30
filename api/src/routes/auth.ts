@@ -8,7 +8,7 @@
  *   Unknown email is a friendly Spanish 404 (never auto-creates a
  *   privileged account).
  *
- * Cookies are HTTP-only, SameSite=Lax, Secure in production. Caddy
+ * Cookies are HTTP-only, SameSite=Lax, Secure in production. The proxy
  * terminates TLS so `secure: true` is safe in prod. */
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";

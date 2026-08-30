@@ -39,7 +39,7 @@ Core visual direction:
 ## 3. Architecture (current)
 
 TYPELY started frontend-only (localStorage) and now has a real backend. It runs
-as **three Docker containers behind a Caddy reverse proxy** at
+as **three Docker containers behind a reverse proxy** at
 `typely.bauhub.online`:
 
 | Layer | Stack | Where | Exposed |
@@ -767,7 +767,7 @@ second source of rules:
 | File | Job |
 |---|---|
 | `CLAUDE.md` | **The rulebook.** Architecture, design, assets, curriculum, deploy, branching, agent rules |
-| `DEPLOY.md` | Ops runbook for the Oracle VPS |
+| `DEPLOY.md` | Deploy runbook — manual, through Coolify |
 | `dbnew.md` | Backend implementation log (history, not rules) |
 | `Images/islands/ISLAS.md` | Prompts for splitting a scene into sky + island, and for fixing pedestal count |
 | `Images/islands/BOTONES.md` | Recipe for drawing and importing a new island's level button |
@@ -840,48 +840,39 @@ edge.
 
 ## 13. Deployment
 
-Containerised behind Nginx + Caddy. `Dockerfile` (frontend, multi-stage
-`node:22-alpine` → `nginx:alpine`, runs `npm ci && npm run build`),
-`Dockerfile.api` (API), `docker-compose.yml` (services `mecanografia`, `api`,
-`db`, all loopback-bound; `db` healthcheck; `api` reads secrets from
-`/run/secrets/*`). `nginx.conf` does SPA fallback. `.dockerignore` excludes
-`node_modules`, `dist`, `.env*`, `secrets/*`, `Images*/`, `Skills/`, `.claude/`,
-docs. Full runbook in `DEPLOY.md`.
+Containerised. `Dockerfile` (frontend, multi-stage `node:22-alpine` →
+`nginx:alpine`, runs `npm ci && npm run build`), `Dockerfile.api` (API),
+`docker-compose.yml` (services `mecanografia`, `api`, `db`, all
+loopback-bound; `db` healthcheck; `api` reads secrets from `/run/secrets/*`).
+`nginx.conf` does SPA fallback. `.dockerignore` excludes `node_modules`,
+`dist`, `.env*`, `secrets/*`, `Images*/`, `Skills/`, `.claude/`, docs.
 
-### 13.1 Frontend deploy to the Oracle VM — RULE
+**The deploy is MANUAL, through Coolify, and Ezequiel does it.** There is no
+autodeploy and we do not want one: merging to `production` publishes nothing by
+itself. If a workflow ever appears that deploys on push, it is a mistake —
+remove it. The repo has no `.github/workflows/` for this reason.
 
-**Never build the frontend Docker image on the Oracle VM** (`168.75.68.75`,
-`/opt/apps/typely`, ~956MB RAM). `docker compose build mecanografia` there takes
-15-20 min and BuildKit OOM-crashes. The **required** procedure (≈1 min) is:
+**The DB in production is Supabase**, not the compose `db` container, which is
+for local development.
 
-1. Build the static bundle **locally** — it must include the Google vars or you
-   break sign-in (Vite inlines them):
-   `VITE_GOOGLE_CLIENT_ID="…" VITE_GOOGLE_ALLOWED_DOMAINS="" npm run build`.
-2. `tar -czf fe-dist.tgz dist nginx.conf` and `scp` it to the VM.
-3. On the VM build a **trivial nginx image that only COPYs the prebuilt `dist/`**
-   (`FROM nginx:alpine` + COPY `nginx.conf` + COPY `dist`), tag it
-   `typely-mecanografia:latest`, then
-   `docker compose up -d --no-build --force-recreate mecanografia`.
-4. Verify the served bundle hash matches local:
-   `curl -s http://127.0.0.1:3005/ | grep -o 'assets/index-[A-Za-z0-9_-]*\.js'`
-   must equal the hash in local `dist/index.html`, and HTTP must be `200`.
+### 13.1 The one thing that breaks silently — RULE
 
-The slow on-VM build (`DOCKER_BUILDKIT=0` + detached `nohup`, never BuildKit) is
-the fallback ONLY for the **API** image, which can't be shipped as a static
-bundle. The DB is **Supabase**, not the local `db` container.
+Vite **inlines** `VITE_*` variables at BUILD time. A frontend image built
+without them ships a bundle without them, and **Google sign-in stops working
+with nothing in the logs**. They must be present as build-time variables:
 
-> **Check this on the VM — it points at the OLD repo.** `/opt/apps/typely`
-> still has `origin` = `bautigoni/Mecanografia-BAU-EZES`, tracked through a
-> local branch confusingly named `main`. The project moved to
-> `becodeb/typely` with `production` as its default branch (§17), so a
-> `git pull` there fetches the old repo. Repoint it before the next deploy:
->
-> ```bash
-> git remote set-url origin https://github.com/becodeb/typely.git
-> git fetch origin
-> git branch -m main production 2>/dev/null || true
-> git branch --set-upstream-to=origin/production production
-> ```
+```
+VITE_GOOGLE_CLIENT_ID   VITE_GOOGLE_ALLOWED_DOMAINS
+```
+
+After every deploy, check the served bundle is the one you meant to publish:
+
+```bash
+curl -s http://127.0.0.1:3005/ | grep -o 'assets/index-[A-Za-z0-9_-]*.js'
+```
+
+and then log in with Google in the browser — that is the only check that
+catches the failure above. Runbook: `DEPLOY.md`.
 
 ## 14. Skills (for agents)
 
@@ -920,9 +911,11 @@ bundle. The DB is **Supabase**, not the local `db` container.
   what is deployed, and only takes changes that already work (see §17).
 - After any code change run `npm run build` (= `tsc --noEmit && vite build`); fix
   failures before claiming done. Report which files changed and how to test.
-- Deploy the frontend to the Oracle VM with the prebuilt-`dist` procedure in
-  §13.1 — never trigger a full `docker compose build` of `mecanografia` on the
-  956MB VM (it OOM-crashes and wastes 15-20 min).
+- **Never add an autodeploy.** The deploy is manual, through Coolify, and
+  Ezequiel does it (§13). A workflow that publishes on push to `production` is
+  a bug, not a feature.
+- The frontend image must be built **with the `VITE_*` variables present**, or
+  Google sign-in breaks with nothing in the logs (§13.1).
 
 ## 16. Quick Start
 
@@ -963,52 +956,23 @@ gh pr merge --merge
 (`tsc --noEmit && vite build`) and `npx tsc -p api/tsconfig.json`, plus the
 deploy checklist in §13.
 
-**Deployment is wired but has never actually run.** `.github/workflows/deploy.yml`
-fires on push to `production` and also accepts a manual run from the Actions tab
-(`workflow_dispatch`). Whether every merge *should* auto-deploy is still an open
-decision — to stop merges deploying on their own, drop the `push:` trigger and
-keep `workflow_dispatch`.
+**Nothing deploys on its own.** There is no CI deploy and no
+`.github/workflows/`; the old repo had one that never worked and it was
+removed with the move. A merge into `production` publishes nothing — it records
+what is *ready* to publish. Ezequiel then redeploys by hand from Coolify (§13).
 
-Two things are broken in it today, and both need fixing before it can work:
+**The rename is DONE (2026-08-30).** The repo moved to **`becodeb/typely`** and
+its default branch is now **`production`**; `main` no longer exists. Only two
+branches remain, `production` and `dev`, which is exactly the model described
+above. GitHub's rename keeps the history and redirects old `main` links.
 
-1. **The SSH key never parsed.** All ten runs in the workflow's history failed
-   the same way — `ssh.ParsePrivateKey: ssh: no key found`. The
-   `SSH_PRIVATE_KEY` secret exists but its contents are not a usable private
-   key (usually a missing `-----BEGIN`/`END-----` envelope or stripped
-   newlines). Re-adding the secret needs admin.
-2. **It contradicts §13.1.** The script runs `docker compose up -d --build`,
-   which is exactly the full build that OOM-crashes the 956MB VM. If this
-   workflow is ever meant to deploy the frontend, it has to be rewritten around
-   the prebuilt-`dist` procedure instead.
-
-So today the app is deployed by hand, per `DEPLOY.md`. Do not tell anyone a
-merge to `production` publishes anything until both points above are resolved.
-
-**The rename is DONE (2026-08-30).** The repo moved to
-**`becodeb/typely`** and its default branch is now **`production`**; `main` no
-longer exists. Only two branches remain, `production` and `dev`, which is
-exactly the model described above. GitHub's rename keeps the history and
-redirects old `main` links, so nothing had to be recreated.
-
-Three loose ends that came with the move and are NOT done:
-
-1. **The branch ruleset did not travel.** `protect-main` lived on the old repo.
-   `becodeb/typely` has no protection on `production` today — anyone with
-   write access can push straight to it. Add a ruleset on
-   `refs/heads/production` if that matters.
-2. **The Actions secrets did not travel either**, `SSH_PRIVATE_KEY` among them
-   — and it was broken anyway (see above).
-3. **The VM still points at the old remote.** `/opt/apps/typely` on the VPS
-   runs `git pull` against `bautigoni/Mecanografia-BAU-EZES` on a local branch
-   confusingly named `main`. Until it is repointed at `becodeb/typely` and
-   `production`, a pull there fetches the old repo (§13.1).
-
-The old remote is still configured locally as **`bautigoni`**, so the previous
-repo stays reachable for reference:
-`git fetch bautigoni`. Drop it once the move is settled.
+One loose end that came with the move and is NOT done: **`production` has no
+branch protection.** The old repo's `protect-main` ruleset did not travel, so
+today anyone with write access can push straight to it. Add a ruleset on
+`refs/heads/production` if that matters.
 
 **History note.** This repo previously ran `dev` → `master`/`main`, then briefly
-a single `main`, and lived at `bautigoni/Mecanografia-BAU-EZES`. Older docs
+a single `main`, and lived in another GitHub account. Older docs
 describing any of that are stale — fix them.
 
 ## 18. Agent Working Rules
@@ -1076,9 +1040,8 @@ report exactly which files changed, why, and how to test the result.
 Confirm `git status` is clean for the intended change, the build succeeds, the
 container rebuilt and is up (`docker compose ps`), and the smoke test passes
 (`curl -I http://127.0.0.1:3005`). Only then suggest
-`caddy validate && caddy reload` and the public smoke test. Deploy the frontend
-with the prebuilt-`dist` procedure in §13.1 — never a full
-`docker compose build` of `mecanografia` on the 956MB VM.
+Then hand it over: **you do not deploy** — Ezequiel redeploys manually from
+Coolify (§13). Never suggest wiring an autodeploy.
 
 ### Verify responsively
 

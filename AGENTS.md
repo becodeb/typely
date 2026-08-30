@@ -26,7 +26,7 @@ one rather than working around it.
 **TYPELY** (internal codename *EduTic*) is a Spanish-first, gamified typing and
 digital-literacy app for primary school kids: Vite 7 + React 19 + TypeScript +
 Tailwind 4 on the front, Fastify + Drizzle + Postgres 16 behind, three Docker
-containers behind Caddy. Internal ids stay `edutic_*` / `island1..15` for
+containers behind a reverse proxy. Internal ids stay `edutic_*` / `island1..15` for
 backward compatibility; only user-facing strings say "TYPELY".
 
 **Two branches.** `dev` is where the work happens — commit there. `production`

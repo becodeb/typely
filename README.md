@@ -3,7 +3,7 @@
 TYPELY is a gamified Primary School digital-literacy and keyboard-skills
 platform. Frontend: **Vite + React 19 + TypeScript + Tailwind 4**. It is backed
 by a **Fastify + Drizzle + Postgres 16 API** and ships as three Docker
-containers (Nginx frontend, API, Postgres) behind Caddy. The typing engine keeps
+containers (Nginx frontend, API, Postgres) behind a reverse proxy. The typing engine keeps
 reading/writing `localStorage` so play never blocks on the network, and falls
 back to localStorage-only when the API is offline (demo mode).
 
@@ -18,8 +18,9 @@ back to localStorage-only when the API is offline (demo mode).
 Two long-lived branches. **`dev`** is where the work happens. **`production`**
 is what is deployed, and only receives changes that already build, run and are
 ready to go live — through a pull request from `dev`. Never commit to
-`production` directly. See `CLAUDE.md` §17 for the full rules, including the
-pending rename of the deployed branch (still called `main` on GitHub).
+`production` directly. See `CLAUDE.md` §17 for the full rules. Deploys are
+**manual**, through Coolify — merging into `production` publishes nothing by
+itself.
 
 ```bash
 git checkout dev && git pull
