@@ -134,17 +134,46 @@ function parseCsv(text: string): { rows: ParsedRow[]; errors: RowError[] } {
 
 /** Trabajo común a preview e import: valida contra la base y arma el plan.
  *  No escribe nada. */
-async function buildPlan(actor: Actor, csv: string) {
+interface PlanOptions {
+  /** Sede destino. El admin siempre importa en la suya; el superadmin
+   *  tiene que indicarla, porque no pertenece a ninguna. */
+  sedeId?: string;
+  /** Grupo por defecto para las filas que no traen columna `grupo`.
+   *  Lo manda la pantalla de "importar dentro de este grupo". */
+  groupId?: string;
+}
+
+async function buildPlan(actor: Actor, csv: string, opts: PlanOptions = {}) {
   const { rows, errors } = parseCsv(csv);
 
-  const sedeId = actor.role === "admin" ? actor.sedeId : null;
-  if (actor.role === "admin" && !sedeId) {
-    throw new ForbiddenError("Tu cuenta no tiene una sede asignada.");
-  }
-  /* El superadmin tiene que importar dentro de una sede concreta: sin eso
-     las cuentas quedarían colgadas sin institución. */
+  /* Un admin importa SIEMPRE en su sede, mande lo que mande. */
+  const sedeId = actor.role === "admin" ? actor.sedeId : (opts.sedeId ?? null);
   if (!sedeId) {
-    throw new ForbiddenError("Elegí una sede antes de importar. El superadmin no puede importar sin sede.");
+    throw new ForbiddenError(
+      actor.role === "admin"
+        ? "Tu cuenta no tiene una sede asignada."
+        : "Elegí una escuela antes de importar.",
+    );
+  }
+  if (!canActOnSede(actor, sedeId)) {
+    throw new ForbiddenError("No podés importar en otra escuela.");
+  }
+
+  /* El grupo por defecto tiene que existir y ser de esta sede. */
+  let defaultGroup: { id: string; name: string } | null = null;
+  if (opts.groupId) {
+    const [g] = await db
+      .select({ id: schema.groups.id, name: schema.groups.name, sedeId: schema.groups.sedeId })
+      .from(schema.groups)
+      .where(eq(schema.groups.id, opts.groupId))
+      .limit(1);
+    if (!g) throw new ForbiddenError("El grupo indicado no existe.");
+    if (g.sedeId !== sedeId) throw new ForbiddenError("Ese grupo es de otra escuela.");
+    defaultGroup = { id: g.id, name: g.name };
+  }
+  /* Las filas sin grupo caen en el grupo por defecto, si lo hay. */
+  if (defaultGroup) {
+    for (const r of rows) if (!r.groupName) r.groupName = defaultGroup.name;
   }
 
   for (const r of rows) assertCanGrant(actor.role, r.role);
@@ -200,7 +229,8 @@ export async function importRoutes(app: FastifyInstance) {
     const csv = String(req.body ?? "");
     if (!csv.trim()) return reply.code(400).send({ error: "El archivo está vacío." });
 
-    const plan = await buildPlan(actor, csv);
+    const { sedeId, groupId } = req.query as { sedeId?: string; groupId?: string };
+    const plan = await buildPlan(actor, csv, { sedeId, groupId });
     return reply.send({
       willCreate: plan.items.length,
       willSkip: plan.skipped.length,
@@ -225,7 +255,8 @@ export async function importRoutes(app: FastifyInstance) {
     const csv = String(req.body ?? "");
     if (!csv.trim()) return reply.code(400).send({ error: "El archivo está vacío." });
 
-    const plan = await buildPlan(actor, csv);
+    const { sedeId, groupId } = req.query as { sedeId?: string; groupId?: string };
+    const plan = await buildPlan(actor, csv, { sedeId, groupId });
     if (!plan.items.length) {
       return reply.code(400).send({
         error: "No hay ninguna fila que se pueda crear.",

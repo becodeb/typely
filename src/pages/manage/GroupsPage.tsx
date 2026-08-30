@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import type { Group } from "../../types";
 import { api, ApiError } from "../../utils/api";
 import { useSede } from "./ManageShell";
@@ -128,7 +129,14 @@ function GroupsTable({ groups }: { groups: Group[] }) {
         <tbody className="divide-y divide-[#eef1f6]">
           {groups.map((g) => (
             <tr key={g.id} className="hover:bg-[#fafbfc]">
-              <td className="px-5 py-3.5 font-semibold text-[#101828]">{g.name}</td>
+              <td className="px-5 py-3.5">
+                <Link
+                  to={`/gestion/grupos/${g.id}`}
+                  className="font-semibold text-[#101828] hover:text-[#3159e8] hover:underline"
+                >
+                  {g.name}
+                </Link>
+              </td>
               <td className="px-5 py-3.5 text-[#475069]">{gradeLabel(g.grade)}</td>
               <td className="px-5 py-3.5 text-right tabular-nums text-[#475069]">{g.studentCount ?? 0}</td>
               <td className="px-5 py-3.5 text-right tabular-nums">

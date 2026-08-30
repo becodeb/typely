@@ -14,6 +14,9 @@ import { AccountPage } from "./pages/AccountPage";
 import { MissionsPage } from "./pages/MissionsPage";
 import { ManageShell } from "./pages/manage/ManageShell";
 import { GroupsPage } from "./pages/manage/GroupsPage";
+import { GroupDetailPage } from "./pages/manage/GroupDetailPage";
+import { SedesPage } from "./pages/manage/SedesPage";
+import { ImportPage } from "./pages/manage/ImportPage";
 import { useAuth } from "./hooks/useAuth";
 
 /* La pantalla de juego es la más pesada: se carga bajo demanda para que el
@@ -156,7 +159,11 @@ export function App() {
         <Route element={<ProtectedRoute roles={["superadmin", "admin"]} />}>
           <Route path="/gestion" element={<ManageShell />}>
             <Route index element={<Navigate to="/gestion/grupos" replace />} />
+            <Route path="sedes" element={<SedesPage />} />
             <Route path="grupos" element={<GroupsPage />} />
+            <Route path="grupos/:groupId" element={<GroupDetailPage />} />
+            <Route path="grupos/:groupId/importar" element={<ImportPage />} />
+            <Route path="importar" element={<ImportPage />} />
           </Route>
         </Route>
 
