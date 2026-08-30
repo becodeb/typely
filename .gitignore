@@ -49,3 +49,6 @@ screenshots/
 
 # Prompts de fondo armados desde FONDOS.md (scripts/prompt-fondo.mjs)
 .prompts-fondos/
+
+# Borradores de diseno del canvas (scripts/prompt-fondo.mjs y /design)
+.design-isla1/

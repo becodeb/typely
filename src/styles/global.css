@@ -645,19 +645,203 @@ a { color: inherit; text-decoration: none; }
    ──────────────────────────────────────────────────────────────────────── */
 
 /* ════════════════════════════════════════════════════════════════════
+   PANTALLA DE JUEGO — teclado de cristal, placa del objetivo y misión
+   --------------------------------------------------------------------
+   El fondo de cada isla es una escena con un pedestal donde apoya el
+   teclado (ver Images/islands/FONDOS.md). Estas piezas están dibujadas
+   para apoyarse ahí: vidrio esmerilado, aristas de hielo y el degradé de
+   marca para lo que está encendido.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── La tecla ──────────────────────────────────────────────────────────
+   El canto inferior de color es lo que deja escanear la fila de un
+   vistazo, y es la única parte del diseño viejo que se conserva tal cual:
+   sin él se pierde la pista para ubicar la fila central sin leer. El color
+   entra por --gp-fila, que pone cada fila desde el TSX.
+
+   NO SE PUEDE CLICKEAR, Y ES A PROPÓSITO. El teclado de la pantalla es un
+   mapa para encontrar la tecla en el teclado DE VERDAD, que es lo que hay
+   que aprender. Antes eran <button> con hover y sombra de apretado: no
+   hacían nada al clickearlos, pero lo prometían, y un chico que descubre
+   que puede resolver el nivel con el mouse deja de mirar sus manos.
+   `pointer-events: none` hace que el clic pase de largo. */
+.gp-key {
+  position: relative;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: 0.8rem;
+  color: var(--color-text);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.80) 42%,
+    rgba(240, 246, 255, 0.72) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-bottom: 4px solid var(--gp-fila, #59cdb7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -6px 10px -6px rgba(23, 53, 95, 0.16),
+    0 3px 9px rgba(23, 53, 95, 0.13);
+}
+/* La arista de hielo que cruza la tapa. */
+.gp-key::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(118deg, rgba(255, 255, 255, 0.55) 0 34%, rgba(255, 255, 255, 0) 34.6%);
+}
+/* Sin :hover: nada acá reacciona al mouse. */
+
+/* La tecla objetivo: el cristal encendido. Comparte lenguaje con el borde
+   de la misión a propósito — la misión dice qué hacer y el cristal dónde. */
+.gp-key--target {
+  color: #fff;
+  background: linear-gradient(150deg, var(--color-mint) 0%, var(--color-accent-sky) 46%, var(--color-accent-strong) 100%);
+  border-color: rgba(255, 255, 255, 0.85);
+  border-bottom-color: #2545c4;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 0 0 4px rgba(51, 199, 240, 0.28),
+    0 10px 26px rgba(49, 89, 232, 0.45);
+  z-index: 2;
+}
+.gp-key--target::after {
+  background:
+    linear-gradient(118deg, rgba(255, 255, 255, 0.42) 0 30%, rgba(255, 255, 255, 0) 30.6%),
+    linear-gradient(300deg, rgba(255, 255, 255, 0.22) 0 22%, rgba(255, 255, 255, 0) 22.6%);
+}
+/* El hundido lo dispara el TECLADO REAL (lastKey en GameplayPage), no el
+   mouse — por eso es una clase y no :active. */
+.gp-key--pressed {
+  transform: translateY(3px) scale(0.95);
+  border-bottom-width: 1px;
+  background: linear-gradient(180deg, rgba(226, 238, 255, 0.95), rgba(240, 246, 255, 0.9));
+  box-shadow: inset 0 3px 7px rgba(23, 53, 95, 0.20);
+}
+
+/* ── La placa del objetivo ─────────────────────────────────────────────
+   Bisel claro arriba, rebalse frío abajo a la derecha. Reemplaza al
+   rectángulo de vidrio plano: se lee como parte de la isla. */
+.gp-placa {
+  position: relative;
+  overflow: hidden;
+  border-radius: 2.125rem;
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.58) 0%,
+    rgba(255, 255, 255, 0.30) 52%,
+    rgba(214, 236, 255, 0.34) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -18px 30px -22px rgba(51, 199, 240, 0.75),
+    0 22px 60px rgba(54, 86, 134, 0.26);
+}
+.gp-placa::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(112deg, rgba(255, 255, 255, 0.30) 0 26%, rgba(255, 255, 255, 0) 26.7%);
+}
+
+/* ── La barra de objetivo: veta de cristal ─────────────────────────── */
+.gp-riel {
+  height: 0.7rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow: inset 0 2px 5px rgba(23, 53, 95, 0.20);
+}
+.gp-veta {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-mint) 0%, var(--color-accent-sky) 52%, var(--color-accent-strong) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 0 12px rgba(51, 199, 240, 0.55);
+}
+
+/* ── La misión (antes "consigna") ──────────────────────────────────────
+   Los chicos no la leían: se veía igual que el objetivo, que los globos y
+   que todo lo demás, así que nada decía "esto va primero". El borde de
+   degradé encendido queda RESERVADO para esta pieza — si otra tarjeta lo
+   usa, la consigna vuelve a desaparecer. */
+.gp-mision {
+  position: relative;
+  border: 3px solid transparent;
+  border-radius: 1.5rem;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.80)),
+    linear-gradient(120deg, var(--color-mint), var(--color-accent-sky), var(--color-accent-strong), #9b7cff);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  box-shadow: 0 0 0 6px rgba(51, 199, 240, 0.18), 0 14px 34px rgba(49, 89, 232, 0.26);
+  transition: box-shadow 400ms ease, transform 400ms ease;
+}
+/* Al entrar al nivel se anuncia; después baja a reposo para no competir
+   con el objetivo. Vuelve a encenderse con el mismo gatillo de inactividad
+   que ya hace pulsar la tecla pista. */
+.gp-mision--entrada {
+  box-shadow:
+    0 0 0 10px rgba(255, 213, 82, 0.30),
+    0 0 0 20px rgba(255, 213, 82, 0.12),
+    0 16px 40px rgba(49, 89, 232, 0.30);
+  animation: gpMisionEntrada 700ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes gpMisionEntrada {
+  0%   { transform: translateY(-14px) scale(0.94); opacity: 0; }
+  60%  { transform: translateY(2px) scale(1.03); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+.gp-mision__insignia {
+  position: absolute;
+  top: -0.8rem;
+  left: 1.25rem;
+  border-radius: 999px;
+  background: linear-gradient(160deg, #ffd552, #f5b81c);
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  color: #6b4a05;
+  box-shadow: 0 4px 10px rgba(245, 184, 28, 0.45);
+}
+.gp-mision__audio {
+  background: linear-gradient(150deg, var(--color-accent-sky), var(--color-accent-strong));
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 0 5px rgba(51, 199, 240, 0.25), 0 6px 16px rgba(49, 89, 232, 0.4);
+}
+.gp-mision__audio:hover { filter: brightness(1.06); }
+/* Mientras la misión se anuncia, el botón de audio late: es la pista de
+   que la consigna se puede ESCUCHAR, que es lo que necesita el que
+   todavía no lee de corrido. */
+.gp-mision--entrada .gp-mision__audio { animation: gpAudioLate 900ms ease-in-out 3; }
+@keyframes gpAudioLate {
+  0%, 100% { box-shadow: 0 0 0 5px rgba(51, 199, 240, 0.25), 0 6px 16px rgba(49, 89, 232, 0.4); }
+  50%      { box-shadow: 0 0 0 11px rgba(51, 199, 240, 0.16), 0 6px 20px rgba(49, 89, 232, 0.5); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gp-mision--entrada,
+  .gp-mision--entrada .gp-mision__audio { animation: none; }
+}
+
+/* ════════════════════════════════════════════════════════════════════
    COMPACT-HEIGHT PASS — ventana SIN pantalla completa (la barra del
    navegador roba ~120px). El gameplay es una columna flex de altura fija:
    acá achicamos lo flexible (teclas, paddings) para que la consigna, el
    objetivo, lo tipeado y el teclado COMPLETO entren siempre sin recortes.
    Mantener al FINAL del archivo para ganar la cascada.
    ════════════════════════════════════════════════════════════════════ */
+/* La tecla en reposo mide 2.875rem (46px) de alto: las Chromebook del aula
+   son táctiles y por debajo de 44px el dedo no acierta. Estos escalones
+   sólo entran cuando la ventana NO da la altura para eso. */
 .gp-key { min-height: 1.5rem; min-width: 2.25rem; font-size: 0.8rem; }
 @media (max-height: 720px) {
-  .gp-key { height: 1.9rem; }
+  .gp-key { height: 2.35rem; }
 }
 @media (max-height: 640px) {
-  .gp-key { height: 1.65rem; font-size: 0.8rem; }
+  .gp-key { height: 2rem; font-size: 0.8rem; }
 }
 @media (max-height: 560px) {
-  .gp-key { height: 1.5rem; font-size: 0.8rem; }
+  .gp-key { height: 1.75rem; font-size: 0.8rem; }
 }

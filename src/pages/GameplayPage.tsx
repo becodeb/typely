@@ -1,4 +1,4 @@
-import { ArrowRight, RotateCcw, Volume2, X } from "lucide-react";
+import { ArrowRight, RotateCcw, Star, Volume2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getActivityById } from "../data/activities";
@@ -270,6 +270,11 @@ export function GameplayPage() {
   const [isCompleted, setIsCompleted] = useState(false);
   const [isErrorActive, setIsErrorActive] = useState(false);
   const [isIdleHintActive, setIsIdleHintActive] = useState(false);
+  /* La misión se anuncia al entrar al nivel y después baja a reposo, para no
+     competir con el objetivo. Se vuelve a encender con el MISMO gatillo de
+     inactividad que ya hace pulsar la tecla pista: si el chico quedó quieto,
+     lo más probable es que no sepa qué hacer. */
+  const [misionEntrada, setMisionEntrada] = useState(true);
   const [inputSignal, setInputSignal] = useState(0);
   const [unlockedAch, setUnlockedAch] = useState<string[]>([]);
   /* Suma de estrellas a la colección (barra del modal): total ANTES/DESPUÉS de
@@ -485,6 +490,25 @@ export function GameplayPage() {
       window.clearTimeout(hide);
     };
   }, [currentTargetIndex, expectedChar, inputSignal, isCompleted, typed]);
+
+  /* La misión se anuncia al ABRIR el nivel y baja a reposo sola. No se
+     re-dispara con cada objetivo: al tercer acierto ya sería ruido y volvería
+     a ser invisible por costumbre. */
+  useEffect(() => {
+    setMisionEntrada(true);
+    const bajar = window.setTimeout(() => setMisionEntrada(false), 2800);
+    return () => window.clearTimeout(bajar);
+  }, [activity.id]);
+
+  /* Y vuelve a encenderse cuando el chico se queda quieto — el mismo gatillo
+     que hace pulsar la tecla pista. Si no sabe qué hacer, lo primero que
+     tiene que volver a mirar es la consigna. */
+  useEffect(() => {
+    if (!isIdleHintActive || isCompleted) return;
+    setMisionEntrada(true);
+    const bajar = window.setTimeout(() => setMisionEntrada(false), 2000);
+    return () => window.clearTimeout(bajar);
+  }, [isIdleHintActive, isCompleted]);
 
   /* Keep the typed-preview pinned to the most recent character so long inputs
      stay legible without wrapping to a new line. */
@@ -813,18 +837,10 @@ export function GameplayPage() {
         {/* Contador de estrellas de la cuenta — sube al completar un nivel
             (escucha el evento edutic:progress). */}
         <StarCounter />
-        {/* Escuchar consigna — solo el ícono, a la izquierda de Reintentar.
-            (Antes era un botón grande abajo que empujaba el teclado fuera de
-            pantalla en alturas chicas.) */}
-        <button
-          type="button"
-          onClick={listen}
-          className="rounded-full w-12 h-12 flex items-center justify-center text-white bg-gradient-to-br from-accent to-accent-strong shadow-btn hover:scale-105 transition-transform"
-          aria-label="Escuchar consigna"
-          title="Escuchar consigna"
-        >
-          <Volume2 size={22} />
-        </button>
+        {/* El botón de escuchar YA NO VIVE ACÁ: se mudó adentro de la misión.
+            Escondido en la esquina, entre otros tres íconos redondos, no se
+            leía como "la consigna se puede escuchar" — que es justo lo que
+            necesita el chico que todavía no lee de corrido. */}
         <button
           type="button"
           onClick={retry}
@@ -844,12 +860,31 @@ export function GameplayPage() {
         </button>
       </div>
 
-      {/* Header — compact floating glass capsule (Liquid Glass). */}
+      {/* LA MISIÓN — antes era una cápsula de vidrio igual a todas las demás
+          de la pantalla, y los chicos directamente no registraban que había
+          una consigna. Ahora es la ÚNICA pieza con borde de degradé
+          encendido, se anuncia al entrar al nivel y lleva el botón de
+          escuchar adelante. Ver .gp-mision en global.css. */}
       {!isCompleted && (
-        <div className="shrink-0 mt-4 mb-1 flex justify-center px-4 z-20" aria-live="polite">
-          <div className="inline-flex flex-col items-center gap-0.5 rounded-3xl px-7 py-2.5 bg-white/20 backdrop-blur-xl border border-white/35 shadow-[0_10px_34px_rgba(54,86,134,0.18)]">
-            <h1 className="font-display font-bold text-lg sm:text-xl text-text leading-tight">{activity.instruction}</h1>
-            <p className="text-sm text-text/70 font-semibold leading-tight">{feedback}</p>
+        <div className="shrink-0 mt-5 mb-1 flex justify-center px-4 z-20" aria-live="polite">
+          <div className={`gp-mision flex items-center gap-3 sm:gap-4 py-2.5 pl-3 pr-5 sm:pr-6 ${misionEntrada ? "gp-mision--entrada" : ""}`}>
+            <span className="gp-mision__insignia inline-flex items-center gap-1 px-3 py-0.5 font-display font-extrabold text-[11px] uppercase tracking-wider">
+              <Star size={11} fill="currentColor" strokeWidth={0} />
+              Tu misión
+            </span>
+            <button
+              type="button"
+              onClick={listen}
+              className="gp-mision__audio shrink-0 rounded-full w-11 h-11 sm:w-[3.25rem] sm:h-[3.25rem] flex items-center justify-center text-white transition-transform hover:scale-105"
+              aria-label="Escuchar la consigna"
+              title="Escuchar la consigna"
+            >
+              <Volume2 size={22} />
+            </button>
+            <span className="pt-0.5">
+              <h1 className="font-display font-extrabold text-lg sm:text-[1.375rem] text-text leading-tight">{activity.instruction}</h1>
+              <p className="text-[13px] sm:text-sm font-semibold leading-tight text-[#4a5f88]">{feedback}</p>
+            </span>
           </div>
         </div>
       )}
@@ -895,9 +930,9 @@ export function GameplayPage() {
                   <span>Objetivo {visibleObjective} / {totalObjectives}</span>
                   <span>{accuracy}% precisión</span>
                 </div>
-                <div className="h-2.5 rounded-full bg-white/45 overflow-hidden shadow-[inset_0_1px_3px_rgba(23,53,95,0.18)] border border-white/50">
+                <div className="gp-riel">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-mint via-accent to-accent-strong transition-all duration-500 ease-out"
+                    className="gp-veta transition-all duration-500 ease-out"
                     style={{ width: `${Math.round((visibleObjective / totalObjectives) * 100)}%` }}
                   />
                 </div>
@@ -906,7 +941,7 @@ export function GameplayPage() {
               {/* Target — the hero. A light floating glass card holds ONLY the
                   letter/word so it reads as the focal point of the scene. */}
               <div
-                className={`inline-flex items-center justify-center rounded-[2.25rem] px-10 py-3 sm:px-14 sm:py-5 bg-white/20 backdrop-blur-xl border border-white/35 shadow-[0_22px_60px_rgba(54,86,134,0.28)] ${isIdleHintActive ? "animate-target-pulse" : ""}`}
+                className={`gp-placa inline-flex items-center justify-center px-10 py-3 sm:px-14 sm:py-5 ${isIdleHintActive ? "animate-target-pulse" : ""}`}
               >
                 <strong
                   ref={targetScrollRef}
@@ -1066,13 +1101,17 @@ export function GameplayPage() {
             /* Teclas esmeriladas blancas y cohesivas. El color de cada fila
                vive SOLO en el borde inferior (el "lado" 3D de la tecla), así
                se conserva la pista de color para escanear el home-row sin el
-               ruido de rellenos arcoíris en cada tecla. */
+               ruido de rellenos arcoíris en cada tecla.
+
+               El tono va por --gp-fila y ahora son colores de MARCA (§5) en
+               vez de los pasteles sueltos de Tailwind, para que el teclado
+               pertenezca a la misma paleta que el resto del juego. */
             const rowKeyTone: Record<string, string> = {
-              num: "bg-white/75 text-slate-700 border-white/80 border-b-amber-300",
-              top: "bg-white/75 text-slate-700 border-white/80 border-b-pink-300",
-              home: "bg-white/75 text-slate-700 border-white/80 border-b-emerald-300",
-              bot: "bg-white/75 text-slate-700 border-white/80 border-b-violet-300",
-              mod: "bg-white/75 text-slate-700 border-white/80 border-b-sky-300",
+              num: "#ffd552",   // dorado
+              top: "#ff9fca",   // rosa
+              home: "#59cdb7",  // menta
+              bot: "#9b7cff",   // violeta
+              mod: "#33c7f0",   // celeste
             };
             return (
               <div
@@ -1088,28 +1127,35 @@ export function GameplayPage() {
                   const isWide = key === "Backspace" || key === "Shift" || key === "Enter";
 
                   const keyClasses = [
-                    "gp-key relative rounded-xl font-extrabold transition-all duration-100 border border-b-[3px] backdrop-blur-sm",
-                    "shadow-[0_2px_7px_rgba(23,53,95,0.10)]",
-                    "hover:-translate-y-[2px] hover:bg-white/95",
-                    "active:translate-y-[1px] active:border-b active:shadow-sm",
+                    "gp-key font-display font-bold transition-all duration-100",
                     "flex items-center justify-center select-none",
-                    isSpace ? "w-48 sm:w-72 h-8 sm:h-9 text-sm" : isWide ? "w-16 sm:w-24 h-8 sm:h-9 text-xs" : "w-10 h-8 sm:w-12 sm:h-9 text-sm",
-                    // Target/combo override the row colour with the brand gradient.
-                    isTarget && !isCombo
-                      ? "bg-gradient-to-br from-mint via-accent to-accent-strong text-white border-accent-strong border-b-accent-strong shadow-[0_8px_22px_rgba(49,89,232,0.5)] scale-110 animate-target-pulse"
-                      : isCombo
-                        ? "bg-gradient-to-br from-accent to-accent-strong text-white border-accent-strong border-b-accent-strong shadow-[0_8px_22px_rgba(49,89,232,0.55)] scale-110 animate-target-pulse"
-                        : rowKeyTone[row.tone],
+                    isSpace
+                      ? "w-48 sm:w-[16.75rem] h-10 sm:h-[2.875rem] text-sm"
+                      : isWide
+                        ? "w-[4.5rem] sm:w-[6.75rem] h-10 sm:h-[2.875rem] text-xs px-1"
+                        : "w-11 h-10 sm:w-[3.25rem] sm:h-[2.875rem] text-[17px]",
+                    (isTarget || isCombo) ? "gp-key--target scale-110 animate-target-pulse" : "",
                     isFindHint ? "animate-key-find ring-4 ring-accent-pink/50" : "",
-                    isPressed ? "animate-key-pop scale-90" : "",
+                    isPressed ? "gp-key--pressed animate-key-pop" : "",
                   ]
                     .filter(Boolean)
                     .join(" ");
 
+                  /* <span> y no <button>: el teclado de la pantalla es un MAPA
+                     para encontrar la tecla en el teclado de verdad, que es lo
+                     que hay que aprender. Como <button> con hover prometía un
+                     clic que nunca hizo nada, y un chico que cree que puede
+                     resolver el nivel con el mouse deja de mirar sus manos.
+                     El pointer-events: none va en .gp-key. */
                   return (
-                    <button key={key} type="button" className={keyClasses} tabIndex={-1}>
+                    <span
+                      key={key}
+                      className={keyClasses}
+                      style={{ ["--gp-fila" as string]: rowKeyTone[row.tone] }}
+                      aria-hidden="true"
+                    >
                       {key === "Space" ? "Espacio" : key}
-                    </button>
+                    </span>
                   );
                 })}
               </div>
