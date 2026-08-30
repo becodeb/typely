@@ -111,10 +111,16 @@ La composición tiene tres franjas y cada una tiene un trabajo:
    Una plataforma ancha y despejada, centrada, que ocupe del 22 % al 78 % del
    ancho. Es la mesa donde el juego apoya un teclado flotante. Tiene que ser
    del material de esa isla, como una versión grande del disco donde se apoyan
-   los botones de nivel. Su superficie tiene que ser de VALOR MEDIO y textura
-   pareja: encima van teclas claras con letras oscuras, y si la superficie es
-   muy clara, muy oscura o muy estampada, las teclas dejan de leerse.
-   Podés decorar los bordes de la plataforma, pero el centro va limpio.
+   los botones de nivel.
+
+   La superficie tiene que ser de TONO MEDIO, claramente más oscura que el
+   cielo: piedra mojada, madera, roca, metal opaco. NO mármol claro, NO piedra
+   blanca, NO nada de valor parecido al del cielo. Encima van teclas casi
+   blancas, y si el piso es igual de claro el teclado se funde y deja de
+   leerse como un objeto apoyado. Comparada con una tecla blanca, la
+   plataforma tiene que verse NOTORIAMENTE más oscura.
+
+   Textura pareja y centro limpio. Podés decorar los bordes.
 
 2) FRANJA DEL MEDIO (del 20 % al 60 % de la altura) — EL AIRE.
    Acá flota una tarjeta de vidrio translúcido con texto azul oscuro. Necesita
@@ -189,7 +195,9 @@ Lo que NO puede cambiar, porque es lo que hace que los quince fondos sean
 intercambiables:
 - El encuadre y la altura del horizonte.
 - La plataforma de abajo: mismo lugar, mismo ancho (del 22 % al 78 %), misma
-  altura de su superficie, mismo centro despejado y de valor medio.
+  altura de su superficie y mismo centro despejado. Su tono tiene que seguir
+  siendo MEDIO y claramente más oscuro que el cielo, aunque cambie el
+  material: encima van teclas casi blancas y si el piso es claro se funden.
 - La franja del medio clara y sin detalle, entre el 20 % y el 60 % de la
   altura.
 - La franja de arriba tranquila, primer 12 %.
@@ -281,8 +289,20 @@ así que no hay ninguna tabla que actualizar.
 
 ## 5. Verificar
 
-Abrí un nivel de esa isla y mirá los tres tamaños. El que manda es el 3:2,
-que es la Chromebook:
+Primero lo que se mide, que es el error que más caro sale porque se propaga a
+todas las islas que salgan de ese molde:
+
+```bash
+node scripts/medir-pedestal.mjs Images/islands/_default/REFERENCIA-fondo-nivel.png
+```
+
+Mide el tono de la plataforma justo donde caen las teclas y lo compara con el
+color de una tecla. **Tiene que dar 2,5:1 o más.** Los fondos que hoy funcionan
+dan entre 3,7 y 4,5; el placeholder que comparten las islas 1 a 5 da 1,56 y
+ahí las teclas se funden con el piso.
+
+Después, abrí un nivel de esa isla y mirá los tres tamaños. El que manda es el
+3:2, que es la Chromebook:
 
 ```
 /gameplay/island2-l1

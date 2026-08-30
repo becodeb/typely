@@ -68,12 +68,42 @@ const arg = process.argv[2];
 
 if (arg === "--todos") {
   mkdirSync(SALIDA, { recursive: true });
+
+  const partes = [
+    "# Prompts de fondo de nivel — los quince",
+    "",
+    "Generado con `node scripts/prompt-fondo.mjs --todos`. No se edita a mano:",
+    "el prompt y los temas viven en `Images/islands/FONDOS.md`, y si se tocan acá",
+    "se pierden en la próxima corrida.",
+    "",
+    "## Qué adjuntar, siempre lo mismo",
+    "",
+    "En los quince van **tres imágenes, en este orden**:",
+    "",
+    "1. **El molde**, que es siempre el mismo archivo:",
+    "   `Images/islands/_default/REFERENCIA-fondo-nivel.png`",
+    "2. **La isla de ese mundo**: `public/assets/islands/islandN/island.webp`",
+    "3. **El botón de ese mundo**: `public/assets/islands/islandN/button.webp`",
+    "",
+    "Cambian sólo las dos últimas, y sólo en el número de la carpeta. Debajo de",
+    "cada título están las rutas ya escritas.",
+    "",
+    "---",
+    "",
+  ];
+
   for (const id of temas.keys()) {
-    const { texto } = armar(id);
+    const { mundo, adjuntos, texto } = armar(id);
     writeFileSync(`${SALIDA}/${id}.txt`, texto, "utf8");
+    partes.push(`## ${id} — ${mundo}`, "");
+    partes.push("Adjuntar:", "");
+    adjuntos.forEach(([que, ruta], i) => partes.push(`${i + 1}. ${que} — \`${ruta}\``));
+    partes.push("", "```", texto.trimEnd(), "```", "", "---", "");
   }
-  console.log(`Quince prompts escritos en ${SALIDA}/  (island1.txt … island15.txt)`);
-  console.log("Abrilos, copiá el contenido y adjuntá las tres imágenes que dice cada uno.");
+
+  writeFileSync(`${SALIDA}/TODOS.md`, partes.join("\n"), "utf8");
+  console.log(`Los quince, uno por archivo:  ${SALIDA}/island1.txt … island15.txt`);
+  console.log(`Todos juntos en uno:          ${SALIDA}/TODOS.md`);
   process.exit(0);
 }
 
