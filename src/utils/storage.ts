@@ -31,12 +31,19 @@ export function isDemoMode(): boolean {
 
 /** A dónde va cada rol después de entrar.
  *
- *  Hoy solo existe la superficie del alumno. Las pantallas de docente y
- *  administración se van a construir de cero: hasta que existan, quien no
- *  es alumno entra igual pero no tiene todavía a dónde ir, y lo decimos
- *  explícitamente en vez de mandarlo a una ruta rota. */
+ *  El docente todavía no tiene pantalla propia: entra igual, pero cae en
+ *  una que lo dice explícitamente en vez de mandarlo a una ruta rota o al
+ *  mapa de islas, que es del alumno. */
 export function routeForRole(role: Role): string {
-  return role === "alumno" ? "/mundos" : "/sin-pantalla";
+  switch (role) {
+    case "alumno":
+      return "/mundos";
+    case "superadmin":
+    case "admin":
+      return "/gestion/grupos";
+    case "docente":
+      return "/sin-pantalla";
+  }
 }
 
 export function roleLabel(role: Role): string {
