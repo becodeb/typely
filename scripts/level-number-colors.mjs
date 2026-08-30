@@ -1,20 +1,31 @@
 import sharp from "sharp";
 import { botonDe } from "./island-paths.mjs";
 
-/* Color del número para un nivel COMPLETADO, uno por isla.
+/* Color del número de cada nivel, una fila por isla.
    ---------------------------------------------------------------------
-   Sin completar el número va blanco, que es lo que más contrasta. Completado
-   tiene que verse distinto de un vistazo, y para eso necesita color propio —
-   pero un color que pegue con el botón de esa isla, no un verde de sistema
-   igual para las quince.
+   SIN COMPLETAR el número va BLANCO en las quince. Es lo que más contrasta
+   contra cualquier disco y no hay que pensarlo por isla.
 
-   La regla: se mide el color que el número tiene DETRÁS (no el disco entero:
-   justo la franja donde se dibuja), y se busca su COMPLEMENTARIO PARTIDO —
-   el tono opuesto, traído un 25 % de vuelta hacia el original. Es la relación
-   que en teoría del color contrasta sin pelearse: el opuesto puro chilla, el
-   análogo no se despega. Después se le ajusta la luminosidad hasta pasar
-   4.5:1 contra ese fondo, yendo hacia el lado que tenga lugar: si el disco es
-   oscuro el número se aclara, y si es claro se oscurece.
+   COMPLETADO toma el color del PROPIO BOTÓN, más oscuro. Se mide el color que
+   el número tiene detrás — no el disco entero: justo la franja donde se
+   dibuja — se conserva su TONO y se le baja la luminosidad hasta que se lee.
+   La idea es que el número completado se distinga del botón sin gritar como
+   el blanco: mismo color, apagado y hundido, como si estuviera grabado.
+
+   Dos detalles que no son adorno:
+
+     - La saturación se sostiene en un mínimo. Al oscurecer en HSL un disco
+       poco saturado sale GRIS, y el gris ya significa otra cosa en esta
+       pantalla: es el color del número de un nivel BLOQUEADO. Un número
+       completado gris se leería como bloqueado, que es lo contrario.
+
+     - Si el disco YA es oscuro, bajar la luminosidad no gana contraste — no
+       hay lugar hacia abajo. En ese caso se sube, y sale un tinte claro del
+       mismo tono. Sigue siendo el color del botón y sigue siendo más suave
+       que el blanco del nivel sin completar, que es lo que se pedía.
+
+   Correr:  node scripts/level-number-colors.mjs
+   Pegar la última tabla en LEVEL_NUMBER_DONE (src/utils/assets.ts).
 */
 
 const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
@@ -68,93 +79,84 @@ async function fondoDelNumero(file) {
   return [r / n, g / n, b / n].map(Math.round);
 }
 
-/* Paleta de premio. Son tonos que se mantienen VIVOS cuando están claros —
-   dorado, lima, menta, turquesa, cielo, rosa, lila. Ese es el punto: para
-   contrastar contra un disco medio u oscuro el número tiene que ser claro, y
-   en la mayoría de los tonos "claro" significa lavado. Estos no.
+/* Objetivo de contraste del número completado contra su disco.
 
-   Varios salen de la paleta de marca (§5): menta #5be8ba, turquesa #54e8c6,
-   rosa #ff9fca, dorado #facc15. */
-const PREMIO = [
-  { nombre: "dorado",    rgb: [250, 204, 21] },
-  { nombre: "ambar",     rgb: [255, 159, 67] },
-  { nombre: "lima",      rgb: [183, 240, 0] },
-  { nombre: "menta",     rgb: [91, 232, 186] },
-  { nombre: "turquesa",  rgb: [84, 232, 198] },
-  { nombre: "cielo",     rgb: [127, 215, 255] },
-  { nombre: "rosa",      rgb: [255, 159, 202] },
-  { nombre: "lila",      rgb: [196, 166, 255] },
-  /* Tintes claros. Se usan sólo cuando ningún vivo llega al piso: un disco de
-     luminosidad media no contrasta con nada saturado, y hay que irse más
-     claro. Siguen teniendo tono, así que al lado de un número blanco de un
-     nivel sin completar se distinguen. */
-  { nombre: "oro palido",  rgb: [255, 230, 128], tinte: true },
-  { nombre: "menta clara", rgb: [184, 255, 227], tinte: true },
-  { nombre: "cielo claro", rgb: [199, 238, 255], tinte: true },
-  { nombre: "rosa claro",  rgb: [255, 209, 230], tinte: true },
-  /* Para los discos CLAROS hace falta ir al otro lado: oscuro pero saturado,
-     no gris. */
-  { nombre: "vino",      rgb: [122, 20, 58], oscuro: true },
-  { nombre: "indigo",    rgb: [45, 42, 130], oscuro: true },
-  { nombre: "bosque",    rgb: [16, 78, 52], oscuro: true },
-  { nombre: "teja",      rgb: [150, 52, 18], oscuro: true },
-];
+   3.2 y no 4.5, y la diferencia importa. El piso exigible para texto grande es
+   3:1, y este número es enorme y en negrita, muy por encima del tamaño que
+   pide ese piso. Con 4.5 pasaban dos cosas, las dos malas: los discos medios
+   había que llevarlos casi a NEGRO — y negro no es "el color del botón más
+   oscuro", es negro —, y los nueve discos que ya son oscuros no llegaban
+   nunca, así que se daban vuelta a tintes claros. Con 3.2 el número se
+   oscurece lo justo para leerse y sigue siendo del color del disco.
 
-/** Distancia entre tonos por la vuelta corta de la rueda, en vueltas (0..0.5). */
-const dTono = (a, b) => { const d = Math.abs(a - b); return Math.min(d, 1 - d); };
+   La búsqueda para APENAS pasa el objetivo, no sigue de largo: cuanto menos se
+   aleje del color del disco, más se lee como el mismo color apagado, que es lo
+   que se pidió. */
+const OBJETIVO = 3.2;
+/* Por debajo de esto no se acepta un color: sería ilegible. */
+const PISO = 3;
 
-/* Piso de contraste. 3.5:1 y no 4.5: el número es enorme y en negrita, el
-   mínimo exigible para texto grande es 3:1, y además lleva sombra oscura
-   debajo. Con 4.5 sólo sobrevivían los dos o tres tonos más claros de la
-   paleta y las quince islas terminaban con el mismo color, que es justo lo
-   que no se quiere. */
-const PISO = 3.5;
+/* Mínimo de saturación al oscurecer. Sin esto, un disco grisáceo da un número
+   gris oscuro y el gris ya es el color de "bloqueado" en esta pantalla. */
+const SAT_MIN_OSCURO = 0.45;
+const SAT_MIN_CLARO = 0.35;
+
+/** Recorre la luminosidad en una dirección buscando el objetivo, sin tocar el
+ *  tono. Devuelve el mejor que encontró aunque no haya llegado. */
+function buscar(fondo, dir, satMin) {
+  const [h, s, l] = rgb2hsl(...fondo);
+  const sat = Math.min(0.9, Math.max(satMin, s));
+  let mejor = null;
+  for (let nl = l; dir < 0 ? nl >= 0 : nl <= 1; nl += dir * 0.005) {
+    const rgb = hsl2rgb(h, sat, nl);
+    const k = contraste(rgb, fondo);
+    if (!mejor || k > mejor.k) mejor = { rgb, k };
+    if (k >= OBJETIVO) return { rgb, k, llego: true };
+  }
+  return { ...mejor, llego: false };
+}
 
 function colorCompletado(fondo) {
-  const [h] = rgb2hsl(...fondo);
-  /* Complementario partido: el opuesto traído un 25 % de vuelta. Es la
-     relación que contrasta sin pelearse — el opuesto puro chilla y el
-     análogo no se despega. */
-  const objetivo = (h + 0.5 - 0.5 * 0.25 + 1) % 1;
-
-  const puntuados = PREMIO.map((c) => {
-    const [hc] = rgb2hsl(...c.rgb);
-    return { ...c, k: contraste(c.rgb, fondo), armonia: dTono(hc, objetivo) };
-  });
-  const porArmonia = (a, b) => a.armonia - b.armonia;
-
-  /* Tres escalones, en orden de preferencia. Dentro de cada uno gana el tono
-     más cercano al complementario partido.
-       1. Vivo: es el que mejor se ve como premio.
-       2. Tinte claro: cuando el disco es de luminosidad media y no contrasta
-          con nada saturado.
-       3. Oscuro: último recurso, sólo si el disco es tan claro que no hay
-          nada más claro todavía. Un número oscuro tiende a leerse como
-          deshabilitado, que es lo contrario de lo que se quiere decir. */
-  for (const tier of [
-    (c) => !c.tinte && !c.oscuro,
-    (c) => c.tinte,
-    (c) => c.oscuro,
-  ]) {
-    const pasan = puntuados.filter((c) => tier(c) && c.k >= PISO);
-    if (pasan.length) return pasan.sort(porArmonia)[0];
-  }
-  return puntuados.sort((a, b) => b.k - a.k)[0];
+  /* Primero hacia abajo, que es lo pedido: el color del botón pero más
+     oscuro. */
+  const oscuro = buscar(fondo, -1, SAT_MIN_OSCURO);
+  if (oscuro.llego) return { ...oscuro, sentido: "oscuro" };
+  /* El disco ya era oscuro y abajo no queda lugar. Se sube: tinte claro del
+     mismo tono, que sigue siendo el color del botón y sigue siendo más suave
+     que el blanco. */
+  const claro = buscar(fondo, +1, SAT_MIN_CLARO);
+  if (claro.llego) return { ...claro, sentido: "claro" };
+  /* Ninguno llegó al objetivo: gana el que más contraste haya conseguido. */
+  return oscuro.k >= claro.k
+    ? { ...oscuro, sentido: "oscuro" }
+    : { ...claro, sentido: "claro" };
 }
 
 const filas = [];
 for (let n = 1; n <= 15; n++) {
   const id = `island${n}`;
   const fondo = await fondoDelNumero(botonDe(id));
+  const [, , l] = rgb2hsl(...fondo);
   const elegido = colorCompletado(fondo);
-  filas.push({ id, fondo, color: hex(elegido.rgb), nombre: elegido.nombre, k: elegido.k, blanco: contraste([255, 255, 255], fondo) });
+  filas.push({
+    id, fondo, luz: l,
+    color: hex(elegido.rgb), k: elegido.k, sentido: elegido.sentido,
+    blanco: contraste([255, 255, 255], fondo),
+  });
 }
 
-console.log("isla        fondo del numero    blanco    completado            contraste");
+console.log("isla       fondo del numero   luz   BLANCO (sin completar)   COMPLETADO");
 for (const f of filas) {
+  const alertaBlanco = f.blanco < PISO ? "  <-- NO LLEGA A 3:1" : "";
+  const alertaColor = f.k < PISO ? "  <-- NO LLEGA A 3:1" : f.k < OBJETIVO ? "  (por debajo de 4.5)" : "";
   console.log(
-    `${f.id.padEnd(10)} rgb(${f.fondo.join(",").padEnd(11)})  ${f.blanco.toFixed(2)}:1   ${f.color} ${f.nombre.padEnd(9)}  ${f.k.toFixed(2)}:1`
+    `${f.id.padEnd(10)} rgb(${f.fondo.join(",").padEnd(11)}) ${f.luz.toFixed(2)}  ` +
+    `${f.blanco.toFixed(2)}:1${alertaBlanco.padEnd(22)}  ` +
+    `${f.color} ${f.sentido.padEnd(6)} ${f.k.toFixed(2)}:1${alertaColor}`
   );
 }
-console.log("\n// para pegar en assets.ts");
-for (const f of filas) console.log(`  ${(f.id + ":").padEnd(10)} "${f.color}",   // ${f.nombre} — ${f.k.toFixed(2)}:1`);
+
+console.log("\n// para pegar en LEVEL_NUMBER_DONE (src/utils/assets.ts)");
+for (const f of filas) {
+  console.log(`  ${(f.id + ":").padEnd(10)} "${f.color}",   // ${f.sentido === "oscuro" ? "tono propio oscurecido" : "tono propio aclarado (disco oscuro)"} — ${f.k.toFixed(2)}:1`);
+}

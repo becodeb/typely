@@ -164,46 +164,56 @@ export function levelButtonFor(worldId: string, pressed = false): string {
 /* =====================================================================
    COLOR DEL NÚMERO CUANDO EL NIVEL ESTÁ COMPLETADO
    ---------------------------------------------------------------------
-   Sin completar, el número va BLANCO: es lo que más contrasta contra
-   cualquier disco. Completado necesita verse distinto de un vistazo, y
-   para eso necesita color — pero uno que pegue con el botón de esa isla,
-   no un verde de sistema igual para las quince.
+   Sin completar, el número va BLANCO en las quince, sin excepciones.
 
-   Cada valor sale de medir el color que el número tiene realmente detrás
-   en ese botón y buscar su COMPLEMENTARIO PARTIDO: el tono opuesto,
-   traído un 25 % de vuelta hacia el original. Es la relación que
-   contrasta sin pelearse — el opuesto puro chilla y el análogo no se
-   despega. Después se elige, de una paleta de tonos que se mantienen
-   vivos, el más cercano a ese tono que pase 3.5:1 de contraste.
+   Completado toma el color del PROPIO BOTÓN, más oscuro: el mismo tono del
+   disco con la luminosidad bajada hasta que se lee. Se distingue del botón
+   sin gritar como el blanco — queda como grabado en el disco —, y así el
+   contraste entre un nivel hecho y uno pendiente se ve de un vistazo sin
+   que los hechos compitan por la atención.
+
+   Antes cada isla llevaba el COMPLEMENTARIO PARTIDO de su disco, elegido de
+   una paleta de tonos vivos. Contrastaba bien pero hacía lo contrario de lo
+   que conviene: los niveles ya hechos eran los que más saltaban de la
+   pantalla, y el que faltaba se perdía entre ellos.
+
+   Dos cosas del cálculo que no son adorno, y están explicadas largo en el
+   script que los genera:
+     - La saturación tiene un mínimo. Oscurecer un disco poco saturado da
+       GRIS, y el gris ya significa "bloqueado" en esta pantalla.
+     - Cuatro discos (3, 8, 13 y 15) son tan oscuros que no hay lugar hacia
+       abajo: por debajo de ellos ni el negro llega al piso de contraste.
+       Ahí el número va hacia el otro lado y sale un tinte CLARO del mismo
+       tono, que sigue siendo el color del botón y sigue siendo más suave
+       que el blanco del nivel pendiente.
 
    Se regeneran con:  node scripts/level-number-colors.mjs
-
-   Casi todos son claros a propósito. La isla 1 es la excepción: su disco
-   es un turquesa muy claro — de hecho es la única donde el número blanco
-   queda flojo, 2.80:1 — así que ahí el número completado va oscuro.
+   Para mirarlos:     node scripts/preview-level-numbers.mjs
 ===================================================================== */
 const LEVEL_NUMBER_DONE: Partial<Record<string, string>> = {
-  island1:  "#7a143a",   // vino sobre turquesa claro   — 3.75:1
-  island2:  "#b8ffe3",   // menta clara sobre verdeazul — 3.49:1
-  island3:  "#5be8ba",   // menta sobre borgoña         — 4.30:1
-  island4:  "#104e34",   // bosque sobre pétalo rosa    — 5.69:1
-  island5:  "#b8ffe3",   // menta clara sobre azul      — 3.42:1
-  island6:  "#facc15",   // dorado sobre índigo         — 3.63:1
-  island7:  "#b8ffe3",   // menta clara sobre terracota — 3.40:1
-  island8:  "#ff9fca",   // rosa sobre pizarra          — 4.05:1
-  island9:  "#b8ffe3",   // menta clara sobre naranja   — 3.97:1
-  island10: "#54e8c6",   // turquesa sobre verde musgo  — 3.59:1
-  island11: "#5be8ba",   // menta sobre frambuesa       — 3.51:1
-  island12: "#54e8c6",   // turquesa sobre ocre         — 4.05:1
-  island13: "#b7f000",   // lima sobre violeta          — 5.31:1
-  island14: "#facc15",   // dorado sobre verdeazul      — 3.56:1
-  island15: "#ff9fca",   // rosa sobre azul             — 4.19:1
+  island1:  "#244c5f",   // azul del disco, oscurecido      — 3.28:1
+  island2:  "#153831",   // verde del disco, oscurecido     — 3.22:1
+  island3:  "#d6aab1",   // rosa del disco, aclarado        — 3.22:1
+  island4:  "#ba3f1c",   // terracota del disco, oscurecido — 3.22:1
+  island5:  "#0c3362",   // azul del disco, oscurecido      — 3.24:1
+  island6:  "#0f172b",   // índigo del disco, oscurecido    — 3.21:1
+  island7:  "#55271a",   // teja del disco, oscurecida      — 3.21:1
+  island8:  "#8dabc8",   // pizarra del disco, aclarada     — 3.21:1
+  island9:  "#3f230f",   // naranja del disco, oscurecido   — 3.20:1
+  island10: "#0b1d0b",   // verde del disco, oscurecido     — 3.21:1
+  island11: "#320f18",   // frambuesa del disco, oscurecida — 3.20:1
+  island12: "#0b0904",   // ocre del disco, oscurecido      — 3.21:1
+  island13: "#cc9fd1",   // violeta del disco, aclarado     — 3.24:1
+  island14: "#0a1b18",   // verdeazul del disco, oscurecido — 3.26:1
+  island15: "#8ba4e1",   // azul del disco, aclarado        — 3.22:1
 };
 
-/** Color del número de un nivel COMPLETADO en ese mundo. El menta de marca
- *  queda de reserva para un mundo que todavía no tenga el suyo. */
+/** Color del número de un nivel COMPLETADO en ese mundo. La reserva es un
+ *  pizarra oscuro, que es lo que corresponde sobre el botón `_default`: gris
+ *  piedra. Ojo si se cambia — tiene que seguir siendo oscuro y no gris puro,
+ *  porque el gris es el color del número BLOQUEADO. */
 export function levelNumberDoneColor(worldId: string): string {
-  return LEVEL_NUMBER_DONE[worldId] ?? "#5be8ba";
+  return LEVEL_NUMBER_DONE[worldId] ?? "#26333f";
 }
 
 

@@ -962,6 +962,24 @@ export function IslandDetailPage() {
                  el botón medía 102.6 px y el número 24.84 px. */
               const numSize = `${(24.21 * numScale * (position.numSize ?? 1)).toFixed(2)}cqw`;
 
+              /* Contorno oscuro del número BLANCO, en cqw como todo lo demás.
+                 El blanco solo no alcanza en todos los discos: el de la isla 4
+                 es un rosa pálido y el número quedaba en 1.71:1 — se leía
+                 apenas —, y el de la isla 1 en 2.81:1, los dos por debajo del
+                 piso de 3:1 que pide un texto grande.
+
+                 Se resuelve con contorno y no cambiando el color porque la
+                 regla es que el número pendiente sea blanco en las quince: es
+                 lo que hace que se reconozca de una isla a otra. Con el
+                 contorno el blanco se lee sobre cualquier disco, por claro que
+                 sea, y las otras trece sólo ganan definición.
+
+                 paint-order: stroke pinta el contorno DETRÁS del relleno; sin
+                 eso el trazo se come el glifo desde el borde y el número
+                 adelgaza. Va sólo en el blanco: el número completado es oscuro
+                 y un contorno oscuro alrededor sólo lo engordaría. */
+              const numStroke = `${(24.21 * numScale * (position.numSize ?? 1) * 0.11).toFixed(2)}cqw`;
+
               /* Corrimiento del número respecto del centro del PNG, por nivel.
                  En cqw (% del ancho del botón), nunca en px: el centro del
                  lienzo deja de caer sobre el centro visible del disco apenas
@@ -1088,12 +1106,15 @@ export function IslandDetailPage() {
                     style={{ transform: `translate(${numHx}cqw, ${numHy + lift}cqw)` }}
                   >
                     <span style={{ transform: numTransform }}>
-                      {/* Sin completar el número va blanco, que es lo que más
-                          contrasta contra cualquier disco. Completado lleva el
-                          color propio de esa isla — derivado del disco de SU
-                          botón, ver levelNumberDoneColor en utils/assets. La
-                          sombra va en los dos casos: es lo que despega el
-                          número del arte cuando el disco tiene degradé. */}
+                      {/* Sin completar el número va BLANCO en las quince islas,
+                          con un contorno oscuro que lo hace legible incluso
+                          sobre los discos claros (ver numStroke arriba).
+                          Completado lleva el color del propio botón oscurecido
+                          — ver levelNumberDoneColor en utils/assets —, así el
+                          nivel hecho se distingue sin robarle la atención al
+                          que falta. La sombra va en los dos casos: es lo que
+                          despega el número del arte cuando el disco tiene
+                          degradé. */}
                       <span
                         className={[
                           "font-display font-black select-none",
@@ -1102,7 +1123,11 @@ export function IslandDetailPage() {
                         ].filter(Boolean).join(" ")}
                         style={{
                           fontSize: numSize,
-                          ...(isCompleted && !isBlocked ? { color: levelNumberDoneColor(world.id) } : {}),
+                          ...(isCompleted && !isBlocked
+                            ? { color: levelNumberDoneColor(world.id) }
+                            : !isBlocked
+                              ? { WebkitTextStroke: `${numStroke} rgba(0,0,0,0.5)`, paintOrder: "stroke" }
+                              : {}),
                         }}
                       >
                         {level.levelNumber}

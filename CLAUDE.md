@@ -504,25 +504,45 @@ leaves, ferns, sand — the smaller the button has to be drawn to fit the canvas
 Practical consequence: **islands whose base came out small need a higher `scale`
 on their nodes.** That is per-island tuning done once in the visual editor.
 
-**The number's contrast is a hard requirement, not a nicety.** The game draws a
-large white number on the disc, so the disc must be an even, mid-to-dark colour.
-Measured across the fifteen: 2.80:1 (island 1, the only one below the 3:1 floor
-for large text) up to 8.0:1. `scripts/lighten-disc.mjs` can lighten or darken
-just the disc without touching the rest — it samples the disc's own hue and
-matches by hue and saturation, never by lightness, so a gradient survives.
+**The number's colour says one thing: done or not done.** Not completed →
+**white**, on all fifteen without exception. Completed → **that button's own
+colour, darkened**: the hue sampled from the disc with its lightness pushed down
+until it clears contrast. A finished level then reads as engraved into its own
+disc, and the one you still have to play is the only white thing on the island.
 
-**The number's colour is per island too.** Not completed → **white**, the
-highest-contrast option on any disc. Completed → a colour of that island's own,
-so progress reads at a glance without a system green pasted over fifteen
-different buttons. Each value comes from measuring what the number actually
-sits on in that button and taking its **split complement** — the opposite hue
-pulled 25 % back toward the original, the relation that contrasts without
-clashing — then picking, from a palette of hues that stay vivid, the nearest one
-clearing 3.5:1. They live in `LEVEL_NUMBER_DONE` / `levelNumberDoneColor()` and
-regenerate with `node scripts/level-number-colors.mjs`. Almost all are light;
-island 1 is the exception and goes dark, because its disc is the one pale enough
-that white itself only reaches 2.80:1 — the completed colour is what makes that
-island legible.
+That direction matters and it used to be backwards. Completed numbers were the
+**split complement** of the disc picked from a palette of vivid hues, which
+contrasted beautifully and drew the eye to exactly the wrong place: the levels
+already done shouted, and the next one to play got lost among them.
+
+Two details of the derivation, both load-bearing:
+
+- **Saturation has a floor.** Darkening a low-saturation disc in HSL lands on
+  grey, and grey already means *blocked* on this screen. A completed number in
+  grey reads as locked, the opposite of what it is.
+- **Four discs go the other way.** Islands 3, 8, 13 and 15 are dark enough that
+  nothing below them clears the floor — not even pure black. Those take a light
+  **tint of the same hue** instead. Still the button's colour, still quieter
+  than white.
+
+Values live in `LEVEL_NUMBER_DONE` / `levelNumberDoneColor()`, regenerate with
+`node scripts/level-number-colors.mjs`, and can be eyeballed as a contact sheet
+of all thirty states with `node scripts/preview-level-numbers.mjs`.
+
+**White survives on a pale disc because of the outline, not the fill.** Two
+discs are too light for a flat white number — island 4's pale pink gave 1.71:1
+and island 1's turquoise 2.81:1, both under the 3:1 floor for large text. The
+fix is a dark `-webkit-text-stroke` with `paint-order: stroke`, sized in `cqw`
+like everything else on the node, so the stroke paints *behind* the glyph
+instead of eating it. That keeps "pending is white" true on all fifteen, which
+is what makes the state recognisable from island to island; the other thirteen
+just gain definition. It goes on the white only — a dark outline around an
+already dark completed number would only fatten it.
+
+Changing the art is the other available fix and is still the right one if a
+disc is ever redrawn: `scripts/lighten-disc.mjs` lightens or darkens just the
+disc without touching the rest — it samples the disc's own hue and matches by
+hue and saturation, never by lightness, so a gradient survives.
 
 **Adding an island's button:** follow `Images/islands/BOTONES.md`. One step
 in it is deliberately manual — measuring the base on a percentage grid — and the
