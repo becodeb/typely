@@ -22,7 +22,7 @@ import {
   Field,
   Input,
   PageHeader,
-  TableSkeleton,
+  RowsSkeleton,
 } from "./ui";
 
 type SedeRow = Sede & { groupCount?: number; studentCount?: number };
@@ -89,7 +89,7 @@ export function SedesPage() {
       ) : (
         <Card className="overflow-hidden">
           {sedes === null ? (
-            <TableSkeleton />
+            <RowsSkeleton />
           ) : sedes.length === 0 ? (
             <EmptyState
               title="Todavía no hay escuelas"

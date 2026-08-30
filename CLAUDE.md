@@ -771,6 +771,9 @@ touchpad, windows, tabs, shortcuts, text editing, UI literacy). `SkillLevelView`
   ships, skins, login and home backgrounds.
 - `Images/islands/islandN/` — the sources of that island (sheets, PNGs, hi-res),
   mirroring the shipped folder. Never published.
+- `Images/brand/` — portadas y material de presentación (posts, banners). **No
+  lo usa el juego**: `.dockerignore` deja `Images` afuera del contenedor, así
+  que nada de acá se sirve. Ver su `README.md`.
 - `Images/`, `Images-new/` — **original source art (never modified).**
 
 ### Where the docs live
@@ -786,6 +789,7 @@ second source of rules:
 | `Images/islands/ISLAS.md` | Prompts for splitting a scene into sky + island, and for fixing pedestal count |
 | `Images/islands/BOTONES.md` | Recipe for drawing and importing a new island's level button |
 | `Images/islands/FONDOS.md` | Recipe for the gameplay background: measured safe zones, the mould prompt and the per-island one |
+| `Images/brand/README.md` | The three cover images — which one for which format, and why the logo is baked in |
 | `README.md` | Public-facing intro; points here for anything authoritative |
 | `AGENTS.md` | Stub so non-Claude agents land on `CLAUDE.md` |
 | `.cursor/rules/project.mdc` | Stub so Cursor's always-apply rules land on `CLAUDE.md` |
