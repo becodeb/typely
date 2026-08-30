@@ -1,12 +1,11 @@
 /* Auth — JWT access tokens (15 min) + opaque refresh tokens (30 days,
    stored hashed in the DB so a stolen DB row can't be replayed).
 
-   Passwords are hashed with bcrypt cost 12. The Google ID-token path
-   verifies the JWT against Google's JWKS — the frontend's decoded payload
-   is treated as untrusted, so even a hostile client can't claim to be a
-   different Google account. */
+   Las contraseñas se hashean con bcrypt coste 12. La única forma de entrar
+   es con una cuenta creada por un administrador: no hay proveedores
+   externos de identidad. */
 
-import { SignJWT, jwtVerify, createRemoteJWKSet } from "jose";
+import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcrypt";
 import { createHash, randomBytes } from "node:crypto";
 import { db, schema } from "./db/index.js";
@@ -21,8 +20,6 @@ const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error("JWT_SECRET is required.");
 const secret = new TextEncoder().encode(JWT_SECRET);
 
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
-const googleJwks = GOOGLE_CLIENT_ID ? createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs")) : null;
 
 export interface AccessClaims {
   sub: string;        // user id
@@ -31,7 +28,7 @@ export interface AccessClaims {
   sede: string | null;
   /** Identidad primaria — la tienen todos, incluido el alumno sin email. */
   username: string;
-  /** Opcional: solo quien usa Google o puede recuperar la cuenta. */
+  /** Opcional: para contacto y recuperación de cuenta. */
   email: string | null;
   name: string;
 }
@@ -117,31 +114,3 @@ export async function revokeAllRefreshTokens(userId: string): Promise<void> {
     );
 }
 
-/* ---------------------------------------------------------------- */
-/* Google ID-token verification.                                     */
-/* ---------------------------------------------------------------- */
-export interface GoogleClaims {
-  sub: string;
-  email: string;
-  emailVerified: boolean;
-  name?: string;
-}
-
-export async function verifyGoogleIdToken(idToken: string): Promise<GoogleClaims | null> {
-  if (!googleJwks || !GOOGLE_CLIENT_ID) return null;
-  try {
-    const { payload } = await jwtVerify(idToken, googleJwks, {
-      audience: GOOGLE_CLIENT_ID,
-      issuer: ["https://accounts.google.com", "accounts.google.com"],
-    });
-    if (!payload.sub || !payload.email) return null;
-    return {
-      sub: String(payload.sub),
-      email: String(payload.email).toLowerCase(),
-      emailVerified: payload.email_verified === true,
-      name: payload.name ? String(payload.name) : undefined,
-    };
-  } catch {
-    return null;
-  }
-}

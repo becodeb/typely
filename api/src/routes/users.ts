@@ -363,8 +363,7 @@ export async function userRoutes(app: FastifyInstance) {
   /* ----- POST /api/auth/change-password — la propia -----
      Pide la contraseña actual. El endpoint anterior no lo hacía: con un
      access token robado alcanzaba para quedarse con la cuenta sin conocer
-     la contraseña. La excepción es quien solo entra con Google y por lo
-     tanto nunca tuvo una. */
+     la contraseña. */
   app.post("/api/auth/change-password", async (req, reply) => {
     const actor = requireActor(req);
     const parsed = z
@@ -380,12 +379,10 @@ export async function userRoutes(app: FastifyInstance) {
     const [me] = await db.select().from(schema.users).where(eq(schema.users.id, actor.id)).limit(1);
     if (!me) return reply.code(401).send({ error: "Sesión inválida." });
 
-    /* Se pide la contraseña actual, con dos excepciones:
-       - quien solo entra con Google nunca tuvo una;
-       - quien está en el cambio OBLIGATORIO acaba de autenticarse con la
-         temporal hace segundos. Pedírsela de nuevo es fricción pura, y el
-         público de esta pantalla son chicos de primaria copiando una clave
-         de una tarjeta impresa. */
+    /* Se pide la contraseña actual, salvo en el cambio OBLIGATORIO: quien
+       llega ahí acaba de autenticarse con la temporal hace segundos.
+       Pedírsela de nuevo es fricción pura, y el público de esa pantalla son
+       chicos de primaria copiando una clave de una tarjeta impresa. */
     const mustVerify = Boolean(me.passwordHash) && !me.mustChangePassword;
     if (mustVerify) {
       const ok =

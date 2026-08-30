@@ -71,18 +71,20 @@ Cuatro roles: `superadmin` (la plataforma), `admin` (UNA sede), `docente`
 - **Un solo login para los cuatro.** `POST /api/auth/login` recibe
   `identifier` —usuario **o** email, el mismo campo del formulario— y la
   contraseña. El código anterior devolvía 403 si el rol era `alumno`, en el
-  login manual y en el de Google: un alumno no podía entrar de ninguna forma,
+  login: un alumno no podía entrar de ninguna forma,
   y esa era la causa raíz de que los dashboards estuvieran siempre vacíos.
 - **`username` es la identidad primaria** y la tienen todos. El **email es
   opcional**: un alumno de primaria no tiene, y el admin le entrega usuario y
   contraseña temporal impresos (`GET /api/groups/:id/credentials-sheet`).
-- **Google sign-in** para quien tenga email. Se verifica server-side contra el
-  JWKS de Google; el payload del cliente nunca se considera confiable.
+- **No hay login social.** Se sacó el inicio con Google a propósito: en una
+  escuela las cuentas las reparte un administrador, y no se quiere que
+  cualquiera con un correo entre solo. Si alguna vez vuelve, se implementa de
+  cero — no quedó nada a medias esperándolo.
 - **Contraseñas temporales:** se crean con `must_change_password` y
   `ProtectedRoute` fuerza `/cambiar-contrasena`. Cambiar la propia exige la
   actual, **salvo** en ese cambio forzado (quien llega ahí acaba de
-  autenticarse con la temporal) y en cuentas solo-Google. Nunca se muestra ni
-  se guarda una contraseña en claro: solo el valor temporal, una vez.
+  autenticarse con la temporal). Nunca se muestra ni se guarda una contraseña
+  en claro: solo el valor temporal, una vez.
 - **RBAC** (`api/src/rbac.ts`): matriz explícita de permisos por rol y de qué
   roles puede otorgar cada uno. **Un `admin` nunca puede crear otro `admin`.**
   No es un ranking numérico — eso no puede expresar esa regla.
@@ -756,7 +758,7 @@ touchpad, windows, tabs, shortcuts, text editing, UI literacy). `SkillLevelView`
 - `src/hooks/useAuth.tsx` — sesión contra la API. Sin fallback local.
 - `src/utils/` — `api.ts` (cliente tipado), `assets.ts`, `progress.ts`
   (local + cola de sincronización), `storage.ts` (solo modo demo y rutas por
-  rol), `image.ts`, `googleAuth.ts`, `userContext.ts`.
+  rol), `image.ts`, `userContext.ts`.
 - `src/styles/global.css` — entire visual system + page CSS + the responsive pass.
 - `api/src/` — `server.ts`, `auth.ts`, `rbac.ts`, `authContext.ts`,
   `userIdentity.ts`, `audit.ts`, `stats.ts`, `db/{index,schema,migrate}.ts`,
@@ -879,24 +881,26 @@ contenedor de la API:
 SUPERADMIN_USERNAME=... SUPERADMIN_EMAIL=... SUPERADMIN_NAME="..." npm run bootstrap
 ```
 
-### 13.1 The one thing that breaks silently — RULE
+### 13.1 Qué revisar después de cada deploy
 
-Vite **inlines** `VITE_*` variables at BUILD time. A frontend image built
-without them ships a bundle without them, and **Google sign-in stops working
-with nothing in the logs**. They must be present as build-time variables:
-
-```
-VITE_GOOGLE_CLIENT_ID   VITE_GOOGLE_ALLOWED_DOMAINS
-```
-
-After every deploy, check the served bundle is the one you meant to publish:
+Confirmá que el bundle servido es el que quisiste publicar y que la API
+respondió — esta última prueba es la que importa, porque cubre de una vez el
+proxy de nginx, el arranque de la API y que las migraciones corrieron:
 
 ```bash
-curl -s http://127.0.0.1:3005/ | grep -o 'assets/index-[A-Za-z0-9_-]*.js'
+curl -s https://typely.becode.com.ar/ | grep -o 'assets/index-[A-Za-z0-9_-]*.js'
+curl -s https://typely.becode.com.ar/api/health
 ```
 
-and then log in with Google in the browser — that is the only check that
-catches the failure above. Runbook: `DEPLOY.md`.
+Si `/api/health` da 502, la API no levantó: mirá sus logs, porque una
+migración fallida corta el arranque a propósito.
+
+> **Nota histórica.** Acá vivía una regla sobre `VITE_GOOGLE_CLIENT_ID`: Vite
+> inlinea las `VITE_*` en tiempo de BUILD, así que si faltaban en el build el
+> login con Google moría sin dejar rastro en los logs. Ya no aplica —el login
+> social se eliminó— pero **el mecanismo sigue siendo cierto** para cualquier
+> `VITE_*` que se agregue en el futuro: tiene que estar presente al compilar,
+> no alcanza con ponerla en runtime.
 
 ## 14. Skills (for agents)
 
@@ -929,8 +933,8 @@ catches the failure above. Runbook: `DEPLOY.md`.
 - **Nunca reintroducir una base de usuarios en el navegador.** La API es la
   única autoridad sobre cuentas. Un fallback local significa contraseñas
   dentro del bundle y una lista paralela que se desincroniza.
-- Never put secrets in `VITE_*` (inlined into the public bundle). Backend secrets
-  (`JWT_SECRET`, `RESEND_API_KEY`, OAuth client secret) stay server-side.
+- Nunca poner secretos en `VITE_*`: quedan incrustados en el bundle público.
+  `JWT_SECRET` y `DATABASE_URL` viven solo del lado del servidor.
 - Mantener el build de Docker sano; los servicios usan `expose` y no publican
   puertos en el host: el proxy de Coolify llega por la red interna. No
   publicar botones muertos.
@@ -942,8 +946,9 @@ catches the failure above. Runbook: `DEPLOY.md`.
 - **Never add an autodeploy.** The deploy is manual, through Coolify, and
   Ezequiel does it (§13). A workflow that publishes on push to `production` is
   a bug, not a feature.
-- The frontend image must be built **with the `VITE_*` variables present**, or
-  Google sign-in breaks with nothing in the logs (§13.1).
+- **No reintroducir login social sin decisión explícita.** Se quitó a
+  propósito: la única forma de entrar es con una cuenta creada por un
+  administrador (§4).
 
 ## 16. Quick Start
 
@@ -1052,7 +1057,7 @@ originals under `Images/` and `Images-new/`.
 
 Verificar de punta a punta: login con **usuario** y con **email** (el mismo
 campo); que un **alumno** entre —fue el bug de fondo del sistema anterior—;
-login con Google; que "Cerrar sesión" limpie la sesión; que cada rol caiga en
+que "Cerrar sesión" limpie la sesión; que cada rol caiga en
 su superficie; que una contraseña temporal fuerce `/cambiar-contrasena`; y que
 el modo demo siga sin tocar la API. Nunca guardar ni mostrar la contraseña
 actual de nadie: solo un valor temporal recién generado, una sola vez.

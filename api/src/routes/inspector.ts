@@ -89,7 +89,6 @@ function collectEnv(): EnvVar[] {
     { name: "CORS_ORIGIN", scope: "server", public: false, set: !!e.CORS_ORIGIN, value: e.CORS_ORIGIN ?? "https://typely.bauhub.online (default)", note: "Origen permitido por CORS." },
     { name: "DATABASE_URL", scope: "server", public: false, set: !!e.DATABASE_URL, value: maskDatabaseUrl(e.DATABASE_URL), note: "Conexión Postgres (secreto Docker; contraseña oculta)." },
     { name: "JWT_SECRET", scope: "server", public: false, set: !!e.JWT_SECRET, value: e.JWT_SECRET ? "•••• (configurado)" : null, note: "Firma de los access tokens. Nunca se muestra." },
-    { name: "GOOGLE_CLIENT_ID", scope: "server", public: false, set: !!e.GOOGLE_CLIENT_ID, value: e.GOOGLE_CLIENT_ID ? `${e.GOOGLE_CLIENT_ID.slice(0, 12)}…` : null, note: "Verificación server-side del ID token de Google." },
     { name: "PUBLIC_ORIGIN", scope: "server", public: false, set: !!e.PUBLIC_ORIGIN, value: e.PUBLIC_ORIGIN ?? null, note: "Origen absoluto para armar links de invitación." },
     { name: "SUPERADMIN_EMAIL", scope: "server", public: false, set: !!e.SUPERADMIN_EMAIL, value: e.SUPERADMIN_EMAIL ?? "(solo lo usa el seed)", note: "Usado por dist/seed.js, no por el server." },
   ];
@@ -101,7 +100,6 @@ function collectEnv(): EnvVar[] {
 const SAMPLES: Record<string, unknown> = {
   "GET /health": { ok: true, service: "typely-api", ts: "2026-06-09T12:00:00.000Z" },
   "POST /api/auth/login": { access: "<jwt>", refreshExpiresAt: "<iso>", user: { id: "<uuid>", email: "a@b.c", name: "Nombre", role: "admin-sede", sedeId: "<uuid>", mustChangePassword: false } },
-  "POST /api/auth/google": { access: "<jwt>", refreshExpiresAt: "<iso>", user: { id: "<uuid>", role: "profesor" } },
   "POST /api/auth/refresh": { access: "<jwt>", refreshExpiresAt: "<iso>" },
   "GET /api/auth/me": { user: { id: "<uuid>", email: "a@b.c", name: "Nombre", role: "superadmin", sedeId: "<uuid>" } },
   "GET /api/users": [{ id: "<uuid>", email: "a@b.c", fullName: "Nombre", role: "alumno", sedeId: "<uuid>", active: true }],
@@ -187,7 +185,6 @@ export async function inspectorRoutes(app: FastifyInstance) {
         bodyLimitBytes: 1024 * 1024,
         bcryptCost: 12,
         corsOrigin: process.env.CORS_ORIGIN ?? "https://typely.bauhub.online",
-        googleLoginEnabled: !!process.env.GOOGLE_CLIENT_ID,
       },
       routes,
       recentErrors: errorBuffer,

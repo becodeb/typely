@@ -13,7 +13,7 @@
  *
  * Es idempotente: si ya existe un superadmin no crea otro ni pisa nada.
  * Si no se pasa contraseña, genera una y la imprime UNA vez.
- * El email es opcional; sirve para poder entrar después con Google.
+ * El email es opcional; sirve para contacto y recuperación de cuenta.
  */
 
 import { randomBytes } from "node:crypto";

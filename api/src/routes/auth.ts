@@ -1,17 +1,19 @@
-/* Rutas de autenticación — login, Google, refresh, logout, me.
+/* Rutas de autenticación — login, refresh, logout, me.
  *
  * EL CAMBIO CENTRAL DE ESTA VERSIÓN: hay UN solo login para los cuatro
- * roles. El código anterior devolvía 403 si `role === "alumno"`, tanto en
- * el login manual como en el de Google, así que un alumno literalmente no
- * podía entrar: su única puerta era el modo demo (anónimo, sin token) o
- * aceptar una invitación por email. Como el modo demo tampoco manda
- * progreso a la API, las tablas de progreso quedaban vacías y los
- * dashboards de docente y admin mostraban ceros para siempre.
+ * roles. El código anterior devolvía 403 si `role === "alumno"`, así que un
+ * alumno literalmente no podía entrar: su única puerta era el modo demo
+ * (anónimo, sin token). Como el demo tampoco manda progreso a la API, las
+ * tablas de progreso quedaban vacías y los dashboards mostraban ceros.
  *
  * Identidad: se entra con `identifier`, que puede ser el usuario o el
  * email. El alumno de primaria no tiene email y entra con usuario; el
  * staff suele usar el email. Las dos columnas son citext, así que la
  * comparación ya es insensible a mayúsculas.
+ *
+ * NO hay proveedores externos de identidad. La única forma de entrar es con
+ * una cuenta que creó un administrador — es lo que quiere una escuela, que
+ * reparte credenciales y no deja que cualquiera con un correo entre solo.
  *
  * Las cookies son HTTP-only, SameSite=Lax y Secure en producción.
  */
@@ -26,7 +28,6 @@ import {
   hashToken,
   issueRefreshToken,
   signAccessToken,
-  verifyGoogleIdToken,
 } from "../auth.js";
 import { requireActor } from "../authContext.js";
 
@@ -123,8 +124,6 @@ const loginSchema = z.object({
   password: z.string().min(1, "Falta la contraseña."),
 });
 
-const googleSchema = z.object({ credential: z.string().min(10) });
-
 export async function authRoutes(app: FastifyInstance) {
   /* ----- POST /api/auth/login ----- */
   app.post("/api/auth/login", async (req, reply) => {
@@ -176,58 +175,6 @@ export async function authRoutes(app: FastifyInstance) {
     const { access, refresh, refreshExpiresAt } = await buildSession(user);
     setRefreshCookie(reply, refresh);
     return reply.send({ access, refreshExpiresAt, user: publicUser(user) });
-  });
-
-  /* ----- POST /api/auth/google -----
-     Disponible para cualquier rol que TENGA email. El alumno curricular
-     no lo usa (no tiene), pero un alumno suelto sí puede. Nunca crea una
-     cuenta: si el email no existe, es un 404 con mensaje claro. */
-  app.post("/api/auth/google", async (req, reply) => {
-    const parsed = googleSchema.safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send({ error: "Credencial inválida." });
-
-    const claims = await verifyGoogleIdToken(parsed.data.credential);
-    if (!claims) {
-      return reply.code(401).send({ error: "No pudimos verificar tu cuenta de Google." });
-    }
-    if (!claims.emailVerified) {
-      return reply.code(403).send({ error: "Tu email de Google todavía no está verificado." });
-    }
-
-    const [user] = await db
-      .select()
-      .from(schema.users)
-      .where(
-        and(
-          or(eq(schema.users.googleSub, claims.sub), eq(schema.users.email, claims.email)),
-          isNull(schema.users.deletedAt),
-        ),
-      )
-      .limit(1);
-
-    if (!user) {
-      return reply.code(404).send({
-        error: "No encontramos una cuenta con ese email. Pedile a tu administrador que te cree una.",
-      });
-    }
-    if (!user.active) {
-      return reply
-        .code(403)
-        .send({ error: "Tu cuenta está desactivada. Hablá con tu administrador." });
-    }
-
-    /* Se ata el `sub` de Google la primera vez, así los ingresos siguientes
-       no dependen de que el email no haya cambiado. */
-    const patch: Partial<schema.NewUser> = { lastLoginAt: new Date() };
-    if (!user.googleSub) patch.googleSub = claims.sub;
-    await db.update(schema.users).set(patch).where(eq(schema.users.id, user.id));
-
-    /* Google ya probó la identidad: no tiene sentido forzar el cambio de
-       una contraseña temporal que esta persona nunca va a usar. */
-    const session = { ...user, mustChangePassword: false };
-    const { access, refresh, refreshExpiresAt } = await buildSession(session);
-    setRefreshCookie(reply, refresh);
-    return reply.send({ access, refreshExpiresAt, user: publicUser(session) });
   });
 
   /* ----- POST /api/auth/refresh ----- */

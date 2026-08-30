@@ -81,10 +81,9 @@ export const users = pgTable(
     groupId: uuid("group_id").references(() => groups.id, { onDelete: "set null" }),
     /* Identidad primaria: la tienen todos, incluido el alumno sin email. */
     username: text("username").notNull(),
-    /* Opcional: solo para Google sign-in y recuperación de cuenta. */
+    /* Opcional: para contacto y recuperación de cuenta. */
     email: text("email"),
     passwordHash: text("password_hash"),
-    googleSub: text("google_sub"),
     fullName: text("full_name").notNull(),
     active: boolean("active").notNull().default(true),
     mustChangePassword: boolean("must_change_password").notNull().default(false),

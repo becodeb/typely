@@ -6,7 +6,6 @@ import { useAuth } from "../hooks/useAuth";
 import { assets } from "../utils/assets";
 import { routeForRole } from "../utils/storage";
 import { clearDemoProgressOnly } from "../utils/progress";
-import { getGoogleClientId, promptGoogleSignIn } from "../utils/googleAuth";
 import {
   ArrowRight,
   Eye,
@@ -38,7 +37,7 @@ export function LoginPage() {
   // message text is identical to the previous attempt.
   const [errKey, setErrKey] = useState(0);
   const [showDemoModal, setShowDemoModal] = useState(false);
-  const { login, loginDemo, loginGoogle } = useAuth();
+  const { login, loginDemo } = useAuth();
   const navigate = useNavigate();
 
   /** Show an error in the red popup above the card (re-animates each time). */
@@ -84,45 +83,6 @@ export function LoginPage() {
     // It can never reach an admin/teacher surface.
     const nextUser = loginDemo();
     navigate(routeForRole(nextUser.role));
-  }
-
-  /** Google sign-in via Google Identity Services. Opens the GIS popup,
-   *  then matches the returned email against Typely's user store. */
-  async function googleLogin() {
-    if (!getGoogleClientId()) {
-      showError("Google Login no está configurado. Pedile a tu administrador que cargue VITE_GOOGLE_CLIENT_ID en el servidor.");
-      return;
-    }
-    showError(""); // clear any prior error before opening the prompt
-    await promptGoogleSignIn({
-      onCredential: async (credential) => {
-        const result = await loginGoogle(credential);
-        if (result.ok) {
-          if (result.user.mustChangePassword) {
-            navigate("/cambiar-contrasena");
-            return;
-          }
-          navigate(routeForRole(result.user.role));
-          return;
-        }
-        if (result.reason === "USER_NOT_FOUND") {
-          showError("No encontramos una cuenta asociada a este correo. Pedile acceso a tu administrador.");
-        } else if (result.reason === "NETWORK_ERROR") {
-          showError("No pudimos conectar con el servidor. Probá de nuevo.");
-        } else {
-          showError("No pudimos validar tu cuenta de Google. Probá de nuevo.");
-        }
-      },
-      onError: (reason) => {
-        if (reason === "MISSING_CLIENT_ID") {
-          showError("Google Login no está configurado.");
-        } else if (reason === "GIS_LOAD_FAILED") {
-          showError("No se pudo cargar Google. Revisá tu conexión.");
-        } else {
-          showError("No se pudo abrir el inicio con Google. Probá de nuevo.");
-        }
-      },
-    });
   }
 
   return (
@@ -220,19 +180,6 @@ export function LoginPage() {
             Ingresar
           </AnimatedButton>
 
-          {/* Google sign-in — opens the FedCM "continuar como…" popup. */}
-          <button
-            type="button"
-            className="bg-white flex items-center justify-center gap-2.5 py-3 px-5 rounded-full shadow-md cursor-pointer font-extrabold text-text transition-transform hover:scale-[1.02] active:scale-[0.98] w-full"
-            onClick={googleLogin}
-          >
-            <span className="inline-flex items-center" aria-hidden="true">
-              <GoogleGlyph />
-            </span>
-            <span>Ingresar con Google</span>
-          </button>
-
-
           <AnimatedButton
             type="button"
             variant="secondary"
@@ -312,17 +259,5 @@ export function LoginPage() {
         </div>
       )}
     </main>
-  );
-}
-
-/* Official Google "G" mark, rendered inline so the button needs no asset. */
-function GoogleGlyph() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-      <path fill="#4285F4" d="M17.64 9.2045c0-.6381-.0573-1.2518-.1636-1.8409H9v3.4814h4.8436c-.2086 1.125-.8427 2.0782-1.7959 2.7164v2.2581h2.9081c1.7018-1.5668 2.6842-3.874 2.6842-6.615z"/>
-      <path fill="#34A853" d="M9 18c2.43 0 4.4673-.806 5.9564-2.1805l-2.9081-2.2581c-.806.54-1.8368.859-3.0483.859-2.344 0-4.3282-1.5831-5.036-3.7104H.9573v2.3318C2.4382 15.9832 5.4818 18 9 18z"/>
-      <path fill="#FBBC05" d="M3.964 10.71c-.18-.54-.2822-1.1168-.2822-1.71s.1023-1.17.2822-1.71V4.9582H.9573C.3477 6.1732 0 7.5477 0 9s.3477 2.8268.9573 4.0418L3.964 10.71z"/>
-      <path fill="#EA4335" d="M9 3.5795c1.3214 0 2.5077.4541 3.4405 1.346l2.5813-2.5814C13.4632.8918 11.426 0 9 0 5.4818 0 2.4382 2.0168.9573 4.9582L3.964 7.29C4.6718 5.1627 6.656 3.5795 9 3.5795z"/>
-    </svg>
   );
 }
