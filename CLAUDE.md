@@ -4,11 +4,12 @@
 > rules and workflow all live here — there is no second rulebook. Every other
 > agent entry point (`AGENTS.md`, `.cursor/rules/project.mdc`) is a stub that
 > points back to this file, so Claude Code, Codex, Cursor and OpenCode all read
-> the same rules. Only three companion docs carry content of their own, and each
-> has a distinct job: `DEPLOY.md` (ops runbook), `dbnew.md` (backend
-> implementation log) and `Images/islands/BOTONES.md` (recipe for drawing a new
-> island's level button). If any of them ever disagrees with this file, **this
-> file wins** — fix the other one.
+> the same rules. A handful of companion docs carry content of their own, and
+> each has a distinct job: `DEPLOY.md` (ops runbook), `dbnew.md` (backend
+> implementation log) and the three art recipes under `Images/islands/` —
+> `ISLAS.md` (splitting a scene), `BOTONES.md` (a world's level button) and
+> `FONDOS.md` (a world's gameplay background). If any of them ever disagrees
+> with this file, **this file wins** — fix the other one.
 
 ## 1. Project Overview
 
@@ -642,6 +643,7 @@ second source of rules:
 | `dbnew.md` | Backend implementation log (history, not rules) |
 | `Images/islands/ISLAS.md` | Prompts for splitting a scene into sky + island, and for fixing pedestal count |
 | `Images/islands/BOTONES.md` | Recipe for drawing and importing a new island's level button |
+| `Images/islands/FONDOS.md` | Recipe for the gameplay background: measured safe zones, the mould prompt and the per-island one |
 | `README.md` | Public-facing intro; points here for anything authoritative |
 | `AGENTS.md` | Stub so non-Claude agents land on `CLAUDE.md` |
 | `.cursor/rules/project.mdc` | Stub so Cursor's always-apply rules land on `CLAUDE.md` |
