@@ -51,7 +51,7 @@
  * puede volver — al volver, el escenario arranca de cero.
  */
 
-import { Monitor, RotateCcw, X } from "lucide-react";
+import { Monitor, RotateCcw, Star, Volume2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Activity, ShortcutDialog, ShortcutScene, ShortcutTab } from "../data/activities";
@@ -353,6 +353,14 @@ export function ShortcutLevelView({ activity }: { activity: Activity }) {
   progressRef.current = prog.progress;
 
   const [clicked, setClicked] = useState<Record<string, boolean>>({});
+  /* La misión se anuncia al abrir el nivel y baja a reposo. Acá importa más
+     que en escritura: un atajo no se adivina mirando la pantalla. */
+  const [misionEntrada, setMisionEntrada] = useState(true);
+  useEffect(() => {
+    setMisionEntrada(true);
+    const bajar = window.setTimeout(() => setMisionEntrada(false), 2800);
+    return () => window.clearTimeout(bajar);
+  }, [activity.id]);
   const [feedback, setFeedback] = useState<string | undefined>();
   const [kbTrigger, setKbTrigger] = useState(0);
   const feedbackTimer = useRef<number | null>(null);
@@ -514,14 +522,15 @@ export function ShortcutLevelView({ activity }: { activity: Activity }) {
         ))}
       </div>
 
-      {/* Header */}
+      {/* Encabezado — suelto sobre el fondo. El título del nivel no necesita
+          una tarjeta propia: lo que tiene que resaltar es la misión. */}
       <header className="flex flex-wrap items-center justify-between gap-3 px-4 pt-4 sm:px-8">
-        <div className="glass-card-smooth flex flex-col gap-0.5 rounded-2xl px-4 py-3 shadow-card max-w-[72%]">
+        <div className="nv-dato flex flex-col gap-0.5 max-w-[72%]">
           <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent-strong">
             NIVEL {activity.levelNumber}
           </span>
           <strong className="font-display text-base sm:text-lg text-text leading-tight">{activity.title}</strong>
-          <em className="text-xs text-muted not-italic">{activity.subtitle}</em>
+          <em className="text-xs text-text/70 not-italic font-semibold">{activity.subtitle}</em>
         </div>
         <div className="flex items-center gap-2">
           <StarCounter />
@@ -537,42 +546,58 @@ export function ShortcutLevelView({ activity }: { activity: Activity }) {
         </div>
       </header>
 
-      {/* Goal strip. Con guion manda la consigna DEL PASO: la del nivel sola
-          no alcanzaba para saber qué había que hacer en cada momento. */}
-      <div className="mx-4 mt-4 sm:mx-8 glass-card-smooth rounded-2xl px-4 py-3 shadow-card">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-block rounded-full bg-accent/20 px-3 py-0.5 text-[11px] font-bold uppercase tracking-wider text-accent-strong">
-            {steps ? "Paso" : "Atajo"} {Math.min(prog.progress + (prog.completed ? 0 : 1), total)} / {total}
+      {/* LA MISIÓN. Acá hace todavía más falta que en los niveles de
+          escritura: ahí el objetivo se adivina mirando la pantalla — hay una
+          letra gigante —, pero un atajo NO se adivina. Si el chico no lee la
+          consigna, no tiene con qué arrancar. Por eso lleva el botón de
+          escuchar adelante y es lo único con borde encendido. */}
+      <div className="mt-3 flex justify-center px-4 z-20" aria-live="polite">
+        <div className={`gp-mision flex items-start gap-3 sm:gap-4 py-2.5 pl-3 pr-5 max-w-3xl ${misionEntrada ? "gp-mision--entrada" : ""}`}>
+          <span className="gp-mision__insignia inline-flex items-center gap-1 px-3 py-0.5 font-display font-extrabold text-[11px] uppercase tracking-wider">
+            <Star size={11} fill="currentColor" strokeWidth={0} />
+            {steps ? "Paso" : "Atajo"} {Math.min(prog.progress + (prog.completed ? 0 : 1), total)} de {total}
           </span>
-          {steps && (
-            <span className="text-xs font-semibold text-muted">{activity.instruction}</span>
-          )}
+          <button
+            type="button"
+            onClick={speak}
+            className="gp-mision__audio shrink-0 rounded-full w-11 h-11 sm:w-[3.25rem] sm:h-[3.25rem] flex items-center justify-center text-white transition-transform hover:scale-105"
+            aria-label="Escuchar la consigna"
+            title="Escuchar la consigna"
+          >
+            <Volume2 size={22} />
+          </button>
+          <span className="pt-1">
+            <h2 className="font-display font-extrabold text-base sm:text-xl leading-snug text-text">
+              {currentStep?.prompt ?? activity.instruction}
+            </h2>
+            {steps && (
+              <p className="text-[13px] font-semibold leading-tight text-[#4a5f88] mt-0.5">{activity.instruction}</p>
+            )}
+          </span>
         </div>
-        <h2 className="mt-1 font-display text-lg sm:text-2xl leading-snug text-text">
-          {currentStep?.prompt ?? activity.instruction}
-        </h2>
-        {steps && (
-          /* Los pasos ya hechos quedan a la vista: así se entiende que
-             seleccionar, copiar y pegar son partes de una misma tarea. */
-          <ol className="mt-2 flex flex-wrap gap-1.5" aria-label="Pasos de la tarea">
-            {steps.map((s, i) => (
-              <li
-                key={i}
-                className={[
-                  "rounded-full px-2.5 py-0.5 text-[11px] font-bold transition",
-                  i < prog.progress
-                    ? "bg-mint/30 text-accent-teal"
-                    : i === prog.progress && !prog.completed
-                      ? "bg-accent/25 text-accent-strong ring-1 ring-accent/40"
-                      : "bg-white/50 text-muted",
-                ].join(" ")}
-              >
-                {i < prog.progress ? "✓ " : ""}{s.combo}
-              </li>
-            ))}
-          </ol>
-        )}
       </div>
+
+      {/* Los pasos, sueltos bajo la misión: así se entiende que seleccionar,
+          copiar y pegar son partes de UNA tarea y no tres ejercicios. */}
+      {steps && (
+        <ol className="mt-2 flex flex-wrap justify-center gap-1.5 px-4" aria-label="Pasos de la tarea">
+          {steps.map((s, i) => (
+            <li
+              key={i}
+              className={[
+                "rounded-full px-2.5 py-0.5 text-[11px] font-bold transition backdrop-blur-sm",
+                i < prog.progress
+                  ? "bg-mint/40 text-accent-teal"
+                  : i === prog.progress && !prog.completed
+                    ? "bg-white/80 text-accent-strong ring-2 ring-accent/50"
+                    : "bg-white/40 text-text/60",
+              ].join(" ")}
+            >
+              {i < prog.progress ? "✓ " : ""}{s.combo}
+            </li>
+          ))}
+        </ol>
+      )}
 
       {/* Stage: mascots + virtual environment */}
       <section
@@ -600,7 +625,11 @@ export function ShortcutLevelView({ activity }: { activity: Activity }) {
           ¡Sos un crack!
         </span>
 
-        <div className="relative z-10 w-full max-w-3xl glass-card p-4 sm:p-6 shadow-card flex flex-col gap-4">
+        {/* SIN caja. Antes esto era un glass-card que envolvía al simulador,
+            y el simulador ya trae su propio marco adentro: dos blancos, uno
+            sobre otro, tapando la isla. El navegador y el documento se
+            sostienen solos como objetos apoyados en el pedestal. */}
+        <div className="relative z-10 w-full max-w-3xl flex flex-col gap-4">
           {/* Sin guion, un montaje nuevo por combo: cada atajo es su propio
               ejercicio y conviene que el simulador arranque limpio.
 
@@ -625,44 +654,47 @@ export function ShortcutLevelView({ activity }: { activity: Activity }) {
 
           {/* Teclado en pantalla. Para los atajos reservados no es un plan B:
               es el ÚNICO camino, porque el navegador se queda con la tecla. */}
-          <div className="flex flex-col items-center gap-2 pt-2">
-            <span className="flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1 text-xs sm:text-sm font-medium text-text shadow-sm backdrop-blur">
+          <div className="flex flex-col items-center gap-2 pt-1">
+            <span className="nv-dato flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-text/85">
               <Monitor size={16} className="text-accent-strong" />
               {current ? comboActionHint(current) : "Hacé el atajo dentro del simulador."}
             </span>
             {reservado ? (
-              <span className="flex items-center gap-1.5 rounded-full bg-amber-100/90 px-3 py-1 text-[11px] sm:text-xs font-bold text-amber-900 shadow-sm">
+              <span className="flex items-center gap-1.5 rounded-full bg-amber-200/80 backdrop-blur px-3 py-1 text-[11px] sm:text-xs font-bold text-amber-900 border border-amber-300/70">
                 <span aria-hidden="true">👇</span>
                 Este atajo lo maneja el navegador: tocá las teclas de acá abajo.
               </span>
             ) : bloqueo.estado === "activo" ? (
-              <span className="flex items-center gap-1.5 rounded-full bg-mint/25 px-3 py-1 text-[11px] sm:text-xs font-bold text-accent-teal shadow-sm">
+              <span className="flex items-center gap-1.5 rounded-full bg-mint/35 backdrop-blur px-3 py-1 text-[11px] sm:text-xs font-bold text-accent-teal border border-mint/50">
                 🔒 Teclado capturado: apretá el atajo de verdad, no le pasa nada al navegador.
               </span>
             ) : (
-              <span className="text-[11px] text-muted">Usá las teclas del juego o el teclado.</span>
+              <span className="nv-dato text-[11px] font-semibold text-text/65">Tocá las teclas de acá abajo o usá el teclado de verdad.</span>
             )}
-            <div className="flex flex-wrap items-center justify-center gap-1.5" aria-label={`Atajo: ${current?.raw ?? ""}`}>
+            {/* ESTAS TECLAS SÍ SE TOCAN, al revés del teclado de los niveles
+                de escritura, que es inerte a propósito. Acá hay atajos que el
+                navegador se queda —Ctrl+T, Ctrl+W— y que nunca llegan a la
+                página: sin poder tocarlas, esos niveles serían imposibles de
+                pasar. Por eso levantan al pasar el mouse y son más grandes:
+                tienen que verse tocables. */}
+            <div className="flex flex-wrap items-center justify-center gap-2" aria-label={`Atajo: ${current?.raw ?? ""}`}>
               {current?.caps.map((cap, i) => (
-                <span key={`${i}:${cap}`} className="flex items-center gap-1.5">
+                <span key={`${i}:${cap}`} className="flex items-center gap-2">
                   <button
                     type="button"
                     className={[
-                      "min-w-[2.5rem] select-none rounded-xl border px-3 py-2 text-sm sm:text-base font-bold shadow-btn transition",
-                      clicked[`${i}:${cap}`]
-                        ? "border-white/80 bg-gradient-to-b from-accent to-accent-strong text-white scale-95 shadow-inner"
-                        : reservado
-                          /* Resaltadas: son el camino real, no un adorno. */
-                          ? "border-amber-300 bg-gradient-to-b from-amber-50 to-amber-100 text-amber-900 ring-2 ring-amber-300/70 hover:-translate-y-0.5 hover:shadow-btn-hover active:scale-95"
-                          : "border-white/80 bg-gradient-to-b from-white to-bg-soft text-text hover:-translate-y-0.5 hover:shadow-btn-hover active:scale-95",
+                      "nv-tecla min-w-[3.25rem] h-[2.875rem] px-3 select-none font-display font-bold text-sm sm:text-base",
+                      "flex items-center justify-center",
+                      clicked[`${i}:${cap}`] ? "nv-tecla--puesta" : "",
                     ].join(" ")}
+                    style={{ ["--nv-canto" as string]: reservado ? "#ffd552" : "#33c7f0" }}
                     onClick={() => onKeycapClick(i, cap)}
                     tabIndex={-1}
                   >
                     {cap}
                   </button>
                   {i < current.caps.length - 1 && (
-                    <span className="px-1 text-lg font-bold text-muted">+</span>
+                    <span className="nv-dato px-0.5 text-lg font-bold text-text/70">+</span>
                   )}
                 </span>
               ))}
@@ -709,7 +741,7 @@ export function ShortcutLevelView({ activity }: { activity: Activity }) {
       )}
 
       {/* Metrics bar */}
-      <div className="mx-4 mt-4 mb-2 sm:mx-8 flex items-center justify-center gap-3 rounded-2xl bg-white/60 px-4 py-2 text-sm font-semibold text-text shadow-card backdrop-blur-md">
+      <div className="nv-dato mx-4 mt-3 mb-2 sm:mx-8 flex items-center justify-center gap-3 text-sm font-semibold text-text/85">
         <span className="text-amber-400">★</span>
         <div><b>Intentos:</b> {prog.attempts}</div>
         <div className="h-4 w-px bg-text/15" />
@@ -721,17 +753,13 @@ export function ShortcutLevelView({ activity }: { activity: Activity }) {
 
       {/* Footer */}
       <footer className="flex flex-wrap items-center justify-between gap-2 px-4 pb-4 sm:px-8">
-        <div className="glass-card-smooth flex-1 rounded-2xl px-4 py-2 text-sm font-medium text-text shadow-card min-w-[200px]">
+        <div className="nv-dato flex-1 px-1 py-2 text-sm font-semibold text-text/85 min-w-[200px]">
           <span aria-hidden="true" className="mr-1 text-amber-400">★</span>
           {feedback ?? activity.description}
         </div>
-        <button
-          type="button"
-          className="glass-card-smooth rounded-full px-4 py-2 text-sm font-semibold text-text shadow-btn transition hover:-translate-y-0.5 hover:shadow-btn-hover active:translate-y-0 flex items-center gap-1.5"
-          onClick={speak}
-        >
-          <span aria-hidden="true">🔊</span> Escuchar consigna
-        </button>
+        {/* El botón de escuchar ya no vive acá: se mudó adentro de la misión,
+            que es donde está la consigna que hay que escuchar. Al pie, entre
+            otros botones, no se leía como parte de ella. */}
         <button
           type="button"
           className="glass-card-smooth rounded-full px-4 py-2 text-sm font-semibold text-text shadow-btn transition hover:-translate-y-0.5 hover:shadow-btn-hover active:translate-y-0 flex items-center gap-1.5"
@@ -1254,7 +1282,7 @@ function VirtualBrowser({ combo, completed, triggerSignal, onAction, scene, step
     "Hacer la acción";
 
   return (
-    <div className="glass-surface flex flex-col gap-3 p-4">
+    <div className="nv-escena flex flex-col gap-3 p-4">
       <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
         {varias ? `${ventanas.length} ventanas` : "1 ventana"} ·{" "}
         {abiertas} {abiertas === 1 ? "pestaña abierta" : "pestañas abiertas"}
@@ -1323,7 +1351,7 @@ function VirtualFindBox({ combo, completed, triggerSignal, onAction, scene }: En
   }
 
   return (
-    <div className="glass-surface flex flex-col gap-3 p-4">
+    <div className="nv-escena flex flex-col gap-3 p-4">
       <div className="relative min-h-[8rem] rounded-xl bg-white/80 p-4 text-sm text-text shadow-inner">
         <p>
           {resaltar ? (
@@ -1403,7 +1431,7 @@ function VirtualDialog({ combo, completed, triggerSignal, onAction, dialog, step
   const peligro = dialog?.danger === true;
 
   return (
-    <div className="glass-surface flex flex-col items-center gap-3 p-4">
+    <div className="nv-escena flex flex-col items-center gap-3 p-4">
       <div className="relative flex w-full min-h-[8rem] flex-col items-center justify-center rounded-xl bg-white/80 p-4 text-center text-sm text-text shadow-inner">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted">
           {dialog?.app ?? "Una app"}
@@ -1579,7 +1607,7 @@ function VirtualTextEditor({ combo, completed, triggerSignal, onAction, scene, s
     "Hacer la acción";
 
   return (
-    <div className="glass-surface flex flex-col gap-3 p-4">
+    <div className="nv-escena flex flex-col gap-3 p-4">
       {/* Barra del documento. El cartel de la derecha es medio nivel entero:
           sin él, guardar no se distingue de no guardar. */}
       <div className="flex items-center gap-3 rounded-xl border border-white/70 bg-gradient-to-b from-white/90 to-bg-soft/70 px-3 py-1.5 text-[11px] font-semibold text-muted shadow-sm">

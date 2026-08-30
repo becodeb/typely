@@ -826,6 +826,95 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   NIVELES DE ATAJOS Y HABILIDADES — la escena flotante
+   --------------------------------------------------------------------
+   Estas pantallas venían apiladas en CINCO paneles blancos (encabezado,
+   consigna, la caja del simulador, métricas y pie) y encima el simulador
+   traía su propio `glass-surface` adentro: dos blancos, uno sobre otro,
+   tapando la isla entera. Acá el simulador es UN objeto que flota sobre
+   el pedestal — el navegador o el documento ya traen su propio marco, no
+   necesitan una caja que los contenga — y todo lo demás queda suelto
+   sobre el fondo.
+   ════════════════════════════════════════════════════════════════════ */
+.nv-escena {
+  border-radius: 1.25rem;
+  background: rgba(255, 255, 255, 0.34);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    0 24px 60px rgba(23, 53, 95, 0.24);
+}
+
+/* ── La tecla de estas pantallas SÍ se toca ────────────────────────────
+   Y es la diferencia deliberada con el teclado de escritura, que es
+   inerte. Acá hay atajos que el navegador se queda —Ctrl+T, Ctrl+W— y
+   que nunca llegan a la página: sin estas teclas el nivel sería
+   imposible de pasar. Por eso levantan al pasar el mouse y muestran el
+   cursor de mano: tienen que verse tocables. */
+.nv-tecla {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  border-radius: 0.8rem;
+  color: var(--color-text);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.82) 42%,
+    rgba(240, 246, 255, 0.74) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-bottom: 4px solid var(--nv-canto, #33c7f0);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -6px 10px -6px rgba(23, 53, 95, 0.16),
+    0 3px 9px rgba(23, 53, 95, 0.13);
+  transition: transform 110ms ease, box-shadow 110ms ease;
+}
+.nv-tecla::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(118deg, rgba(255, 255, 255, 0.55) 0 34%, rgba(255, 255, 255, 0) 34.6%);
+}
+.nv-tecla:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 8px 18px rgba(23, 53, 95, 0.20);
+}
+.nv-tecla:active {
+  transform: translateY(2px) scale(0.96);
+  border-bottom-width: 1px;
+  box-shadow: inset 0 3px 7px rgba(23, 53, 95, 0.20);
+}
+/* Ya tocada dentro de la combinación en curso. */
+.nv-tecla--puesta {
+  color: #fff;
+  background: linear-gradient(150deg, var(--color-mint), var(--color-accent-sky), var(--color-accent-strong));
+  border-color: rgba(255, 255, 255, 0.85);
+  border-bottom-color: #2545c4;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 6px 16px rgba(49, 89, 232, 0.4);
+}
+
+/* Texto suelto sobre el fondo, sin panel. El halo blanco es lo que lo hace
+   legible sin necesidad de una caja.
+
+   Va en TRES capas y no en una, por las islas oscuras: la 6, la 14 y la 15
+   tienen el pedestal casi negro, y ahí un texto azul oscuro con una sombra
+   blanca finita no se despega. Las dos capas anchas arman un resplandor que
+   sí lo separa; la fina le devuelve el filo a la letra. */
+.nv-dato {
+  text-shadow:
+    0 0 10px rgba(255, 255, 255, 0.95),
+    0 0 20px rgba(255, 255, 255, 0.85),
+    0 1px 2px rgba(255, 255, 255, 0.95);
+}
+
+/* ════════════════════════════════════════════════════════════════════
    COMPACT-HEIGHT PASS — ventana SIN pantalla completa (la barra del
    navegador roba ~120px). El gameplay es una columna flex de altura fija:
    acá achicamos lo flexible (teclas, paddings) para que la consigna, el

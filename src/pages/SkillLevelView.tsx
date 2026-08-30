@@ -1,4 +1,4 @@
-import { RotateCcw, X } from "lucide-react";
+import { RotateCcw, Star, Volume2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Activity } from "../data/activities";
@@ -92,6 +92,13 @@ function Island5Shell({
   feedback,
 }: ShellProps) {
   const navigate = useNavigate();
+  /* La misión se anuncia al abrir el nivel y después baja a reposo. */
+  const [misionEntrada, setMisionEntrada] = useState(true);
+  useEffect(() => {
+    setMisionEntrada(true);
+    const bajar = window.setTimeout(() => setMisionEntrada(false), 2800);
+    return () => window.clearTimeout(bajar);
+  }, [activity.id]);
 
   function speak() {
     if (!("speechSynthesis" in window)) return;
@@ -126,10 +133,10 @@ function Island5Shell({
       </div>
 
       <header className="flex items-center justify-between px-4 sm:px-6 py-3">
-        <div className="glass-surface rounded-2xl px-5 py-2.5 flex items-center gap-3">
-          <span className="text-xs font-bold uppercase tracking-wider text-accent-strong">{kicker}</span>
-          <strong className="font-display font-extrabold text-lg text-text">{title}</strong>
-          <em className="text-[10px] text-muted italic font-normal tracking-wider uppercase">{subtitle}</em>
+        <div className="nv-dato flex flex-col sm:flex-row sm:items-baseline gap-x-3">
+          <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent-strong">{kicker}</span>
+          <strong className="font-display font-extrabold text-lg text-text leading-tight">{title}</strong>
+          <em className="text-[10px] text-text/65 italic font-semibold tracking-wider uppercase">{subtitle}</em>
         </div>
         <div className="flex items-center gap-2">
           <StarCounter />
@@ -145,28 +152,50 @@ function Island5Shell({
         </div>
       </header>
 
-      <div className="flex justify-center px-5 py-2">
-        <div className="glass-strong rounded-full px-5 py-2 flex items-center gap-2.5 shadow-md">
-          <span className="text-xs font-black uppercase tracking-wider text-accent-strong whitespace-nowrap">
-            Objetivo {Math.min(progress + (completed ? 0 : 1), total)} / {total}
+      {/* LA MISIÓN. En esta isla la consigna es lo ÚNICO que dice qué hacer:
+          no hay una letra gigante ni un atajo escrito, hay una escena con
+          cosas para arrastrar. Sin leerla —o escucharla— no se arranca. */}
+      <div className="flex justify-center px-4 pt-1 pb-2 z-20" aria-live="polite">
+        <div className={`gp-mision flex items-center gap-3 sm:gap-4 py-2.5 pl-3 pr-5 max-w-3xl ${misionEntrada ? "gp-mision--entrada" : ""}`}>
+          <span className="gp-mision__insignia inline-flex items-center gap-1 px-3 py-0.5 font-display font-extrabold text-[11px] uppercase tracking-wider">
+            <Star size={11} fill="currentColor" strokeWidth={0} />
+            Objetivo {Math.min(progress + (completed ? 0 : 1), total)} de {total}
           </span>
-          <h2 className="font-display font-extrabold text-text text-base">{goal}</h2>
+          <button
+            type="button"
+            onClick={speak}
+            className="gp-mision__audio shrink-0 rounded-full w-11 h-11 sm:w-[3.25rem] sm:h-[3.25rem] flex items-center justify-center text-white transition-transform hover:scale-105"
+            aria-label="Escuchar la consigna"
+            title="Escuchar la consigna"
+          >
+            <Volume2 size={22} />
+          </button>
+          <h2 className="font-display font-extrabold text-text text-base sm:text-xl leading-snug pt-0.5">{goal}</h2>
         </div>
       </div>
 
+      {/* La escena se apoya ABAJO, no en el centro: los fondos nuevos traen un
+          pedestal en el tercio inferior y la actividad tiene que caer encima,
+          no flotar arriba de él. `items-end` con aire abajo la sienta ahí; si
+          el contenido de un nivel crece, sube desde el pedestal en vez de
+          desbordar. */}
       <section className="flex-1 flex items-center justify-center relative min-h-0 overflow-hidden" aria-label="Escena">
         <img className="absolute bottom-0 left-0 w-auto max-h-[44vh] pointer-events-none select-none animate-mascot-float z-10" src={assets.mascotFemaleWave} alt="" decoding="async" />
         <span className="absolute glass-strong rounded-2xl px-2.5 py-1.5 text-xs font-bold text-text animate-bubble-pop max-w-[9rem] bottom-[44%] left-[2%] rounded-bl-sm z-20">¡Vos podés!</span>
         <img className="absolute bottom-0 right-0 w-auto max-h-[44vh] pointer-events-none select-none animate-mascot-float z-10" src={assets.mascotMaleProud} alt="" decoding="async" />
         <span className="absolute glass-strong rounded-2xl px-2.5 py-1.5 text-xs font-bold text-text animate-bubble-pop max-w-[9rem] bottom-[44%] right-[2%] rounded-br-sm z-20">¡Sos un crack!</span>
 
-        <div className="flex items-center justify-center w-full h-full">{children}</div>
+        {/* La actividad se APOYA abajo, no flota en el centro: los fondos
+            nuevos traen un pedestal en el tercio inferior y la escena tiene
+            que caer encima. Si el contenido de un nivel crece, crece hacia
+            arriba desde el pedestal en vez de desbordar. */}
+        <div className="flex items-end justify-center w-full h-full pb-[10vh]">{children}</div>
       </section>
 
       {/* Readable glass bar for stats + instruction + actions (was plain text
           floating over the bright art). */}
-      <div className="glass-strong mx-3 mb-3 rounded-2xl px-4 py-2.5 flex flex-col gap-2 shadow-md">
-        <div className="flex items-center justify-center gap-4 text-sm font-bold text-text">
+      <div className="nv-dato mx-3 mb-3 px-4 py-1.5 flex flex-col gap-1.5">
+        <div className="nv-dato flex items-center justify-center gap-4 text-sm font-bold text-text/90">
           <span className="text-amber-400">★</span>
           <div><b>{metrics.left}:</b> {metrics.leftValue}</div>
           <div className="w-px h-5 bg-text/15" />
@@ -177,17 +206,12 @@ function Island5Shell({
         </div>
 
       <footer className="flex items-center justify-between gap-3">
-        <div className="text-sm text-text font-semibold flex-1 min-w-0">
+        <div className="nv-dato text-sm text-text/90 font-semibold flex-1 min-w-0">
           <span aria-hidden="true" className="text-amber-400">★ </span>
           {feedback ?? instruction}
         </div>
-        <button
-          type="button"
-          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-white/70 border border-white/60 text-text font-bold text-sm cursor-pointer transition hover:bg-white/90 hover:-translate-y-0.5 active:scale-95 shadow-sm"
-          onClick={speak}
-        >
-          <span aria-hidden="true">🔊</span> Escuchar consigna
-        </button>
+        {/* Escuchar se mudó adentro de la misión, que es donde está la
+            consigna que hay que escuchar. */}
         <button
           type="button"
           className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-white/70 border border-white/60 text-text font-bold text-sm cursor-pointer transition hover:bg-white/90 hover:-translate-y-0.5 active:scale-95 shadow-sm"
