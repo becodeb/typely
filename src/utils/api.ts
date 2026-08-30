@@ -213,6 +213,16 @@ export interface ProgressItem {
   endedAt: string;
 }
 
+/** El admin importa siempre en su sede; el superadmin tiene que indicarla.
+ *  `groupId` es el grupo por defecto de las filas sin columna `grupo`. */
+function importQuery(q: { sedeId?: string; groupId?: string }): string {
+  const p = new URLSearchParams();
+  if (q.sedeId) p.set("sedeId", q.sedeId);
+  if (q.groupId) p.set("groupId", q.groupId);
+  const qs = p.toString();
+  return qs ? `?${qs}` : "";
+}
+
 /* ------------------------------------------------------------------ */
 /* Superficie pública                                                  */
 /* ------------------------------------------------------------------ */
@@ -326,8 +336,10 @@ export const api = {
   myGroup: () => call<{ group: Group | null; worldIds: string[] | null }>("/groups/mine"),
 
   /* ---- Alta masiva por CSV ---- */
-  importPreview: (csv: string) => call<ImportPreview>("/import/preview", { method: "POST", text: csv }),
-  importUsers: (csv: string) => call<ImportResult>("/import", { method: "POST", text: csv }),
+  importPreview: (csv: string, q: { sedeId?: string; groupId?: string } = {}) =>
+    call<ImportPreview>(`/import/preview${importQuery(q)}`, { method: "POST", text: csv }),
+  importUsers: (csv: string, q: { sedeId?: string; groupId?: string } = {}) =>
+    call<ImportResult>(`/import${importQuery(q)}`, { method: "POST", text: csv }),
 
   /* ---- Progreso ---- */
   myProgress: () => call<StudentProgressRow[]>("/progress/me"),

@@ -31,6 +31,9 @@ interface SedeContextValue {
   sedeName: string;
   /** Solo el superadmin puede cambiar de sede. */
   canSwitch: boolean;
+  /** Vuelve a pedir la lista de sedes. La usa la pantalla de Sedes tras
+   *  crear o editar una, para que el selector de arriba quede al día. */
+  reloadSedes: () => void;
 }
 
 const SedeContext = createContext<SedeContextValue | null>(null);
@@ -41,11 +44,17 @@ export function useSede(): SedeContextValue {
   return ctx;
 }
 
-const NAV = [{ to: "/gestion/grupos", label: "Grupos" }];
+/* El ítem de Sedes es solo del superadmin: un admin pertenece a una y no
+   administra ninguna. */
+const NAV_ALL = [
+  { to: "/gestion/sedes", label: "Escuelas", superadminOnly: true },
+  { to: "/gestion/grupos", label: "Grupos", superadminOnly: false },
+];
 
 export function ManageShell() {
   const { user, logout } = useAuth();
   const isSuperadmin = user?.role === "superadmin";
+  const NAV = NAV_ALL.filter((i) => !i.superadminOnly || isSuperadmin);
 
   const [sedes, setSedes] = useState<Sede[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -154,7 +163,12 @@ export function ManageShell() {
             <FirstSede onCreated={() => void load()} />
           ) : (
             <SedeContext.Provider
-              value={{ sedeId: current.id, sedeName: current.name, canSwitch: isSuperadmin }}
+              value={{
+                sedeId: current.id,
+                sedeName: current.name,
+                canSwitch: isSuperadmin,
+                reloadSedes: () => void load(),
+              }}
             >
               {/* Navegación en pantallas angostas, debajo del encabezado. */}
               <nav className="mb-4 flex gap-1 md:hidden" aria-label="Secciones">
