@@ -263,24 +263,31 @@ volver a generar que recortar a mano.
 
 ## 4. Importar
 
-No hay script todavía: es una conversión sola, a WebP del tamaño que usan las
-quince (1672×941).
+Dejá lo que generaste en `Images/islands/islandN/gameplay-source.png` — el
+mismo lugar y el mismo criterio que `button-sheet.png`: es el original tal como
+vino y **no se toca**. Si algún día hay que reencuadrar, se vuelve a él.
+
+Después:
 
 ```bash
-npx sharp-cli -i Images/islands/island1/gameplay-source.png \
-  -o public/assets/islands/island1/gameplay.webp \
-  resize 1672 941 --fit cover -- webp --quality 82
+node scripts/import-gameplay-bg.mjs island1     # una isla
+node scripts/import-gameplay-bg.mjs             # todas las que tengan fuente
 ```
 
-O con node, que es lo que ya está instalado:
+Deja `public/assets/islands/islandN/gameplay.webp` en 1672×941 y de paso
+**mide el pedestal**, que es el chequeo que más importa. Sale algo así:
 
-```bash
-node -e "require('sharp')('Images/islands/island1/gameplay-source.png').resize(1672,941,{fit:'cover'}).webp({quality:82}).toFile('public/assets/islands/island1/gameplay.webp').then(i=>console.log(i.width+'x'+i.height, Math.round(i.size/1024)+'KB'))"
+```
+-- island1 --
+   fuente   Images/islands/island1/gameplay-source.png  1672x941  (1.777)
+   encuadre ya venia 16:9, no se recorto nada
+   salida   public/assets/islands/island1/gameplay.webp  1672x941
+   pedestal 5.54:1 contra la tecla  -> ok
 ```
 
-Guardá el original en `Images/islands/islandN/gameplay-source.png`, igual que
-se guarda `button-sheet.png`. **No se toca**: si algún día hay que reencuadrar,
-se vuelve a él.
+Si la fuente no viene en 16:9, el script recorta al centro y **avisa cuánto se
+llevó y de dónde**. En un 3:2 son ~11 % arriba y ~11 % abajo, así que ahí hay
+que mirar si la plataforma quedó al ras del borde.
 
 El juego lo toma solo — `islandGameplayBg()` arma la ruta desde el `worldId`,
 así que no hay ninguna tabla que actualizar.
@@ -326,6 +333,8 @@ volver a generar pidiendo el centro despejado.
 |---|---|
 | `_default/REFERENCIA-fondo-nivel.png` | El molde aprobado, va con el prompt de cada isla |
 | `Images/islands/islandN/gameplay-source.png` | El original tal como vino. **No se toca** |
+| `scripts/import-gameplay-bg.mjs` | Fuente → WebP 1672×941, y mide el pedestal |
+| `scripts/medir-pedestal.mjs` | Mide solo, para chequear un fondo ya importado |
 | `public/assets/islands/islandN/gameplay.webp` | El que consume el juego, 1672×941 |
 | `src/utils/assets.ts` → `islandGameplayBg()` | Arma la ruta desde el `worldId` |
 | `src/pages/GameplayPage.tsx` | Lo pinta con `bg-cover bg-center` |
