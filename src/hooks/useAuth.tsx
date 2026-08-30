@@ -1,302 +1,191 @@
+/* Proveedor de sesión.
+ *
+ * La API es la única autoridad. La versión anterior, si la API no
+ * respondía, autenticaba contra una lista de usuarios guardada en
+ * localStorage —con contraseñas en texto plano y un `admin`/`admin` fijo
+ * dentro del bundle público—. Eso permitía entrar al panel de
+ * administración simplemente estando la API caída. Se fue por completo.
+ *
+ * Lo único que sigue viviendo en el navegador es el MODO DEMO: una partida
+ * suelta, sin cuenta ni token, que nunca toca datos reales.
+ */
+
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import type { ActiveUser, Role } from "../types";
-import {
-  authenticate,
-  authenticateAny,
-  demoLogin,
-  ensureSeedData,
-  getActiveUser,
-  loginByGoogleEmail,
-  setActiveUser,
-  setDemoMode,
-  setUserPassword,
-  getViewAs,
-  setViewAsStored,
-  type ViewAs,
-} from "../utils/storage";
-import { isEmailDomainAllowed, parseJwtCredential } from "../utils/googleAuth";
-import { api, ApiError, setAccessToken, setReadOnlyMode, type ApiActiveUser } from "../utils/api";
+import type { ActiveUser } from "../types";
+import { api, ApiError, setAccessToken, type SessionUser } from "../utils/api";
+import { clearDemoMode, isDemoMode, setDemoMode } from "../utils/storage";
+import { parseJwtCredential } from "../utils/googleAuth";
 
-/** Sesión de soporte en modo lectura: a quién estoy viendo, quién la inició
- *  y cuándo expira (epoch ms). `null` = sesión normal. */
-export interface Impersonation {
-  targetName: string;
-  actorName: string;
-  expiresAt: number;
-}
+/** Alumno de demostración. No existe en la base y no puede salir del juego. */
+const DEMO_USER: ActiveUser = {
+  id: "demo",
+  name: "Explorador",
+  username: "demo",
+  role: "alumno",
+  groupId: null,
+  sedeId: null,
+};
 
-/** Result of a Google sign-in attempt. Always returns a structured value
- *  so the UI can render a friendly Spanish message — `null` would lose
- *  the reason. */
+export type LoginResult =
+  | { ok: true; user: ActiveUser }
+  | { ok: false; message: string };
+
 export type GoogleLoginResult =
   | { ok: true; user: ActiveUser }
-  | { ok: false; reason: "INVALID_TOKEN" | "DOMAIN_NOT_ALLOWED" | "USER_NOT_FOUND" | "NETWORK_ERROR" };
+  | { ok: false; reason: "INVALID_TOKEN" | "USER_NOT_FOUND" | "NETWORK_ERROR"; message: string };
 
-/* The localStorage user shape and the API user shape are intentionally
-   compatible — we map between them in one place so the rest of the app
-   never has to know. */
-function toActiveUser(u: ApiActiveUser): ActiveUser {
+function toActiveUser(u: SessionUser): ActiveUser {
   return {
     id: u.id,
     name: u.name,
-    username: u.username ?? "",
+    username: u.username,
     email: u.email,
     role: u.role,
-    siteId: u.sedeId ?? undefined,
-    classId: u.classId ?? undefined,
+    sedeId: u.sedeId,
+    groupId: u.groupId,
     mustChangePassword: u.mustChangePassword,
-    active: true,
   };
 }
 
 interface AuthContextValue {
   user: ActiveUser | null;
-  /** True while the silent bootstrap is still running — pages can show
-   *  a soft loader while we try the refresh-cookie. */
+  /** True mientras corre el intento silencioso de recuperar la sesión. */
   bootstrapping: boolean;
-  /** True if the last login round-trip went to the API (not local). Set
-   *  after a successful API login OR bootstrap. Used by the dashboard
-   *  shells to decide whether to show a "Backend offline" banner. */
-  usingApi: boolean;
-  loginAny: (username: string, password: string) => Promise<ActiveUser | null>;
-  login: (role: Role, username: string, password: string) => Promise<ActiveUser | null>;
-  /** Demo sign-in — always the lowest-privilege demo student. */
-  loginDemo: () => ActiveUser;
-  completePasswordChange: (newPassword: string) => Promise<ActiveUser | null>;
+  /** True si esta sesión es el modo demo (partida local, sin cuenta). */
+  demo: boolean;
+  login: (identifier: string, password: string) => Promise<LoginResult>;
   loginGoogle: (credential: string) => Promise<GoogleLoginResult>;
-  /** Adopt a session created out-of-band (e.g. accepting an invitation,
-   *  which logs the user in server-side). The access token + refresh cookie
-   *  are already set by the api client; this syncs the React/local state. */
-  adoptSession: (apiUser: ApiActiveUser) => ActiveUser;
-  /** Superadmin "god mode": the role/sede/dev surface they chose to enter
-   *  from the "¿Cómo querés entrar?" chooser. `null` = act as superadmin. */
-  viewAs: ViewAs | null;
-  setViewAs: (view: ViewAs | null) => void;
-  /** Sesión de soporte en modo lectura (impersonación), o null. */
-  impersonation: Impersonation | null;
-  /** Inicia el modo lectura sobre `target` (el access token ya fue emitido
-   *  por la API). Reemplaza la sesión actual en memoria. */
-  startImpersonation: (access: string, target: ApiActiveUser, actorName: string, expiresInSeconds: number) => ActiveUser;
-  /** Termina el modo lectura y restaura la sesión del administrador real. */
-  stopImpersonation: () => Promise<void>;
+  loginDemo: () => ActiveUser;
+  changePassword: (currentPassword: string | undefined, newPassword: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  ensureSeedData();
-  const [user, setUser] = useState<ActiveUser | null>(() => getActiveUser());
+  const [user, setUser] = useState<ActiveUser | null>(null);
   const [bootstrapping, setBootstrapping] = useState(true);
-  const [usingApi, setUsingApi] = useState(false);
-  const [viewAs, setViewAsState] = useState<ViewAs | null>(() => getViewAs());
-  const [impersonation, setImpersonation] = useState<Impersonation | null>(null);
+  const [demo, setDemo] = useState(() => isDemoMode());
 
-  const setViewAs = useCallback((view: ViewAs | null) => {
-    setViewAsStored(view);
-    setViewAsState(view);
-  }, []);
-
-  /* Try to recover a session from the HTTP-only refresh cookie. If it
-     works we replace the localStorage user with the API user (more
-     authoritative). If it fails we keep whatever localStorage has so
-     demo mode stays functional. */
+  /* Recuperar la sesión desde la cookie de refresh. Si no hay, se muestra
+     el login: no hay ningún otro camino para entrar. */
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const apiUser = await api.bootstrap();
-        if (cancelled) return;
-        if (apiUser) {
-          const au = toActiveUser(apiUser);
-          setActiveUser(au);
-          setUser(au);
-          setUsingApi(true);
+      /* El demo no tiene cuenta ni cookie: se restaura desde su propia
+         marca. Sin esto, recargar la página en medio de una partida de
+         demostración devolvía al login. */
+      if (isDemoMode()) {
+        if (!cancelled) {
+          setUser(DEMO_USER);
+          setDemo(true);
+          setBootstrapping(false);
         }
-      } catch {
-        /* offline / API not up yet — fall through, localStorage user remains */
+        return;
+      }
+      try {
+        const session = await api.bootstrap();
+        if (!cancelled && session) {
+          setUser(toActiveUser(session));
+          setDemo(false);
+        }
       } finally {
         if (!cancelled) setBootstrapping(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const loginAny = useCallback(async (username: string, password: string): Promise<ActiveUser | null> => {
+  const login = useCallback(async (identifier: string, password: string): Promise<LoginResult> => {
     try {
-      const { user: apiUser } = await api.login(username, password);
-      const au = toActiveUser(apiUser);
-      setDemoMode(false);
-      setActiveUser(au);
-      setUser(au);
-      setUsingApi(true);
-      return au;
+      const session = await api.login(identifier.trim(), password);
+      const active = toActiveUser(session);
+      clearDemoMode();
+      setDemo(false);
+      setUser(active);
+      return { ok: true, user: active };
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403 || err.status === 404)) {
-        // Server is reachable but rejected credentials — do NOT fall through to
-        // localStorage, that would risk a stale "admin/admin" matching.
-        return null;
-      }
-      // Network error or server down: fall back to the in-browser user list.
-      const nextUser = authenticateAny(username, password);
-      if (nextUser) {
-        setDemoMode(false);
-        setActiveUser(nextUser);
-        setUser(nextUser);
-        setUsingApi(false);
-      }
-      return nextUser;
+      if (err instanceof ApiError) return { ok: false, message: err.message };
+      return { ok: false, message: "No pudimos conectarnos. Revisá tu conexión e intentá de nuevo." };
     }
   }, []);
-
-  const login = useCallback(async (role: Role, username: string, password: string): Promise<ActiveUser | null> => {
-    try {
-      const { user: apiUser } = await api.login(username, password);
-      if (apiUser.role !== role) {
-        return null; // server is authoritative about role
-      }
-      const au = toActiveUser(apiUser);
-      setDemoMode(false);
-      setActiveUser(au);
-      setUser(au);
-      setUsingApi(true);
-      return au;
-    } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403 || err.status === 404)) {
-        return null;
-      }
-      const nextUser = authenticate(role, username, password);
-      if (nextUser) {
-        setDemoMode(false);
-        setActiveUser(nextUser);
-        setUser(nextUser);
-        setUsingApi(false);
-      }
-      return nextUser;
-    }
-  }, []);
-
-  const loginDemo = useCallback((): ActiveUser => {
-    const nextUser = demoLogin();
-    setDemoMode(true);
-    setActiveUser(nextUser);
-    setUser(nextUser);
-    setUsingApi(false); // demo never round-trips the API
-    return nextUser;
-  }, []);
-
-  const completePasswordChange = useCallback(async (newPassword: string): Promise<ActiveUser | null> => {
-    if (!user) return null;
-    if (usingApi) {
-      // API-backed session: the server is the source of truth. If this call
-      // fails the flag stays set and the guard keeps the user on the page.
-      try {
-        await api.changeOwnPassword(user.id, newPassword);
-      } catch {
-        return null;
-      }
-    } else {
-      const ok = setUserPassword(user.id, newPassword);
-      if (!ok) return null;
-    }
-    const refreshed: ActiveUser = { ...user, mustChangePassword: false };
-    setActiveUser(refreshed);
-    setUser(refreshed);
-    return refreshed;
-  }, [user, usingApi]);
 
   const loginGoogle = useCallback(async (credential: string): Promise<GoogleLoginResult> => {
-    const payload = parseJwtCredential(credential);
-    if (!payload || !payload.email) return { ok: false, reason: "INVALID_TOKEN" };
-    /* NOTE: the domain allowlist is NOT applied up front anymore. An account
-       that an admin already created (any email, including @gmail.com) must be
-       able to sign in with Google. The allowlist only gates UNKNOWN emails. */
+    /* Se decodifica solo para dar un mensaje claro si el token viene roto.
+       La verificación de verdad la hace el servidor contra el JWKS de
+       Google — el payload del cliente nunca se considera confiable. */
+    if (!parseJwtCredential(credential)?.email) {
+      return { ok: false, reason: "INVALID_TOKEN", message: "La credencial de Google no es válida." };
+    }
     try {
-      const { user: apiUser } = await api.google(credential);
-      const au = toActiveUser({ ...apiUser, mustChangePassword: false });
-      setDemoMode(false);
-      setActiveUser(au);
-      setUser(au);
-      setUsingApi(true);
-      return { ok: true, user: au };
+      const session = await api.google(credential);
+      const active = toActiveUser(session);
+      clearDemoMode();
+      setDemo(false);
+      setUser(active);
+      return { ok: true, user: active };
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-        return { ok: false, reason: "INVALID_TOKEN" };
+      if (err instanceof ApiError) {
+        return {
+          ok: false,
+          reason: err.status === 404 ? "USER_NOT_FOUND" : "INVALID_TOKEN",
+          message: err.message,
+        };
       }
-      // 404 (server: no such user) or network error → look in the local user
-      // list. A matching account is ALWAYS allowed regardless of its domain.
-      const nextUser = loginByGoogleEmail(payload.email);
-      if (nextUser) {
-        const au: ActiveUser = { ...nextUser, mustChangePassword: false };
-        setDemoMode(false);
-        setActiveUser(au);
-        setUser(au);
-        setUsingApi(false);
-        return { ok: true, user: au };
-      }
-      // Unknown email: a non-allowlisted domain gets the clearer message.
-      if (!isEmailDomainAllowed(payload.email)) return { ok: false, reason: "DOMAIN_NOT_ALLOWED" };
-      return { ok: false, reason: "USER_NOT_FOUND" };
+      return {
+        ok: false,
+        reason: "NETWORK_ERROR",
+        message: "No pudimos conectarnos. Revisá tu conexión e intentá de nuevo.",
+      };
     }
   }, []);
 
-  const adoptSession = useCallback((apiUser: ApiActiveUser): ActiveUser => {
-    const au = toActiveUser(apiUser);
-    setDemoMode(false);
-    setActiveUser(au);
-    setUser(au);
-    setUsingApi(true);
-    return au;
+  /* El demo nunca pide token ni toca la API: es una partida local que se
+     guarda solo en este navegador. No puede llegar a ninguna pantalla de
+     gestión — es alumno y nada más. */
+  const loginDemo = useCallback((): ActiveUser => {
+    setAccessToken(null);
+    setDemoMode(true);
+    setDemo(true);
+    setUser(DEMO_USER);
+    return DEMO_USER;
   }, []);
 
-  const startImpersonation = useCallback(
-    (access: string, target: ApiActiveUser, actorName: string, expiresInSeconds: number): ActiveUser => {
-      setReadOnlyMode(true);
-      setAccessToken(access);
-      const au = toActiveUser({ ...target, mustChangePassword: false });
-      setActiveUser(au);
-      setUser(au);
-      setUsingApi(true);
-      setImpersonation({ targetName: au.name, actorName, expiresAt: Date.now() + expiresInSeconds * 1000 });
-      return au;
+  const changePassword = useCallback(
+    async (currentPassword: string | undefined, newPassword: string): Promise<LoginResult> => {
+      if (!user) return { ok: false, message: "No hay una sesión activa." };
+      try {
+        await api.changePassword(currentPassword, newPassword);
+        const refreshed = { ...user, mustChangePassword: false };
+        setUser(refreshed);
+        return { ok: true, user: refreshed };
+      } catch (err) {
+        if (err instanceof ApiError) return { ok: false, message: err.message };
+        return { ok: false, message: "No pudimos guardar la contraseña nueva." };
+      }
     },
-    [],
+    [user],
   );
 
-  const stopImpersonation = useCallback(async () => {
-    setReadOnlyMode(false);
-    setImpersonation(null);
-    setAccessToken(null);
-    // La cookie de refresh del administrador real sigue viva → recuperamos
-    // su sesión. Si falla (expiró), caemos al login.
-    const apiUser = await api.bootstrap();
-    if (apiUser) {
-      const au = toActiveUser(apiUser);
-      setActiveUser(au);
-      setUser(au);
-      setUsingApi(true);
-    } else {
-      setActiveUser(null);
-      setUser(null);
+  const logout = useCallback(async () => {
+    clearDemoMode();
+    setDemo(false);
+    if (!isDemoMode()) {
+      try {
+        await api.logout();
+      } catch {
+        /* Si la API no responde, igual limpiamos el estado local. */
+      }
     }
+    setAccessToken(null);
+    setUser(null);
   }, []);
 
-  const logout = useCallback(async () => {
-    setReadOnlyMode(false);
-    setImpersonation(null);
-    setDemoMode(false);
-    setViewAsStored(null);
-    setViewAsState(null);
-    if (usingApi) {
-      try { await api.logout(); } catch { /* ignore */ }
-    }
-    setActiveUser(null);
-    setUser(null);
-  }, [usingApi]);
-
   const value = useMemo<AuthContextValue>(
-    () => ({ user, bootstrapping, usingApi, loginAny, login, loginDemo, completePasswordChange, loginGoogle, adoptSession, viewAs, setViewAs, impersonation, startImpersonation, stopImpersonation, logout }),
-    [user, bootstrapping, usingApi, loginAny, login, loginDemo, completePasswordChange, loginGoogle, adoptSession, viewAs, setViewAs, impersonation, startImpersonation, stopImpersonation, logout],
+    () => ({ user, bootstrapping, demo, login, loginGoogle, loginDemo, changePassword, logout }),
+    [user, bootstrapping, demo, login, loginGoogle, loginDemo, changePassword, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -304,6 +193,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used inside AuthProvider");
+  if (!context) throw new Error("useAuth tiene que usarse dentro de AuthProvider");
   return context;
 }

@@ -36,8 +36,8 @@ import { CharacterSkin } from "../components/common/CharacterSkin";
 import { SkinProgressBar } from "../components/common/SkinProgressBar";
 import { SkinUnlockCelebration } from "../components/common/SkinUnlockCelebration";
 import { assets } from "../utils/assets";
-import { getUserContext, makeRapidClickDetector } from "../utils/userContext";
-import { getTotalStars, loadProgress } from "../utils/progress";
+import { getUserContext, loadMyGroup, makeRapidClickDetector } from "../utils/userContext";
+import { getTotalStars, loadProgress, hydrateProgress, flushProgressQueue } from "../utils/progress";
 
 /* ------------------------------------------------------------------ */
 /* Asset pre-fetch cache                                               */
@@ -178,8 +178,29 @@ export function WorldsPage() {
      Rebuilding all 15 worlds + reading localStorage on each hover/menu toggle
      was a real cost; memoizing removes it. Progress is stable within a mount
      (this page never writes it). */
-  const context = useMemo(() => getUserContext(user), [user]);
-  const progress = useMemo(() => loadProgress(), [user]);
+  /* Al entrar al juego se traen dos cosas del servidor:
+       - el grupo del alumno, que dice qué islas habilitó su docente;
+       - su progreso, para que sobreviva a cambiar de computadora.
+     Y de paso se vacía la cola de niveles que quedaron sin enviar.
+
+     Nada de esto bloquea el dibujado: la pantalla se arma con lo que hay
+     en localStorage y se vuelve a armar cuando llega la respuesta. Si no
+     hay red, se juega igual. */
+  const [syncTick, setSyncTick] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      await Promise.all([loadMyGroup(), hydrateProgress()]);
+      await flushProgressQueue();
+      if (!cancelled) setSyncTick((t) => t + 1);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  const context = useMemo(() => getUserContext(user), [user, syncTick]);
+  const progress = useMemo(() => loadProgress(), [user, syncTick]);
   const visibleWorlds = useMemo(() => getWorldsForUser(context, progress), [context, progress]);
   const worldStates = useMemo(() => getWorldStatesForUser(context, progress), [context, progress]);
 
@@ -459,17 +480,6 @@ export function WorldsPage() {
               <Star size={19} />
               <span>{totalStars} estrellas</span>
             </button>
-            {/* Superadmin-only shortcut to the teacher/admin panel. */}
-            {context.isSuperAdmin && (
-              <button
-                type="button"
-                className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-text font-semibold text-sm cursor-pointer bg-transparent border-0 hover:bg-white/40 transition-colors text-left w-full"
-                onClick={() => navigate("/profesor")}
-              >
-                <GraduationCap size={19} />
-                <span>Panel docente</span>
-              </button>
-            )}
             <button
               type="button"
               className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-text font-semibold text-sm cursor-pointer bg-transparent border-0 hover:bg-white/40 transition-colors text-left w-full"

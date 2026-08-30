@@ -89,9 +89,7 @@ function collectEnv(): EnvVar[] {
     { name: "CORS_ORIGIN", scope: "server", public: false, set: !!e.CORS_ORIGIN, value: e.CORS_ORIGIN ?? "https://typely.bauhub.online (default)", note: "Origen permitido por CORS." },
     { name: "DATABASE_URL", scope: "server", public: false, set: !!e.DATABASE_URL, value: maskDatabaseUrl(e.DATABASE_URL), note: "Conexión Postgres (secreto Docker; contraseña oculta)." },
     { name: "JWT_SECRET", scope: "server", public: false, set: !!e.JWT_SECRET, value: e.JWT_SECRET ? "•••• (configurado)" : null, note: "Firma de los access tokens. Nunca se muestra." },
-    { name: "RESEND_API_KEY", scope: "server", public: false, set: !!e.RESEND_API_KEY, value: e.RESEND_API_KEY ? "•••• (configurado)" : null, note: "Emails de invitación. Vacío = solo link compartible." },
     { name: "GOOGLE_CLIENT_ID", scope: "server", public: false, set: !!e.GOOGLE_CLIENT_ID, value: e.GOOGLE_CLIENT_ID ? `${e.GOOGLE_CLIENT_ID.slice(0, 12)}…` : null, note: "Verificación server-side del ID token de Google." },
-    { name: "INVITE_FROM", scope: "server", public: false, set: !!e.INVITE_FROM, value: e.INVITE_FROM ?? null, note: "Remitente de los emails de invitación." },
     { name: "PUBLIC_ORIGIN", scope: "server", public: false, set: !!e.PUBLIC_ORIGIN, value: e.PUBLIC_ORIGIN ?? null, note: "Origen absoluto para armar links de invitación." },
     { name: "SUPERADMIN_EMAIL", scope: "server", public: false, set: !!e.SUPERADMIN_EMAIL, value: e.SUPERADMIN_EMAIL ?? "(solo lo usa el seed)", note: "Usado por dist/seed.js, no por el server." },
   ];
@@ -117,7 +115,6 @@ const SAMPLES: Record<string, unknown> = {
   "GET /api/admin/overview": { counts: { courses: 3, teachers: 4, students: 60 }, activeToday: 12, avgProgress: 81, weekly: [], alerts: {}, attentionCourses: [], recent: [] },
   "GET /api/audit": [{ id: 1, action: "create_user", entityType: "user", at: "<iso>", actorName: "Admin" }],
   "GET /api/academic-years": [{ id: "<uuid>", label: "2026", isActive: true, closedAt: null }],
-  "GET /api/invitations": [{ id: "<uuid>", email: "docente@escuela.edu", role: "profesor", status: "sent" }],
   "GET /api/admin/inspector": { service: "…", db: "…", env: "…", routes: "…", recentErrors: "…" },
 };
 
@@ -125,7 +122,7 @@ async function requireInspectorAccess(req: FastifyRequest): Promise<AccessClaims
   const auth = req.headers.authorization;
   if (!auth?.startsWith("Bearer ")) throw Object.assign(new Error("Sin sesión."), { status: 401 });
   const claims = await verifyAccessToken(auth.slice("Bearer ".length));
-  if (claims.role !== "superadmin" && claims.role !== "admin-general" && claims.role !== "admin-sede") {
+  if (claims.role !== "superadmin" && claims.role !== "admin") {
     throw Object.assign(new Error("No autorizado."), { status: 403 });
   }
   return claims;
@@ -152,7 +149,7 @@ export async function inspectorRoutes(app: FastifyInstance) {
     let recentAudit: unknown[] = [];
     if (dbOk) {
       try {
-        const where = actor.role === "admin-sede" && actor.sede ? eq(schema.auditLog.sedeId, actor.sede) : undefined;
+        const where = actor.role === "admin" && actor.sede ? eq(schema.auditLog.sedeId, actor.sede) : undefined;
         recentAudit = await db
           .select({
             action: schema.auditLog.action,
@@ -187,12 +184,10 @@ export async function inspectorRoutes(app: FastifyInstance) {
       config: {
         accessTokenTtlMinutes: 15,
         refreshTokenTtlDays: 30,
-        invitationTtlDays: 14,
         bodyLimitBytes: 1024 * 1024,
         bcryptCost: 12,
         corsOrigin: process.env.CORS_ORIGIN ?? "https://typely.bauhub.online",
         googleLoginEnabled: !!process.env.GOOGLE_CLIENT_ID,
-        inviteEmailsEnabled: !!process.env.RESEND_API_KEY,
       },
       routes,
       recentErrors: errorBuffer,

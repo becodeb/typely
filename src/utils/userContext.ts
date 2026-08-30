@@ -1,149 +1,142 @@
 /**
- * userContext.ts
+ * Qué islas ve cada alumno.
  *
- * Single source of truth for:
- *  - role detection  (alumno / profesor / admin-sede / admin-general)
- *  - course/grade resolution from the user's classId
- *  - path selection  (course path vs. free path)
- *  - world/level visibility per user
+ * Antes esto se resolvía leyendo una base de datos falsa en localStorage:
+ * buscaba el curso del alumno en `getDemoData()` y las islas habilitadas en
+ * una clave `edutic_class_worlds_*`. Mientras tanto, el docente guardaba su
+ * selección en la API. Las dos mitades nunca se hablaron, así que
+ * configurar un grupo no tenía ningún efecto visible para el alumno.
  *
- * This is intentionally a pure utility module — no React hooks — so it can
- * be called from anywhere (WorldsPage, App routing, server-side in the future).
+ * Ahora hay una sola fuente: la API. `loadMyGroup()` la consulta una vez al
+ * entrar y deja el resultado en memoria (con espejo en localStorage para
+ * que un refresh no parpadee), y el resto del juego lo lee sincrónicamente.
  */
 
-import type { ActiveUser, GradeId, Role } from "../types";
-import { getDemoData, getActiveUser, getEnabledWorldsForClass, isDemoMode } from "./storage";
+import type { ActiveUser, GradeId, Group, Role } from "../types";
+import { api, getAccessToken } from "./api";
+import { isDemoMode } from "./storage";
 import type { Activity } from "../data/activities";
 
 /* ------------------------------------------------------------------ */
-/* Types                                                               */
+/* Grupo del alumno — cargado una vez, leído muchas                    */
+/* ------------------------------------------------------------------ */
+
+const CACHE_KEY = "typely_my_group_v1";
+
+interface MyGroup {
+  grade: GradeId;
+  /** Islas que habilitó el docente. `null` = sin restricción. */
+  worldIds: string[] | null;
+  groupName: string | null;
+}
+
+let cached: MyGroup | null = readCache();
+
+function readCache(): MyGroup | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    return raw ? (JSON.parse(raw) as MyGroup) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(value: MyGroup | null) {
+  cached = value;
+  try {
+    if (value) localStorage.setItem(CACHE_KEY, JSON.stringify(value));
+    else localStorage.removeItem(CACHE_KEY);
+  } catch {
+    /* modo privado / sin espacio — el valor en memoria alcanza */
+  }
+}
+
+/** Consulta el grupo del alumno. Llamar una vez, al entrar al juego.
+ *
+ *  En modo demo no hay cuenta, así que no hay grupo que consultar: sin
+ *  esta guarda, cada partida de demostración disparaba un pedido al
+ *  servidor que solo podía fallar. */
+export async function loadMyGroup(): Promise<MyGroup | null> {
+  if (!getAccessToken() || isDemoMode()) return null;
+  try {
+    const res = await api.myGroup();
+    const group = res.group as Group | null;
+    const value: MyGroup = {
+      grade: (group?.grade as GradeId) ?? "1ep",
+      worldIds: res.worldIds,
+      groupName: group?.name ?? null,
+    };
+    writeCache(value);
+    return value;
+  } catch {
+    /* Sin red: seguimos con lo último que supimos. El juego no puede
+       quedarse esperando a la API para dibujar el mapa. */
+    return cached;
+  }
+}
+
+export function clearMyGroup() {
+  writeCache(null);
+}
+
+export function myGroupName(): string | null {
+  return cached?.groupName ?? null;
+}
+
+/* ------------------------------------------------------------------ */
+/* Contexto                                                            */
 /* ------------------------------------------------------------------ */
 
 export interface UserContext {
   user: ActiveUser | null;
   role: Role | "guest";
   grade: GradeId;
-  /** true  → show only worlds that belong to the student's course
-   *  false → show all worlds (teacher / admin / superadmin / demo / free)  */
+  /** true → solo las islas de su curso. false → todas (demo / staff). */
   isCoursePath: boolean;
-  /** Superadmin (admin/admin) — sees everything. */
-  isSuperAdmin: boolean;
-  /** Demo mode — full free-path preview of every world. */
   isDemo: boolean;
 }
 
-export function isSuperAdmin(user: ActiveUser | null): boolean {
-  return user?.role === "superadmin";
-}
-
-/* ------------------------------------------------------------------ */
-/* Grade derivation                                                    */
-/* ------------------------------------------------------------------ */
-
-/** Derives the student's grade from their classId.  Falls back to the
- *  classroom name pattern ("3ro", "4to", etc.) if no explicit grade is
- *  stored, and finally returns "libre" so they always get *some* worlds. */
-export function getGradeForUser(user: ActiveUser | null): GradeId {
-  if (!user) return "libre";
-
-  // Non-students always get the full free path.
-  if (user.role !== "alumno") return "libre";
-
-  // If the user belongs to a classroom, read the grade from it.
-  if (user.classId) {
-    const data = getDemoData();
-    const classroom = data.classes.find((c) => c.id === user.classId);
-    if (classroom?.grade) return classroom.grade;
-
-    // Fallback: parse grade from classroom name pattern.
-    const name = (classroom?.name ?? "").toLowerCase();
-    if (name.includes("inicial") || name.includes("sala")) return "inicial";
-    if (name.startsWith("1")) return "1ep";
-    if (name.startsWith("2")) return "2ep";
-    if (name.startsWith("3")) return "3ep";
-    if (name.startsWith("4")) return "4ep";
-    if (name.startsWith("5")) return "5ep";
-    if (name.startsWith("6")) return "6ep";
-    if (name.includes("sec") || name.includes("1ro b") || name.includes("secundaria")) return "sec";
-  }
-
-  // Student with no classroom → show the initial course
-  return "1ep";
-}
-
-/* ------------------------------------------------------------------ */
-/* Context factory                                                     */
-/* ------------------------------------------------------------------ */
-
-export function getUserContext(user?: ActiveUser | null): UserContext {
-  const activeUser = user ?? getActiveUser();
-  const role: Role | "guest" = activeUser?.role ?? "guest";
-  const superAdmin = isSuperAdmin(activeUser);
+export function getUserContext(user: ActiveUser | null): UserContext {
+  const role: Role | "guest" = user?.role ?? "guest";
   const demo = isDemoMode();
 
-  // Superadmin and demo mode both get the FULL free path (all worlds).
-  const freePath = superAdmin || demo || (role !== "alumno");
-  const grade = freePath ? "libre" : getGradeForUser(activeUser);
-  const isCoursePath = !freePath;
+  /* El demo y cualquiera que no sea alumno recorren el camino libre: ven
+     todas las islas. Solo el alumno real sigue el recorrido de su grado. */
+  const freePath = demo || role !== "alumno";
+  const grade: GradeId = freePath ? "libre" : (cached?.grade ?? "1ep");
 
-  return {
-    user: activeUser,
-    role,
-    grade,
-    isCoursePath,
-    isSuperAdmin: superAdmin,
-    isDemo: demo,
-  };
+  return { user, role, grade, isCoursePath: !freePath, isDemo: demo };
 }
 
 /* ------------------------------------------------------------------ */
-/* Course → worlds mapping                                             */
+/* Grado → islas                                                       */
 /* ------------------------------------------------------------------ */
 
-/** Maps each grade to the set of worldIds that are appropriate.
- *  Worlds are listed in the exact difficulty order so the first unlocked
- *  world the student reaches is always grade-appropriate. */
+/** Qué islas corresponden a cada grado, en orden de dificultad. */
 export const GRADE_WORLDS: Record<GradeId, Activity["worldId"][]> = {
-  // Inicial (Pre-K / Sala 5): letters only
   inicial: ["island1", "island6"],
-
-  // 1º EP: letters + basic words
   "1ep": ["island1", "island6", "island2"],
-
-  // 2º EP: words + phrases
   "2ep": ["island1", "island6", "island2", "island7", "island13"],
-
-  // 3º EP: typing basics + accents + punctuation
   "3ep": ["island1", "island6", "island2", "island7", "island13", "island3", "island8"],
-
-  // 4º EP: full typing + email + searches
   "4ep": [
     "island1", "island6", "island2", "island7", "island13",
     "island3", "island8", "island9", "island4", "island10",
   ],
-
-  // 5º EP: all typing + mouse skills + basic shortcuts
   "5ep": [
     "island1", "island6", "island2", "island7", "island13",
     "island3", "island8", "island9", "island4", "island10",
     "island5", "island11",
   ],
-
-  // 6º EP: everything
   "6ep": [
     "island1", "island6", "island2", "island7", "island13",
     "island3", "island8", "island9", "island4", "island10",
     "island5", "island11", "island12", "island14", "island15",
   ],
-
-  // Secundaria: same as 6EP (could add advanced content later)
   sec: [
     "island1", "island6", "island2", "island7", "island13",
     "island3", "island8", "island9", "island4", "island10",
     "island5", "island11", "island12", "island14", "island15",
   ],
-
-  // Libre: all worlds (teachers, admins, free exploration)
   libre: [
     "island1", "island6", "island2", "island7", "island13",
     "island3", "island8", "island9", "island4", "island10",
@@ -151,40 +144,27 @@ export const GRADE_WORLDS: Record<GradeId, Activity["worldId"][]> = {
   ],
 };
 
-/** Returns the ordered list of worldIds visible to a user.
- *  - Superadmin / demo / teacher / free-path  → every world (libre).
- *  - Students on the course path → worlds for their grade, further
- *    narrowed by any island selection their teacher saved for the class. */
+/** Las islas visibles para este usuario, en orden. */
 export function getVisibleWorldIds(context: UserContext): Activity["worldId"][] {
   const base = GRADE_WORLDS[context.grade] ?? GRADE_WORLDS.libre;
-
-  // Free-path roles (superadmin / demo / teacher / admin) ignore the
-  // per-class teacher selection — they always see everything.
   if (!context.isCoursePath) return base;
 
-  // Course-path student: respect the teacher's enabled-islands selection.
-  const enabled = getEnabledWorldsForClass(context.user?.classId);
-  if (!enabled) return base; // teacher never customised → all grade worlds
+  /* Alumno con curso: se respeta lo que habilitó su docente. Sin filas
+     guardadas (`null`) significa "todas las de su grado". */
+  const enabled = cached?.worldIds;
+  if (!enabled) return base;
   return base.filter((id) => enabled.includes(id));
 }
 
-/** Returns true if the given world is accessible at all for this user.
- *  Note: this is about visibility, not progression lock (that's handled
- *  separately by getWorldStates). */
-export function canAccessWorld(
-  worldId: Activity["worldId"],
-  context: UserContext,
-): boolean {
+export function canAccessWorld(worldId: Activity["worldId"], context: UserContext): boolean {
   return getVisibleWorldIds(context).includes(worldId);
 }
 
 /* ------------------------------------------------------------------ */
-/* Dev-bypass helper (5-click shortcut)                                */
+/* Detector de clicks rápidos (atajo de desarrollo)                    */
 /* ------------------------------------------------------------------ */
 
-/** Shared rapid-click tracker for the 5-click dev bypass.
- *  Call `registerClick(id)` on every click; returns `true` when 5 rapid
- *  clicks on the same id have been detected.  Resets after detection. */
+/** Devuelve `true` cuando detecta `required` clicks seguidos sobre el mismo id. */
 export function makeRapidClickDetector(windowMs = 450, required = 5) {
   let lastId = "";
   let count = 0;
@@ -192,9 +172,8 @@ export function makeRapidClickDetector(windowMs = 450, required = 5) {
 
   return function registerClick(id: string): boolean {
     const now = Date.now();
-    if (id === lastId && now - lastTime <= windowMs) {
-      count += 1;
-    } else {
+    if (id === lastId && now - lastTime <= windowMs) count += 1;
+    else {
       count = 1;
       lastId = id;
     }
@@ -207,9 +186,3 @@ export function makeRapidClickDetector(windowMs = 450, required = 5) {
     return false;
   };
 }
-
-/* ------------------------------------------------------------------ */
-/* Convenience re-exports used by WorldsPage / IslandDetailPage        */
-/* ------------------------------------------------------------------ */
-
-export { getActiveUser };

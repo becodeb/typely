@@ -1,206 +1,319 @@
-/* CSV bulk import — admins of a sede can upload a CSV of students /
- * teachers and the API will create them in batch.
+/* Alta masiva por CSV — el admin sube la lista de un curso y el sistema
+ * crea las cuentas con usuario y contraseña temporal para imprimir.
  *
- * The CSV must have a header row:
- *   name,email,role,grade,class
- * - role: "alumno" | "profesor"   (admin-sede cannot import admin-sede)
- * - grade: opcional, default "libre"
- * - class: opcional, nombre de la clase (se crea si no existe)
+ * Formato (con o sin fila de encabezado):
  *
- * Endpoint: POST /api/import/users
- * Body: text/csv (small enough to fit in the Fastify body limit)
+ *     nombre,rol,grupo,email
+ *     Sofía Gómez,alumno,4to B,
+ *     Marcela Ruiz,docente,4to B,mruiz@escuela.edu.ar
  *
- * Returns:
- *   { created: number, skipped: number, errors: Array<{row, message}> }
+ *  - `rol`: "alumno" o "docente". Vacío = alumno.
+ *  - `grupo`: opcional; se crea si no existe en la sede.
+ *  - `email`: OPCIONAL. Un alumno de primaria no tiene, y no lo necesita.
  *
- * Each created user is given a temporary password; the response includes
- * a per-row `temporaryPassword` so the admin can hand them out (or share
- * via the invitation link). */
+ * Dos endpoints:
+ *   POST /api/import/preview  → qué se crearía, qué choca. No escribe nada.
+ *   POST /api/import          → lo hace, en UNA transacción.
+ *
+ * Por qué transaccional: la versión anterior insertaba fila por fila en un
+ * `for`. Si fallaba en la mitad de un curso de 300, quedaban 150 cuentas
+ * creadas, sin forma de saber cuáles, y reintentar duplicaba. Ahora entra
+ * todo o no entra nada.
+ *
+ * Y por qué preview: el admin ve la planilla resultante ANTES de escribir.
+ * Un CSV con una columna corrida creaba 300 usuarios basura que había que
+ * borrar a mano.
+ */
 
-import type { FastifyInstance, FastifyRequest } from "fastify";
-import { z } from "zod";
+import type { FastifyInstance } from "fastify";
 import { db, schema } from "../db/index.js";
-import { and, eq, sql } from "drizzle-orm";
-import { verifyAccessToken, hashPassword } from "../auth.js";
-import { assertCanGrant, canActOnSede, ForbiddenError } from "../rbac.js";
-
-async function requireAdminOrAbove(req: FastifyRequest) {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) throw Object.assign(new Error("Sin sesión."), { status: 401 });
-  const claims = await verifyAccessToken(auth.slice("Bearer ".length));
-  if (!["admin-sede", "admin-general", "superadmin"].includes(claims.role)) {
-    throw Object.assign(new Error("Solo los administradores pueden importar usuarios."), { status: 403 });
-  }
-  return claims;
-}
+import { and, eq, inArray, isNull } from "drizzle-orm";
+import { hashPassword } from "../auth.js";
+import { requirePermission } from "../authContext.js";
+import { assertCanGrant, canActOnSede, ForbiddenError, type Actor } from "../rbac.js";
+import { assignUsernames, makeTempPassword } from "../userIdentity.js";
+import { audit } from "../audit.js";
 
 interface ParsedRow {
-  name: string;
-  email: string;
-  role: "alumno" | "profesor";
-  grade?: string;
-  className?: string;
+  line: number;
+  fullName: string;
+  role: "alumno" | "docente";
+  groupName: string | null;
+  email: string | null;
 }
 
-function parseCsv(text: string): { rows: ParsedRow[]; errors: Array<{ row: number; message: string }> } {
-  const errors: Array<{ row: number; message: string }> = [];
-  const rows: ParsedRow[] = [];
-  // Lightweight parser: handles quoted fields with commas inside.
-  const lines: string[][] = [];
-  let cur: string[] = [];
+interface RowError {
+  line: number;
+  message: string;
+}
+
+/* Parser mínimo pero correcto: soporta comillas, comas dentro de comillas y
+   comillas escapadas (""). No usamos una librería porque el formato es
+   nuestro y son 40 líneas. */
+function splitCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
   let field = "";
   let inQuotes = false;
+
   for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
+    const ch = text[i]!;
     if (inQuotes) {
       if (ch === '"') {
         if (text[i + 1] === '"') { field += '"'; i++; }
         else inQuotes = false;
       } else field += ch;
-    } else if (ch === '"') inQuotes = true;
-    else if (ch === ",") { cur.push(field); field = ""; }
-    else if (ch === "\n" || ch === "\r") {
-      if (field.length || cur.length) { cur.push(field); lines.push(cur); cur = []; field = ""; }
+      continue;
+    }
+    if (ch === '"') { inQuotes = true; continue; }
+    if (ch === ",") { row.push(field); field = ""; continue; }
+    if (ch === "\n" || ch === "\r") {
+      if (field.length || row.length) { row.push(field); rows.push(row); row = []; field = ""; }
       if (ch === "\r" && text[i + 1] === "\n") i++;
-    } else field += ch;
+      continue;
+    }
+    field += ch;
   }
-  if (field.length || cur.length) { cur.push(field); lines.push(cur); }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+function parseCsv(text: string): { rows: ParsedRow[]; errors: RowError[] } {
+  const rows: ParsedRow[] = [];
+  const errors: RowError[] = [];
+  const lines = splitCsv(text);
   if (!lines.length) return { rows, errors };
 
-  // Header?
-  const first = lines[0]!.map((s) => s.toLowerCase().trim());
-  const hasHeader = first.includes("email") || first.includes("name");
+  /* Encabezado opcional: si la primera fila menciona "nombre" o "email",
+     la salteamos. */
+  const first = lines[0]!.map((c) => c.trim().toLowerCase());
+  const hasHeader = first.includes("nombre") || first.includes("email") || first.includes("name");
   const data = hasHeader ? lines.slice(1) : lines;
+  const offset = hasHeader ? 2 : 1; // número de línea real, para el mensaje
+
+  const seenNames = new Set<string>();
 
   for (let i = 0; i < data.length; i++) {
     const cells = data[i]!;
-    if (!cells.some((c) => c.trim().length)) continue; // skip empty lines
-    const [name, email, role, grade, className] = cells.map((c) => c.trim());
-    if (!name || !email) {
-      errors.push({ row: i + 1, message: "Faltan nombre o email." });
+    const line = i + offset;
+    if (!cells.some((c) => c.trim())) continue; // fila vacía
+
+    const [rawName, rawRole, rawGroup, rawEmail] = cells.map((c) => (c ?? "").trim());
+
+    if (!rawName) { errors.push({ line, message: "Falta el nombre." }); continue; }
+    if (rawName.length > 120) { errors.push({ line, message: "El nombre es demasiado largo." }); continue; }
+
+    const role = (rawRole || "alumno").toLowerCase();
+    if (role !== "alumno" && role !== "docente") {
+      errors.push({ line, message: `Rol no válido: "${rawRole}". Usá "alumno" o "docente".` });
       continue;
     }
-    if (!email.includes("@")) {
-      errors.push({ row: i + 1, message: "Email inválido." });
+
+    let email: string | null = null;
+    if (rawEmail) {
+      const e = rawEmail.toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+        errors.push({ line, message: `Email inválido: "${rawEmail}".` });
+        continue;
+      }
+      email = e;
+    }
+
+    /* Un docente sin email no puede usar Google, pero sí entrar con usuario
+       y contraseña. No es un error: se avisa en el preview. */
+
+    const key = rawName.toLowerCase();
+    if (seenNames.has(key)) {
+      errors.push({ line, message: `"${rawName}" aparece más de una vez en el archivo.` });
       continue;
     }
-    if (role && !["alumno", "profesor"].includes(role)) {
-      errors.push({ row: i + 1, message: `Rol no permitido en CSV: ${role}.` });
-      continue;
-    }
-    rows.push({ name, email, role: (role as "alumno" | "profesor") || "alumno", grade, className });
+    seenNames.add(key);
+
+    rows.push({ line, fullName: rawName, role, groupName: rawGroup || null, email });
   }
+
   return { rows, errors };
 }
 
-function makeUsername(name: string): string {
-  const base = name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "").slice(0, 10);
-  return base || `user${Date.now().toString().slice(-4)}`;
-}
+/** Trabajo común a preview e import: valida contra la base y arma el plan.
+ *  No escribe nada. */
+async function buildPlan(actor: Actor, csv: string) {
+  const { rows, errors } = parseCsv(csv);
 
-function makeTempPassword(): string {
-  return `tmp-${Math.random().toString(36).slice(2, 8)}`;
+  const sedeId = actor.role === "admin" ? actor.sedeId : null;
+  if (actor.role === "admin" && !sedeId) {
+    throw new ForbiddenError("Tu cuenta no tiene una sede asignada.");
+  }
+  /* El superadmin tiene que importar dentro de una sede concreta: sin eso
+     las cuentas quedarían colgadas sin institución. */
+  if (!sedeId) {
+    throw new ForbiddenError("Elegí una sede antes de importar. El superadmin no puede importar sin sede.");
+  }
+
+  for (const r of rows) assertCanGrant(actor.role, r.role);
+
+  /* --- Choques con cuentas que ya existen. Una consulta, no una por fila. --- */
+  const emails = rows.map((r) => r.email).filter((e): e is string => Boolean(e));
+  const existingEmails = emails.length
+    ? await db
+        .select({ email: schema.users.email })
+        .from(schema.users)
+        .where(and(inArray(schema.users.email, emails), isNull(schema.users.deletedAt)))
+    : [];
+  const takenEmails = new Set(existingEmails.map((r) => (r.email ?? "").toLowerCase()));
+
+  /* --- Grupos: los que existen y los que habría que crear. --- */
+  const groupNames = [...new Set(rows.map((r) => r.groupName).filter((g): g is string => Boolean(g)))];
+  const existingGroups = groupNames.length
+    ? await db
+        .select({ id: schema.groups.id, name: schema.groups.name })
+        .from(schema.groups)
+        .where(eq(schema.groups.sedeId, sedeId))
+    : [];
+  const groupByName = new Map(existingGroups.map((g) => [g.name.toLowerCase(), g]));
+  const groupsToCreate = groupNames.filter((n) => !groupByName.has(n.toLowerCase()));
+
+  /* --- Filas que se pueden crear vs. las que se saltean. --- */
+  const skipped: RowError[] = [];
+  const creatable = rows.filter((r) => {
+    if (r.email && takenEmails.has(r.email)) {
+      skipped.push({ line: r.line, message: `Ya existe una cuenta con el email ${r.email}.` });
+      return false;
+    }
+    return true;
+  });
+
+  const usernames = creatable.length ? await assignUsernames(creatable.map((r) => r.fullName)) : [];
+
+  return {
+    sedeId,
+    errors,
+    skipped,
+    groupsToCreate,
+    groupByName,
+    items: creatable.map((r, i) => ({ ...r, username: usernames[i]! })),
+  };
 }
 
 export async function importRoutes(app: FastifyInstance) {
-  app.post("/api/import/users", async (req, reply) => {
-    const actor = await requireAdminOrAbove(req);
-    const csv = (req.body ?? "").toString();
-    if (!csv) return reply.code(400).send({ error: "El cuerpo de la solicitud está vacío." });
+  /* ----- POST /api/import/preview -----
+     Cuerpo: el CSV como texto plano. No escribe nada. */
+  app.post("/api/import/preview", async (req, reply) => {
+    const actor = requirePermission(req, "user:import");
+    const csv = String(req.body ?? "");
+    if (!csv.trim()) return reply.code(400).send({ error: "El archivo está vacío." });
 
-    const { rows, errors: parseErrors } = parseCsv(csv);
-    if (!rows.length && parseErrors.length) {
-      return reply.code(400).send({ error: "CSV sin filas válidas.", errors: parseErrors });
+    const plan = await buildPlan(actor, csv);
+    return reply.send({
+      willCreate: plan.items.length,
+      willSkip: plan.skipped.length,
+      groupsToCreate: plan.groupsToCreate,
+      errors: plan.errors,
+      skipped: plan.skipped,
+      /* Sin contraseñas: todavía no existen. Solo el plan. */
+      preview: plan.items.map((it) => ({
+        line: it.line,
+        fullName: it.fullName,
+        username: it.username,
+        role: it.role,
+        group: it.groupName,
+        email: it.email,
+      })),
+    });
+  });
+
+  /* ----- POST /api/import ----- */
+  app.post("/api/import", async (req, reply) => {
+    const actor = requirePermission(req, "user:import");
+    const csv = String(req.body ?? "");
+    if (!csv.trim()) return reply.code(400).send({ error: "El archivo está vacío." });
+
+    const plan = await buildPlan(actor, csv);
+    if (!plan.items.length) {
+      return reply.code(400).send({
+        error: "No hay ninguna fila que se pueda crear.",
+        errors: plan.errors,
+        skipped: plan.skipped,
+      });
     }
 
-    // Pre-flight RBAC: refuse roles the actor cannot grant.
-    for (const r of rows) {
-      try {
-        assertCanGrant(actor.role as schema.Role, r.role);
-      } catch (e) {
-        if (e instanceof ForbiddenError) {
-          return reply.code(403).send({ error: e.message });
-        }
-        throw e;
-      }
-    }
+    /* Los hashes de bcrypt son caros (coste 12) y NO van dentro de la
+       transacción: hacerlos adentro tendría la transacción abierta varios
+       segundos en un curso grande, bloqueando escrituras. */
+    const withSecrets = await Promise.all(
+      plan.items.map(async (it) => {
+        const temporaryPassword = makeTempPassword();
+        return { ...it, temporaryPassword, passwordHash: await hashPassword(temporaryPassword) };
+      }),
+    );
 
-    const results: Array<{ row: number; ok: true; email: string; username: string; temporaryPassword: string } | { row: false; ok: false; email: string; message: string }> = [];
-    let created = 0;
-    let skipped = 0;
-    const runErrors: Array<{ row: number; message: string }> = [...parseErrors];
+    const created = await db.transaction(async (tx) => {
+      /* 1. Los grupos que falten. */
+      const groupByName = new Map(plan.groupByName);
+      if (plan.groupsToCreate.length) {
+        const rows = await tx
+          .insert(schema.groups)
+          .values(plan.groupsToCreate.map((name) => ({ sedeId: plan.sedeId, name })))
+          .returning({ id: schema.groups.id, name: schema.groups.name });
+        for (const g of rows) groupByName.set(g.name.toLowerCase(), g);
+      }
 
-    for (let i = 0; i < rows.length; i++) {
-      const r = rows[i]!;
-      // Skip duplicates by email.
-      const existing = await db
-        .select({ id: schema.users.id })
-        .from(schema.users)
-        .where(sql`lower(${schema.users.email}) = ${r.email.toLowerCase()}`)
-        .limit(1);
-      if (existing[0]) {
-        results.push({ row: false, ok: false, email: r.email, message: "Ya existe una cuenta con ese email." });
-        skipped++;
-        continue;
-      }
-      // Resolve / create class.
-      let classId: string | null = null;
-      if (r.className) {
-        if (!actor.sede) {
-          results.push({ row: false, ok: false, email: r.email, message: "No hay sede asociada a tu cuenta." });
-          skipped++;
-          continue;
-        }
-        const [existingClass] = await db
-          .select()
-          .from(schema.classes)
-          .where(and(eq(schema.classes.sedeId, actor.sede), eq(schema.classes.name, r.className)))
-          .limit(1);
-        if (existingClass) classId = existingClass.id;
-        else {
-          const [created] = await db
-            .insert(schema.classes)
-            .values({
-              sedeId: actor.sede,
-              name: r.className,
-              grade: (r.grade as schema.Grade | undefined) ?? "libre",
-            })
-            .returning();
-          classId = created!.id;
-        }
-      }
-      const tempPassword = makeTempPassword();
-      const passwordHash = await hashPassword(tempPassword);
-      const [row] = await db
+      /* 2. Las cuentas, en un solo INSERT. */
+      const inserted = await tx
         .insert(schema.users)
-        .values({
-          fullName: r.name,
-          email: r.email.toLowerCase(),
-          username: makeUsername(r.name),
-          role: r.role,
-          sedeId: actor.sede,
-          classId,
-          grade: (r.grade as schema.Grade | undefined) ?? "libre",
-          passwordHash,
-          mustChangePassword: true,
-          temporaryPassword: true,
+        .values(
+          withSecrets.map((it) => ({
+            role: it.role,
+            sedeId: plan.sedeId,
+            groupId:
+              it.role === "alumno" && it.groupName
+                ? (groupByName.get(it.groupName.toLowerCase())?.id ?? null)
+                : null,
+            username: it.username,
+            email: it.email,
+            fullName: it.fullName,
+            passwordHash: it.passwordHash,
+            mustChangePassword: true,
+          })),
+        )
+        .returning({ id: schema.users.id, username: schema.users.username });
+
+      /* 3. Los docentes, a cargo de su grupo. */
+      const teacherLinks = withSecrets
+        .map((it, i) => {
+          if (it.role !== "docente" || !it.groupName) return null;
+          const g = groupByName.get(it.groupName.toLowerCase());
+          const u = inserted[i];
+          return g && u ? { groupId: g.id, userId: u.id } : null;
         })
-        .returning();
-      if (!row) {
-        results.push({ row: false, ok: false, email: r.email, message: "No se pudo crear." });
-        skipped++;
-        continue;
+        .filter((x): x is { groupId: string; userId: string } => x !== null);
+      if (teacherLinks.length) {
+        await tx.insert(schema.groupTeachers).values(teacherLinks).onConflictDoNothing();
       }
-      if (classId) {
-        if (r.role === "alumno") {
-          await db.insert(schema.classStudents).values({ classId, userId: row.id }).onConflictDoNothing();
-        } else {
-          await db.insert(schema.classTeachers).values({ classId, userId: row.id }).onConflictDoNothing();
-        }
-      }
-      results.push({ row: i + 1, ok: true, email: r.email, username: row.username!, temporaryPassword: tempPassword });
-      created++;
-    }
-    return reply.send({ created, skipped, results, errors: runErrors });
+
+      return inserted;
+    });
+
+    await audit({
+      actor,
+      action: "import_users",
+      entityType: "user",
+      meta: { created: created.length, groupsCreated: plan.groupsToCreate.length },
+    });
+
+    return reply.send({
+      created: created.length,
+      skipped: plan.skipped.length,
+      errors: plan.errors,
+      /* La planilla para imprimir y repartir. Las contraseñas se muestran
+         UNA vez: no se guardan en claro en ningún lado. */
+      credentials: withSecrets.map((it) => ({
+        fullName: it.fullName,
+        username: it.username,
+        temporaryPassword: it.temporaryPassword,
+        role: it.role,
+        group: it.groupName,
+      })),
+    });
   });
 }

@@ -38,7 +38,7 @@ export function LoginPage() {
   // message text is identical to the previous attempt.
   const [errKey, setErrKey] = useState(0);
   const [showDemoModal, setShowDemoModal] = useState(false);
-  const { loginAny, loginDemo, loginGoogle } = useAuth();
+  const { login, loginDemo, loginGoogle } = useAuth();
   const navigate = useNavigate();
 
   /** Show an error in the red popup above the card (re-animates each time). */
@@ -50,23 +50,19 @@ export function LoginPage() {
   async function submit(event: FormEvent) {
     event.preventDefault();
     const trimUser = username.trim();
-    const nextUser = await loginAny(trimUser, password);
+    const result = await login(trimUser, password);
 
-    if (!nextUser) {
-      showError("Revisá tu usuario y contraseña para ingresar.");
+    if (!result.ok) {
+      /* El mensaje viene del servidor: distingue credenciales incorrectas
+         de cuenta desactivada o demasiados intentos seguidos. */
+      showError(result.message);
       return;
     }
+    const nextUser = result.user;
 
     // Temporary-password sign-ins must set a new password first.
     if (nextUser.mustChangePassword) {
       navigate("/cambiar-contrasena");
-      return;
-    }
-
-    // Superadmin picks how to enter (god-mode chooser) instead of landing
-    // straight on a single dashboard.
-    if (nextUser.role === "superadmin") {
-      navigate("/entrar");
       return;
     }
 
@@ -106,16 +102,10 @@ export function LoginPage() {
             navigate("/cambiar-contrasena");
             return;
           }
-          if (result.user.role === "superadmin") {
-            navigate("/entrar");
-            return;
-          }
           navigate(routeForRole(result.user.role));
           return;
         }
-        if (result.reason === "DOMAIN_NOT_ALLOWED") {
-          showError("Tu dominio de correo no está habilitado para Typely.");
-        } else if (result.reason === "USER_NOT_FOUND") {
+        if (result.reason === "USER_NOT_FOUND") {
           showError("No encontramos una cuenta asociada a este correo. Pedile acceso a tu administrador.");
         } else if (result.reason === "NETWORK_ERROR") {
           showError("No pudimos conectar con el servidor. Probá de nuevo.");

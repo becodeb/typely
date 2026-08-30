@@ -1,46 +1,23 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Link, Navigate, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { LoginPage } from "./pages/LoginPage";
-import { EntrarPage } from "./pages/EntrarPage";
+import { ChangePasswordPage } from "./pages/ChangePasswordPage";
 import { LoginLayoutEditorPage } from "./pages/LoginLayoutEditorPage";
 import { GlassEditorPage } from "./pages/GlassEditorPage";
-import { CourseDetailPage } from "./pages/CourseDetailPage";
-import { CoursesListPage } from "./pages/admin/CoursesListPage";
-import { TeachersListPage } from "./pages/admin/TeachersListPage";
-import { StudentsListPage } from "./pages/admin/StudentsListPage";
-import { ProgresoPage } from "./pages/admin/SedeStubPages";
-import { ConfigPage } from "./pages/admin/SedeConfigPage";
-import { InicioPage } from "./pages/admin/InicioPage";
-import { ApiInspectorPage } from "./pages/admin/ApiInspectorPage";
-import { SedeAcademicYearLayout } from "./components/admin/SedeShell";
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
-import { ImpersonationBanner } from "./components/admin/ImpersonationBanner";
 import { DevLayoutEditorMount } from "./components/dev/layoutEditor";
-import { StudentDetailPage } from "./pages/admin/StudentDetailPage";
-import { TeacherDetailPage } from "./pages/admin/TeacherDetailPage";
-import { ChangePasswordPage } from "./pages/ChangePasswordPage";
-import { InvitePage } from "./pages/InvitePage";
 import { WorldsPage } from "./pages/WorldsPage";
 import { IslandDetailPage } from "./pages/IslandDetailPage";
-import { TeacherPage } from "./pages/TeacherPage";
-import { TeacherClassPage } from "./pages/TeacherClassPage";
-import { TeacherStudentPage } from "./pages/TeacherStudentPage";
 import { RewardsPage } from "./pages/RewardsPage";
 import { AccountPage } from "./pages/AccountPage";
 import { MissionsPage } from "./pages/MissionsPage";
+import { useAuth } from "./hooks/useAuth";
 
-/* -------------------------------------------------------------------- */
-/* Route-level code splitting.                                            */
-/* -------------------------------------------------------------------- */
-/* The four heaviest pages are loaded on demand so the initial bundle     */
-/* (login + world map + island detail) stays under ~150 kB gzipped.      */
-/* `Suspense` shows a soft, on-brand loader instead of a blank flash.    */
+/* La pantalla de juego es la más pesada: se carga bajo demanda para que el
+   bundle inicial (login + mapa de mundos) se mantenga chico. */
 const GameplayPage = lazy(() =>
   import("./pages/GameplayPage").then((m) => ({ default: m.GameplayPage })),
-);
-const AdminGeneralPage = lazy(() =>
-  import("./pages/AdminGeneralPage").then((m) => ({ default: m.AdminGeneralPage })),
 );
 
 function PageFallback() {
@@ -63,95 +40,130 @@ function PageFallback() {
   );
 }
 
+/* Marcador de posición honesto para docente y administración.
+ *
+ * Esas pantallas se van a construir de cero. Hasta que existan, quien
+ * tiene uno de esos roles entra y ve esto — en vez de rebotar contra una
+ * ruta rota o caer en el mapa de islas, que es del alumno. */
+function SinPantallaPage() {
+  const { user, logout } = useAuth();
+  return (
+    <main
+      style={{
+        minHeight: "100vh",
+        display: "grid",
+        placeItems: "center",
+        padding: "2rem",
+        background: "linear-gradient(180deg, #cfeeff 0%, #e8f6ff 100%)",
+        fontFamily: "var(--font-body)",
+        color: "#17355f",
+        textAlign: "center",
+      }}
+    >
+      <div style={{ maxWidth: "34rem", display: "grid", gap: "1rem" }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "2rem", margin: 0 }}>
+          Hola, {user?.name}
+        </h1>
+        <p style={{ margin: 0, fontSize: "1.05rem", lineHeight: 1.6 }}>
+          Tu cuenta está activa, pero la pantalla para tu rol todavía no está construida.
+        </p>
+        <p style={{ margin: 0, opacity: 0.75 }}>
+          El juego funciona y tu progreso se guarda. Las vistas de seguimiento llegan enseguida.
+        </p>
+        <button
+          type="button"
+          onClick={() => void logout()}
+          style={{
+            justifySelf: "center",
+            marginTop: "0.5rem",
+            padding: "0.75rem 1.5rem",
+            borderRadius: "18px",
+            border: "1px solid rgba(130,140,190,0.25)",
+            background: "rgba(255,255,255,0.78)",
+            color: "#405083",
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          Cerrar sesión
+        </button>
+      </div>
+    </main>
+  );
+}
+
+function NotFoundPage() {
+  return (
+    <main
+      style={{
+        minHeight: "100vh",
+        display: "grid",
+        placeItems: "center",
+        background: "linear-gradient(180deg, #cfeeff 0%, #e8f6ff 100%)",
+        fontFamily: "var(--font-body)",
+        color: "#17355f",
+        textAlign: "center",
+      }}
+    >
+      <div style={{ display: "grid", gap: "0.75rem" }}>
+        <h1 style={{ fontFamily: "var(--font-display)", margin: 0 }}>No encontramos esa página</h1>
+        <Link to="/" style={{ color: "#3159e8", fontWeight: 700 }}>
+          Volver al inicio
+        </Link>
+      </div>
+    </main>
+  );
+}
+
 export function App() {
   return (
     <ErrorBoundary>
-    <ImpersonationBanner />
-    {/* Editor de layout interno (SOLO desarrollo; se elimina del bundle de
-        producción por la doble compuerta de DevLayoutEditorMount). */}
-    <DevLayoutEditorMount />
-    <Routes>
-      <Route path="/" element={<LoginPage />} />
-      <Route path="/login" element={<LoginPage />} />
-      {/* Forced password change after a temporary-password sign-in. */}
-      <Route path="/cambiar-contrasena" element={<ChangePasswordPage />} />
-      {/* Invitation acceptance (opened from the email link). */}
-      <Route path="/invite/:token" element={<InvitePage />} />
-      {/* Superadmin god-mode chooser — "¿Cómo querés entrar?". */}
-      <Route element={<ProtectedRoute roles={["superadmin"]} />}>
-        <Route path="/entrar" element={<EntrarPage />} />
-        {/* Superadmin-only sandbox to drag the login mascots and read off
-            their positions. Does not affect the real login screen. */}
-        <Route path="/editor-login" element={<LoginLayoutEditorPage />} />
-        {/* Superadmin-only liquid-glass tuner. */}
-        <Route path="/editor-glass" element={<GlassEditorPage />} />
-      </Route>
+      {/* Editor de layout interno (SOLO desarrollo; la doble compuerta de
+          DevLayoutEditorMount lo saca del bundle de producción). */}
+      <DevLayoutEditorMount />
+      <Routes>
+        <Route path="/" element={<LoginPage />} />
+        <Route path="/login" element={<LoginPage />} />
 
-      {/* Student game experience — exclusive to students. Admins/teachers
-          are redirected to their own dashboards, never the game map. */}
-      <Route element={<ProtectedRoute roles={["alumno"]} exclusive />}>
-        <Route path="/mundos" element={<WorldsPage />} />
-        <Route path="/worlds/:islandId" element={<IslandDetailPage />} />
-        <Route
-          path="/gameplay/:activityId"
-          element={
-            <Suspense fallback={<PageFallback />}>
-              <GameplayPage />
-            </Suspense>
-          }
-        />
-        <Route path="/logros" element={<RewardsPage />} />
-        <Route path="/mi-cuenta" element={<AccountPage />} />
-        <Route path="/misiones" element={<MissionsPage />} />
-      </Route>
-
-      {/* Inspector de API — solo administración (superadmin entra por su
-          bypass; alumnos/profesores y el modo demo quedan afuera). El
-          endpoint /api/admin/inspector re-verifica el rol server-side. */}
-      <Route element={<ProtectedRoute roles={["admin-general", "admin-sede"]} />}>
-        <Route path="/admin/api" element={<ApiInspectorPage />} />
-      </Route>
-
-      <Route element={<ProtectedRoute roles={["admin-general"]} />}>
-        <Route
-          path="/admin-general"
-          element={
-            <Suspense fallback={<PageFallback />}>
-              <AdminGeneralPage />
-            </Suspense>
-          }
-        />
-      </Route>
-
-      <Route element={<ProtectedRoute roles={["admin-sede"]} />}>
-        {/* The academic-year context wraps every admin-sede page at the ROUTE
-            level (the pages call useAcademicYear() in their own bodies, so a
-            provider inside SedeShell can never reach them). */}
-        <Route element={<SedeAcademicYearLayout />}>
-          {/* Inicio = executive dashboard (F3). */}
-          <Route path="/admin-sede" element={<InicioPage />} />
-          {/* Dedicated admin-sede screens (F1 redesign). */}
-          <Route path="/admin-sede/cursos" element={<CoursesListPage />} />
-          <Route path="/admin-sede/docentes" element={<TeachersListPage />} />
-          <Route path="/admin-sede/docentes/:id" element={<TeacherDetailPage />} />
-          <Route path="/admin-sede/alumnos" element={<StudentsListPage />} />
-          <Route path="/admin-sede/alumnos/:id" element={<StudentDetailPage />} />
-          <Route path="/admin-sede/progreso" element={<ProgresoPage />} />
-          <Route path="/admin-sede/config" element={<ConfigPage />} />
-          {/* Per-course management: assign teachers, add students (single/bulk),
-              enable levels. */}
-          <Route path="/admin-sede/curso/:classId" element={<CourseDetailPage />} />
+        {/* Cambio de contraseña forzado tras entrar con una temporal.
+            Abierta a los cuatro roles: es la puerta obligatoria de todos. */}
+        <Route element={<ProtectedRoute roles={["superadmin", "admin", "docente", "alumno"]} />}>
+          <Route path="/cambiar-contrasena" element={<ChangePasswordPage />} />
         </Route>
-      </Route>
 
-      <Route element={<ProtectedRoute roles={["profesor"]} />}>
-        <Route path="/profesor" element={<TeacherPage />} />
-        <Route path="/profesor/curso/:classId" element={<TeacherClassPage />} />
-        <Route path="/profesor/alumno/:studentId" element={<TeacherStudentPage />} />
-      </Route>
+        {/* El juego — exclusivo del alumno. */}
+        <Route element={<ProtectedRoute roles={["alumno"]} />}>
+          <Route path="/mundos" element={<WorldsPage />} />
+          <Route path="/worlds/:islandId" element={<IslandDetailPage />} />
+          <Route
+            path="/gameplay/:activityId"
+            element={
+              <Suspense fallback={<PageFallback />}>
+                <GameplayPage />
+              </Suspense>
+            }
+          />
+          <Route path="/logros" element={<RewardsPage />} />
+          <Route path="/mi-cuenta" element={<AccountPage />} />
+          <Route path="/misiones" element={<MissionsPage />} />
+        </Route>
 
-      <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+        {/* Docente y administración: sin pantallas todavía. */}
+        <Route element={<ProtectedRoute roles={["superadmin", "admin", "docente"]} />}>
+          <Route path="/sin-pantalla" element={<SinPantallaPage />} />
+        </Route>
+
+        {/* Herramientas de diseño del juego. Solo en desarrollo: en el build
+            de producción estas rutas no existen. */}
+        {import.meta.env.DEV && (
+          <>
+            <Route path="/editor-login" element={<LoginLayoutEditorPage />} />
+            <Route path="/editor-glass" element={<GlassEditorPage />} />
+          </>
+        )}
+
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
     </ErrorBoundary>
   );
 }

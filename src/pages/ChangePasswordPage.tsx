@@ -16,7 +16,7 @@ import { assets } from "../utils/assets";
 const MIN_LENGTH = 6;
 
 export function ChangePasswordPage() {
-  const { user, completePasswordChange, logout } = useAuth();
+  const { user, changePassword, logout } = useAuth();
   const navigate = useNavigate();
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -37,12 +37,14 @@ export function ChangePasswordPage() {
       setMessage("Las contraseñas no coinciden.");
       return;
     }
-    const refreshed = await completePasswordChange(next);
-    if (!refreshed) {
-      setMessage("No pudimos actualizar la contraseña. Probá de nuevo.");
+    /* No se pide la contraseña actual: quien llega acá acaba de entrar con
+       la temporal. La API acepta omitirla solo en ese caso. */
+    const result = await changePassword(undefined, next);
+    if (!result.ok) {
+      setMessage(result.message);
       return;
     }
-    navigate(routeForRole(refreshed.role), { replace: true });
+    navigate(routeForRole(result.user.role), { replace: true });
   }
 
   return (

@@ -1,33 +1,39 @@
-/* Auth routes — login (manual + Google), refresh, logout, me.
+/* Rutas de autenticación — login, Google, refresh, logout, me.
  *
- * Manual: POST /api/auth/login { email|username, password } → access cookie
- *   + refresh cookie. Students are blocked here — the staff form is for
- *   staff. (Demo mode stays client-side and never reaches the API.)
- * Google: POST /api/auth/google { credential } → looks up by google_sub,
- *   falls back to matching email, attaches google_sub on first success.
- *   Unknown email is a friendly Spanish 404 (never auto-creates a
- *   privileged account).
+ * EL CAMBIO CENTRAL DE ESTA VERSIÓN: hay UN solo login para los cuatro
+ * roles. El código anterior devolvía 403 si `role === "alumno"`, tanto en
+ * el login manual como en el de Google, así que un alumno literalmente no
+ * podía entrar: su única puerta era el modo demo (anónimo, sin token) o
+ * aceptar una invitación por email. Como el modo demo tampoco manda
+ * progreso a la API, las tablas de progreso quedaban vacías y los
+ * dashboards de docente y admin mostraban ceros para siempre.
  *
- * Cookies are HTTP-only, SameSite=Lax, Secure in production. The proxy
- * terminates TLS so `secure: true` is safe in prod. */
+ * Identidad: se entra con `identifier`, que puede ser el usuario o el
+ * email. El alumno de primaria no tiene email y entra con usuario; el
+ * staff suele usar el email. Las dos columnas son citext, así que la
+ * comparación ya es insensible a mayúsculas.
+ *
+ * Las cookies son HTTP-only, SameSite=Lax y Secure en producción.
+ */
 
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../db/index.js";
-import { eq, or, and, sql } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import {
   comparePassword,
   consumeRefreshToken,
   hashToken,
   issueRefreshToken,
   signAccessToken,
-  verifyAccessToken,
   verifyGoogleIdToken,
 } from "../auth.js";
-import type { AccessClaims } from "../auth.js";
+import { requireActor } from "../authContext.js";
 
 const REFRESH_COOKIE = "typely_refresh";
-const ACCESS_HEADER = "x-typely-access"; // short-lived, sent to the SPA via header
+
+/* Mensaje único para credenciales malas: no revela si el usuario existe. */
+const BAD_CREDENTIALS = "Usuario o contraseña incorrectos.";
 
 function setRefreshCookie(reply: FastifyReply, token: string) {
   reply.setCookie(REFRESH_COOKIE, token, {
@@ -39,11 +45,17 @@ function setRefreshCookie(reply: FastifyReply, token: string) {
   });
 }
 
-async function buildAccessAndRefresh(user: { id: string; role: schema.Role; sedeId: string | null; email: string; fullName: string }) {
+type SessionUser = Pick<
+  schema.DbUser,
+  "id" | "role" | "sedeId" | "groupId" | "username" | "email" | "fullName" | "mustChangePassword"
+>;
+
+async function buildSession(user: SessionUser) {
   const access = await signAccessToken({
     sub: user.id,
     role: user.role,
     sede: user.sedeId,
+    username: user.username,
     email: user.email,
     name: user.fullName,
   });
@@ -51,127 +63,197 @@ async function buildAccessAndRefresh(user: { id: string; role: schema.Role; sede
   return { access, refresh, refreshExpiresAt: expiresAt };
 }
 
+/** Forma pública de la sesión. `groupId` viaja para que el alumno sepa a
+ *  qué grupo pertenece sin una consulta extra. */
+function publicUser(user: SessionUser) {
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    name: user.fullName,
+    role: user.role,
+    sedeId: user.sedeId,
+    groupId: user.groupId,
+    mustChangePassword: user.mustChangePassword,
+  };
+}
+
+/* -------------------------------------------------------------------- */
+/* Freno de fuerza bruta                                                 */
+/* -------------------------------------------------------------------- */
+/* Los alumnos tienen contraseñas cortas generadas por el admin, así que
+   un login sin freno es adivinable. Esto es deliberadamente simple: un
+   contador en memoria por identificador. Se pierde al reiniciar y no se
+   comparte entre réplicas — alcanza para frenar un script casero, no para
+   un atacante distribuido. Si algún día hay más de una réplica, esto pasa
+   a Redis o a @fastify/rate-limit. */
+const MAX_ATTEMPTS = 8;
+const LOCKOUT_MS = 10 * 60 * 1000;
+const failures = new Map<string, { count: number; until: number }>();
+
+function throttleKey(identifier: string, ip: string): string {
+  return `${identifier.toLowerCase()}|${ip}`;
+}
+
+function isLockedOut(key: string): boolean {
+  const entry = failures.get(key);
+  if (!entry) return false;
+  if (Date.now() > entry.until) {
+    failures.delete(key);
+    return false;
+  }
+  return entry.count >= MAX_ATTEMPTS;
+}
+
+function recordFailure(key: string): void {
+  const entry = failures.get(key);
+  const count = entry && Date.now() <= entry.until ? entry.count + 1 : 1;
+  failures.set(key, { count, until: Date.now() + LOCKOUT_MS });
+}
+
+function clearFailures(key: string): void {
+  failures.delete(key);
+}
+
+/* -------------------------------------------------------------------- */
+
 const loginSchema = z.object({
-  email: z.string().trim().toLowerCase().email().optional(),
-  username: z.string().trim().min(1).optional(),
-  password: z.string().min(1),
+  /* Usuario o email — el mismo campo para los dos, como en el formulario. */
+  identifier: z.string().trim().min(1, "Falta el usuario."),
+  password: z.string().min(1, "Falta la contraseña."),
 });
 
-const googleSchema = z.object({
-  credential: z.string().min(10),
-});
+const googleSchema = z.object({ credential: z.string().min(10) });
 
 export async function authRoutes(app: FastifyInstance) {
   /* ----- POST /api/auth/login ----- */
   app.post("/api/auth/login", async (req, reply) => {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "Datos inválidos." });
-    const { email, username, password } = parsed.data;
-    if (!email && !username) return reply.code(400).send({ error: "Falta email o usuario." });
+    const { identifier, password } = parsed.data;
 
-    const rows = await db
+    const key = throttleKey(identifier, req.ip);
+    if (isLockedOut(key)) {
+      return reply
+        .code(429)
+        .send({ error: "Demasiados intentos fallidos. Probá de nuevo en unos minutos." });
+    }
+
+    /* Un solo lookup por usuario O email. Ambas columnas son citext. */
+    const [user] = await db
       .select()
       .from(schema.users)
       .where(
-        email
-          ? sql`lower(${schema.users.email}) = ${email}`
-          : eq(schema.users.username, username!),
+        and(
+          or(eq(schema.users.username, identifier), eq(schema.users.email, identifier)),
+          isNull(schema.users.deletedAt),
+        ),
       )
       .limit(1);
-    const user = rows[0];
-    if (!user || !user.passwordHash || !user.active) {
-      return reply.code(401).send({ error: "Email o contraseña incorrectos." });
-    }
-    // Students never sign in through the staff form.
-    if (user.role === "alumno") {
-      return reply.code(403).send({ error: "Los estudiantes no inician sesión desde este formulario." });
-    }
-    const ok = await comparePassword(password, user.passwordHash);
-    if (!ok) return reply.code(401).send({ error: "Email o contraseña incorrectos." });
 
+    /* Se compara siempre contra algo, exista el usuario o no, para que el
+       tiempo de respuesta no delate qué cuentas existen. */
+    const hash = user?.passwordHash ?? "$2b$12$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidinv";
+    const passwordOk = await comparePassword(password, hash);
+
+    if (!user || !user.passwordHash || !passwordOk) {
+      recordFailure(key);
+      return reply.code(401).send({ error: BAD_CREDENTIALS });
+    }
+    if (!user.active) {
+      recordFailure(key);
+      return reply
+        .code(403)
+        .send({ error: "Tu cuenta está desactivada. Hablá con tu administrador." });
+    }
+
+    clearFailures(key);
     await db
       .update(schema.users)
       .set({ lastLoginAt: new Date() })
       .where(eq(schema.users.id, user.id));
 
-    const { access, refresh, refreshExpiresAt } = await buildAccessAndRefresh(user);
+    const { access, refresh, refreshExpiresAt } = await buildSession(user);
     setRefreshCookie(reply, refresh);
-    return reply.send({
-      access,
-      refreshExpiresAt,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.fullName,
-        username: user.username,
-        role: user.role,
-        sedeId: user.sedeId,
-        classId: user.classId,
-        mustChangePassword: user.mustChangePassword,
-      },
-    });
+    return reply.send({ access, refreshExpiresAt, user: publicUser(user) });
   });
 
-  /* ----- POST /api/auth/google ----- */
+  /* ----- POST /api/auth/google -----
+     Disponible para cualquier rol que TENGA email. El alumno curricular
+     no lo usa (no tiene), pero un alumno suelto sí puede. Nunca crea una
+     cuenta: si el email no existe, es un 404 con mensaje claro. */
   app.post("/api/auth/google", async (req, reply) => {
     const parsed = googleSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "Credencial inválida." });
+
     const claims = await verifyGoogleIdToken(parsed.data.credential);
-    if (!claims) return reply.code(401).send({ error: "No pudimos verificar tu cuenta de Google." });
+    if (!claims) {
+      return reply.code(401).send({ error: "No pudimos verificar tu cuenta de Google." });
+    }
     if (!claims.emailVerified) {
       return reply.code(403).send({ error: "Tu email de Google todavía no está verificado." });
     }
-    const rows = await db
+
+    const [user] = await db
       .select()
       .from(schema.users)
       .where(
-        or(
-          eq(schema.users.googleSub, claims.sub),
-          sql`lower(${schema.users.email}) = ${claims.email}`,
+        and(
+          or(eq(schema.users.googleSub, claims.sub), eq(schema.users.email, claims.email)),
+          isNull(schema.users.deletedAt),
         ),
       )
       .limit(1);
-    const user = rows[0];
-    if (!user || !user.active) {
-      return reply.code(404).send({ error: "No encontramos una cuenta con ese email. Pedile a tu administrador que te cree una." });
+
+    if (!user) {
+      return reply.code(404).send({
+        error: "No encontramos una cuenta con ese email. Pedile a tu administrador que te cree una.",
+      });
     }
-    if (user.role === "alumno") {
-      return reply.code(403).send({ error: "Los estudiantes no inician sesión desde este formulario." });
+    if (!user.active) {
+      return reply
+        .code(403)
+        .send({ error: "Tu cuenta está desactivada. Hablá con tu administrador." });
     }
-    // Attach google_sub on first successful Google login.
-    if (!user.googleSub) {
-      await db.update(schema.users).set({ googleSub: claims.sub }).where(eq(schema.users.id, user.id));
-    }
-    await db.update(schema.users).set({ lastLoginAt: new Date() }).where(eq(schema.users.id, user.id));
-    const { access, refresh, refreshExpiresAt } = await buildAccessAndRefresh(user);
+
+    /* Se ata el `sub` de Google la primera vez, así los ingresos siguientes
+       no dependen de que el email no haya cambiado. */
+    const patch: Partial<schema.NewUser> = { lastLoginAt: new Date() };
+    if (!user.googleSub) patch.googleSub = claims.sub;
+    await db.update(schema.users).set(patch).where(eq(schema.users.id, user.id));
+
+    /* Google ya probó la identidad: no tiene sentido forzar el cambio de
+       una contraseña temporal que esta persona nunca va a usar. */
+    const session = { ...user, mustChangePassword: false };
+    const { access, refresh, refreshExpiresAt } = await buildSession(session);
     setRefreshCookie(reply, refresh);
-    return reply.send({
-      access,
-      refreshExpiresAt,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.fullName,
-        username: user.username,
-        role: user.role,
-        sedeId: user.sedeId,
-        classId: user.classId,
-        mustChangePassword: false, // Google proves identity → no forced change
-      },
-    });
+    return reply.send({ access, refreshExpiresAt, user: publicUser(session) });
   });
 
   /* ----- POST /api/auth/refresh ----- */
   app.post("/api/auth/refresh", async (req, reply) => {
     const token = req.cookies[REFRESH_COOKIE];
     if (!token) return reply.code(401).send({ error: "Sin sesión activa." });
+
     const row = await consumeRefreshToken(token);
-    if (!row) return reply.code(401).send({ error: "Sesión expirada." });
-    const [user] = await db.select().from(schema.users).where(eq(schema.users.id, row.userId)).limit(1);
-    if (!user || !user.active) return reply.code(401).send({ error: "Cuenta desactivada." });
-    const { access, refresh, refreshExpiresAt } = await buildAccessAndRefresh(user);
+    if (!row) {
+      reply.clearCookie(REFRESH_COOKIE, { path: "/api" });
+      return reply.code(401).send({ error: "Sesión expirada." });
+    }
+
+    const [user] = await db
+      .select()
+      .from(schema.users)
+      .where(and(eq(schema.users.id, row.userId), isNull(schema.users.deletedAt)))
+      .limit(1);
+    if (!user || !user.active) {
+      reply.clearCookie(REFRESH_COOKIE, { path: "/api" });
+      return reply.code(401).send({ error: "Cuenta desactivada." });
+    }
+
+    const { access, refresh, refreshExpiresAt } = await buildSession(user);
     setRefreshCookie(reply, refresh);
-    return reply.send({ access, refreshExpiresAt });
+    return reply.send({ access, refreshExpiresAt, user: publicUser(user) });
   });
 
   /* ----- POST /api/auth/logout ----- */
@@ -187,25 +269,19 @@ export async function authRoutes(app: FastifyInstance) {
     return reply.send({ ok: true });
   });
 
-  /* ----- GET /api/auth/me ----- */
-  app.get("/api/auth/me", async (req: FastifyRequest, reply: FastifyReply) => {
-    const auth = req.headers.authorization;
-    if (!auth || !auth.startsWith("Bearer ")) {
-      return reply.code(401).send({ error: "Sin sesión activa." });
-    }
-    try {
-      const claims = await verifyAccessToken(auth.slice("Bearer ".length));
-      return reply.send({
-        user: {
-          id: claims.sub,
-          email: claims.email,
-          name: claims.name,
-          role: claims.role,
-          sedeId: claims.sede,
-        },
-      });
-    } catch {
+  /* ----- GET /api/auth/me -----
+     Lee de la base y no solo del token, para que un cambio de grupo o de
+     nombre se vea sin esperar a que venza el access token. */
+  app.get("/api/auth/me", async (req, reply) => {
+    const actor = requireActor(req);
+    const [user] = await db
+      .select()
+      .from(schema.users)
+      .where(and(eq(schema.users.id, actor.id), isNull(schema.users.deletedAt)))
+      .limit(1);
+    if (!user || !user.active) {
       return reply.code(401).send({ error: "Sesión inválida." });
     }
+    return reply.send({ user: publicUser(user) });
   });
 }
