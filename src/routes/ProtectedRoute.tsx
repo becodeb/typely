@@ -4,33 +4,48 @@ import { useAuth } from "../hooks/useAuth";
 import { routeForRole } from "../utils/storage";
 
 /**
- * Role-gated route group.
+ * Puerta por rol.
  *
- * `exclusive` = true means ONLY the listed roles may enter — the superadmin
- * bypass is disabled. This is used to keep the student game map exclusively
- * for students, so an admin is always redirected to their own dashboard.
+ * La versión anterior tenía un bypass: el superadmin entraba a cualquier
+ * ruta, y un modo "ver como" le dejaba además entrar a las pantallas de
+ * alumno. Eso se fue junto con el god mode. Acá cada ruta declara qué
+ * roles la pueden ver y no hay excepciones.
  */
-export function ProtectedRoute({ roles, exclusive = false }: { roles: Role[]; exclusive?: boolean }) {
-  const { user, viewAs } = useAuth();
+export function ProtectedRoute({ roles }: { roles: Role[] }) {
+  const { user, bootstrapping } = useAuth();
   const location = useLocation();
+
+  /* Mientras se intenta recuperar la sesión desde la cookie no se decide
+     nada: sin esto, un refresh en una ruta protegida rebota al login antes
+     de que la sesión llegue a restaurarse. */
+  if (bootstrapping) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          background: "linear-gradient(180deg, #cfeeff 0%, #e8f6ff 100%)",
+          fontFamily: "var(--font-display)",
+          color: "#17355f",
+          letterSpacing: "0.04em",
+        }}
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <span>Cargando…</span>
+      </div>
+    );
+  }
 
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
-  // A user who logged in with a temporary password must set a new one before
-  // reaching ANY protected surface, regardless of role.
-  if (user.mustChangePassword) {
+  /* Quien entró con una contraseña temporal no llega a ninguna pantalla
+     hasta cambiarla. */
+  if (user.mustChangePassword && location.pathname !== "/cambiar-contrasena") {
     return <Navigate to="/cambiar-contrasena" replace />;
-  }
-
-  // Superadmin has full access to every protected route. Exclusive routes
-  // (the student-only game map) are normally off-limits, but the god-mode
-  // chooser lets a superadmin explicitly enter as "alumno" to play / use
-  // the developer level editor.
-  if (user.role === "superadmin") {
-    if (!exclusive) return <Outlet />;
-    if (exclusive && viewAs?.role === "alumno") return <Outlet />;
   }
 
   if (!roles.includes(user.role)) {

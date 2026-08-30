@@ -38,57 +38,63 @@ Core visual direction:
 
 ## 3. Architecture (current)
 
-TYPELY started frontend-only (localStorage) and now has a real backend. It runs
-as **three Docker containers behind a reverse proxy** at
-`typely.bauhub.online`:
+TYPELY nació solo-frontend (localStorage) y hoy tiene backend real. Corre como
+**dos contenedores detrás del proxy de Coolify**, más un Postgres administrado
+por Coolify, en `typely.becode.com.ar`.
 
-| Layer | Stack | Where | Exposed |
-| --- | --- | --- | --- |
-| Frontend | Vite 7 + **React 19** + TypeScript + **Tailwind 4**, built to static files served by Nginx | `src/`, `Dockerfile`, `nginx.conf` | `127.0.0.1:3005` |
-| API | **Fastify + Drizzle ORM** (TS, ESM) | `api/`, `Dockerfile.api` | `127.0.0.1:3006`, proxied under `/api/*` |
-| Database | **Postgres 16** | `db/init/*.sql` | loopback only |
+| Capa | Stack | Dónde |
+| --- | --- | --- |
+| Frontend | Vite 7 + **React 19** + TypeScript + **Tailwind 4**, compilado a estáticos que sirve Nginx | `src/`, `Dockerfile`, `nginx.conf` |
+| API | **Fastify + Drizzle ORM** (TS, ESM) | `api/`, `Dockerfile.api` |
+| Base | **Postgres 16**, recurso de Coolify | `api/migrations/*.sql` |
 
-- **Hot path stays local.** The typing engine reads/writes `localStorage` so the
-  game never blocks on the network. The API only receives a batched
-  level-complete POST and is the source of truth for cross-device progress +
-  teacher/admin dashboards.
-- **Graceful fallback.** `src/utils/api.ts` + `src/hooks/useAuth.tsx` fall back
-  to the localStorage user list when the API is unreachable, so demo mode and
-  offline play keep working. `usingApi` is exposed so dashboards can show a
-  "backend offline" state.
-- See `dbnew.md` for the full backend log and `DEPLOY.md` for the 3-container
-  deploy/ops runbook. The optional `server/index.mjs` is a separate invitation-
-  email scaffold (NOT in compose) — don't assume it's running.
+- **Un solo dominio.** Nginx sirve el frontend y **proxea `/api/*`** al
+  contenedor de la API por la red interna. El proxy de Coolify (Traefik)
+  enruta por dominio, no por path, así que un dominio no puede alcanzar dos
+  contenedores por sí solo — ese bloque en `nginx.conf` es lo que lo resuelve.
+- **El camino caliente sigue local.** El motor de tipeo lee y escribe
+  `localStorage` para no esperar nunca a la red. La API recibe los niveles
+  completados por una **cola con reintento** y es la fuente de verdad para el
+  progreso entre dispositivos.
+- **No hay fallback a localStorage.** Si la API no responde, se dice que no
+  responde. La versión anterior autenticaba contra una lista de usuarios del
+  navegador, lo que permitía entrar al panel con la API caída.
+- **Migraciones versionadas** en `api/migrations/`, aplicadas por
+  `api/src/db/migrate.ts` al arrancar, bajo advisory lock. Si una falla, la
+  API **no levanta**: servir contra un esquema a medias es peor que no servir.
 
 ## 4. Roles & Auth
 
-Roles: `superadmin`, `admin-sede`, `profesor`, `alumno`. After login each role
-lands on its own surface via `routeForRole` (`/admin-general`, `/admin-sede`,
-`/profesor`, `/mundos`).
+Cuatro roles: `superadmin` (la plataforma), `admin` (UNA sede), `docente`
+(sus grupos), `alumno` (él mismo).
 
-- **Demo mode is student-only.** `demoLogin()` in `src/utils/storage.ts` always
-  returns the seeded demo student and routes to `/mundos`. It can never reach an
-  admin/teacher surface — this is a hard rule.
-- **Staff** (superadmin/admin-sede/profesor) sign in with username/password via
-  `authenticateAny`; students are blocked from the staff form path. Superadmin
-  `admin`/`admin` always works via a defensive fallback.
-- **Google sign-in** matches by normalised email (`normalizeEmail`, server-side
-  ID-token verification against Google JWKS — never trust the client payload).
-- **Temp passwords:** sede admins are created/reset with a temp password +
-  `mustChangePassword`; `ProtectedRoute` forces `/cambiar-contrasena` until
-  changed. Google (passwordless) bypasses it. Never display the current password.
-- **RBAC** (`api/src/rbac.ts`): `canGrantRole(actor,target)` — an `admin_sede`
-  can never grant `admin_sede` or higher; `canActOnSede` blocks cross-sede
-  mutations. Every user-mutating endpoint calls these.
-- **Read-only impersonation (support)** — `POST /api/admin/impersonate`
-  (`api/src/routes/support.ts`) lets superadmin/admin-general/admin-sede VIEW
-  another in-scope account for 30 min after a **triple check** (own password +
-  exact phrase `ACCEDER EN MODO LECTURA` + legal acknowledgment). It mints an
-  access token with a `readOnly` claim and NO refresh cookie (dies in 30 min);
-  a global preHandler in `server.ts` rejects every mutation made with a
-  `readOnly` token. Never targets a superadmin. Front: `ImpersonateModal` +
-  global `ImpersonationBanner` (countdown), wired through `useAuth`
-  (`startImpersonation`/`stopImpersonation`). Audited as `impersonate_start`.
+- **Un solo login para los cuatro.** `POST /api/auth/login` recibe
+  `identifier` —usuario **o** email, el mismo campo del formulario— y la
+  contraseña. El código anterior devolvía 403 si el rol era `alumno`, en el
+  login manual y en el de Google: un alumno no podía entrar de ninguna forma,
+  y esa era la causa raíz de que los dashboards estuvieran siempre vacíos.
+- **`username` es la identidad primaria** y la tienen todos. El **email es
+  opcional**: un alumno de primaria no tiene, y el admin le entrega usuario y
+  contraseña temporal impresos (`GET /api/groups/:id/credentials-sheet`).
+- **Google sign-in** para quien tenga email. Se verifica server-side contra el
+  JWKS de Google; el payload del cliente nunca se considera confiable.
+- **Contraseñas temporales:** se crean con `must_change_password` y
+  `ProtectedRoute` fuerza `/cambiar-contrasena`. Cambiar la propia exige la
+  actual, **salvo** en ese cambio forzado (quien llega ahí acaba de
+  autenticarse con la temporal) y en cuentas solo-Google. Nunca se muestra ni
+  se guarda una contraseña en claro: solo el valor temporal, una vez.
+- **RBAC** (`api/src/rbac.ts`): matriz explícita de permisos por rol y de qué
+  roles puede otorgar cada uno. **Un `admin` nunca puede crear otro `admin`.**
+  No es un ranking numérico — eso no puede expresar esa regla.
+- **Un solo chokepoint:** `api/src/authContext.ts` verifica el token una vez
+  en un hook global y lo deja en `req.actor`. Las rutas piden permisos con
+  `requirePermission()`. Antes había ocho copias de `requireUser`.
+- **Desactivar, borrar o resetear revoca los refresh tokens.** Sin eso la
+  sesión seguía viva hasta 30 días y la desactivación no tenía efecto real.
+- **El modo demo es solo del alumno**, local, sin cuenta ni token, y nunca
+  manda datos a la API. Es una partida de muestra, no una sesión.
+- **El primer superadmin se crea a mano** con `npm run bootstrap` en el
+  contenedor de la API. Ya no existe ningún `admin`/`admin` en el bundle.
 
 ## 5. Visual Design System
 
@@ -715,41 +721,47 @@ touchpad, windows, tabs, shortcuts, text editing, UI literacy). `SkillLevelView`
 
 ## 8. Progress Persistence
 
-`src/utils/progress.ts` manages `localStorage.edutic_progress_v1` →
-`Record<WorldKey, Record<levelNumber, LevelProgress>>`.
+`src/utils/progress.ts` maneja `localStorage.edutic_progress_v1` →
+`Record<WorldKey, Record<levelNumber, LevelProgress>>`, y lo sincroniza.
 
-- `markLevelComplete(worldId, level, accuracy, attempts)` at end of `GameplayPage`
-  (also POSTed to `/api/progress/complete` when API-backed).
+- `markLevelComplete(worldId, level, accuracy, attempts)` al terminar un nivel:
+  escribe local (instantáneo) y **encola** el envío al servidor.
+- `flushProgressQueue()` vacía la cola. Se reintenta al terminar el siguiente
+  nivel, al volver la conexión (`online`) y al entrar al mapa. Es seguro
+  porque el endpoint es idempotente: el servidor guarda el MEJOR resultado.
+- `hydrateProgress()` trae el progreso del servidor al entrar y lo fusiona
+  con lo local quedándose con el mejor de cada lado. Esto es lo que hace que
+  el progreso sobreviva a cambiar de computadora o borrar el caché.
+- **Nada de esto corre en modo demo**: sin cuenta no hay a dónde sincronizar.
 - `levelState()` → `"Completado" | "Actual" | "Bloqueado"`;
   `getCurrentLevelNumber()`; `resetProgress()`.
-- `src/data/worlds.ts` rebuilds `World.levels[]` each render from
-  `activitiesByWorld` + the progress snapshot, so unlocks reflect live.
-- World order is the single source of truth in `WORLD_PEDAGOGY_ORDER`; each world
-  shows its pedagogical `displayNumber` (e.g. "M3").
+- `src/data/worlds.ts` reconstruye `World.levels[]` en cada render desde
+  `activitiesByWorld` + el snapshot de progreso.
+- El orden de mundos es `WORLD_PEDAGOGY_ORDER`; cada uno muestra su
+  `displayNumber` pedagógico (ej. "M3").
 
 ## 9. Project Structure
 
 - `src/App.tsx` — routes + protected-route composition (lazy-loads heavy pages).
-- `src/pages/` — `LoginPage`, `WorldsPage`, `IslandDetailPage`, `GameplayPage`,
-  `RewardsPage`, `AccountPage`, `MissionsPage`, `SkillLevelView`,
-  `ShortcutLevelView`, `ChangePasswordPage`, `AdminGeneralPage`,
-  `TeacherPage`, `TeacherClassPage`, `TeacherStudentPage`, plus the routed
-  admin-sede screens in `src/pages/admin/` (incl. `ApiInspectorPage` at
-  `/admin/api` — superadmin/admin-general/admin-sede only, backed by
-  `GET /api/admin/inspector`).
-- `src/components/` — `auth/`, `common/` (`Brand`, `Button`, `Toast`),
-  `dashboard/DashboardShell`, `dev/LevelPositionEditor`, `digitalSkills/`,
-  `layout/TopNav`.
+- `src/pages/` — **solo el juego**: `LoginPage`, `ChangePasswordPage`,
+  `WorldsPage`, `IslandDetailPage`, `GameplayPage`, `SkillLevelView`,
+  `ShortcutLevelView`, `RewardsPage`, `AccountPage`, `MissionsPage`. Los
+  editores de diseño (`GlassEditorPage`, `LoginLayoutEditorPage`) existen
+  **solo en desarrollo**. Las pantallas de docente y administración se
+  borraron y se rehacen de cero.
+- `src/components/` — `auth/`, `common/`, `dev/` (editores de posiciones y
+  layout), `digitalSkills/`, `layout/TopNav`.
 - `src/data/` — `activities.ts`, `worlds.ts`, `levelPositions.ts`,
-  `digitalSkills.ts`, `seed.ts`.
-- `src/hooks/useAuth.tsx` — API-aware auth provider (async, localStorage fallback).
-- `src/utils/` — `api.ts` (typed API client), `assets.ts` (public-URL map),
-  `progress.ts`, `storage.ts`, `image.ts`, `googleAuth.ts`,
-  `studentStatus.ts`, `userContext.ts`.
+  `digitalSkills.ts`, `achievements.ts`.
+- `src/hooks/useAuth.tsx` — sesión contra la API. Sin fallback local.
+- `src/utils/` — `api.ts` (cliente tipado), `assets.ts`, `progress.ts`
+  (local + cola de sincronización), `storage.ts` (solo modo demo y rutas por
+  rol), `image.ts`, `googleAuth.ts`, `userContext.ts`.
 - `src/styles/global.css` — entire visual system + page CSS + the responsive pass.
-- `api/src/` — `server.ts`, `auth.ts`, `rbac.ts`, `seed.ts`, `db/{index,schema}.ts`,
-  `routes/{auth,users,sedes,progress,import}.ts`.
-- `db/init/` — `001_schema.sql`, `002_partitions.sql`.
+- `api/src/` — `server.ts`, `auth.ts`, `rbac.ts`, `authContext.ts`,
+  `userIdentity.ts`, `audit.ts`, `stats.ts`, `db/{index,schema,migrate}.ts`,
+  `scripts/bootstrap.ts`, `routes/{auth,users,groups,sedes,progress,import,admin,inspector}.ts`.
+- `api/migrations/` — SQL numerado, la fuente de verdad del esquema.
 - `public/assets/islands/islandN/` — **all the art of one island, together**:
   sky, island, map thumbnail, gameplay scene and level button. Path built from
   the `worldId`; see §6.3.
@@ -852,8 +864,20 @@ autodeploy and we do not want one: merging to `production` publishes nothing by
 itself. If a workflow ever appears that deploys on push, it is a mistake —
 remove it. The repo has no `.github/workflows/` for this reason.
 
-**The DB in production is Supabase**, not the compose `db` container, which is
-for local development.
+**La base es un recurso Postgres administrado por Coolify**, en la red
+compartida (`connect_to_docker_network`), con backup programado. La API se
+conecta por `DATABASE_URL` y aplica las migraciones al arrancar.
+
+**El compose NO monta secretos de Docker.** Los valores llegan por variables
+de entorno de Coolify: montar `secrets/*.txt` hacía fallar el arranque porque
+esos archivos no están —ni deben estar— versionados.
+
+**El primer superadmin** se crea una vez, a mano, en la terminal del
+contenedor de la API:
+
+```bash
+SUPERADMIN_USERNAME=... SUPERADMIN_EMAIL=... SUPERADMIN_NAME="..." npm run bootstrap
+```
 
 ### 13.1 The one thing that breaks silently — RULE
 
@@ -900,12 +924,16 @@ catches the failure above. Runbook: `DEPLOY.md`.
   directions are deliberate — see the table in §6.5 before changing either.
 - **A level is one task, not a repeated key** (§7.1), and **Alt+Tab never
   appears in a level**: the OS owns it and no technique captures it.
-- Respect RBAC: students only on student surfaces; demo can never be superadmin;
-  lower roles never reach higher-role screens.
+- Respetar el RBAC: el alumno solo en superficies de alumno; el demo nunca es
+  otra cosa que un alumno local; ningún rol llega a pantallas de otro rol.
+- **Nunca reintroducir una base de usuarios en el navegador.** La API es la
+  única autoridad sobre cuentas. Un fallback local significa contraseñas
+  dentro del bundle y una lista paralela que se desincroniza.
 - Never put secrets in `VITE_*` (inlined into the public bundle). Backend secrets
   (`JWT_SECRET`, `RESEND_API_KEY`, OAuth client secret) stay server-side.
-- Keep Docker building; do not bind host ports 80/443 in app compose; keep the
-  `127.0.0.1:3005` / `:3006` ports stable. Don't ship dead buttons.
+- Mantener el build de Docker sano; los servicios usan `expose` y no publican
+  puertos en el host: el proxy de Coolify llega por la red interna. No
+  publicar botones muertos.
 - Spanish must be correct: tildes (á é í ó ú), ñ, mayúsculas, inverted `¿` `¡`.
 - **Work on `dev`; never commit to `production` directly.** `production` is
   what is deployed, and only takes changes that already work (see §17).
@@ -1022,13 +1050,12 @@ originals under `Images/` and `Images-new/`.
 
 ### Before touching auth
 
-Verify end to end: manual email/password login; Google login (normalized email,
-`normalizeEmail()` in `src/utils/storage.ts`); "Cerrar sesión" clears the
-session; the role redirect lands on the right surface; `localStorage`
-(`edutic_*`) and `sessionStorage` behaviour is preserved; a sede admin on a temp
-password is forced to `/cambiar-contrasena` while Google sign-in bypasses it.
-Never store or display a user's current password — only a freshly generated temp
-value, once.
+Verificar de punta a punta: login con **usuario** y con **email** (el mismo
+campo); que un **alumno** entre —fue el bug de fondo del sistema anterior—;
+login con Google; que "Cerrar sesión" limpie la sesión; que cada rol caiga en
+su superficie; que una contraseña temporal fuerce `/cambiar-contrasena`; y que
+el modo demo siga sin tocar la API. Nunca guardar ni mostrar la contraseña
+actual de nadie: solo un valor temporal recién generado, una sola vez.
 
 ### Before you call it done
 

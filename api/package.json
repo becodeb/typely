@@ -7,7 +7,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
-    "dev": "tsx watch src/server.ts"
+    "dev": "tsx watch src/server.ts",
+    "bootstrap": "node dist/scripts/bootstrap.js",
+    "bootstrap:dev": "tsx src/scripts/bootstrap.ts"
   },
   "dependencies": {
     "fastify": "^4.28.1",

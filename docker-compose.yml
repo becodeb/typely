@@ -1,73 +1,77 @@
+# =====================================================================
+# TYPELY — dos contenedores, desplegados por Coolify.
+#
+# Cambios respecto de la versión anterior, y por qué:
+#
+#  1. SIN `secrets:`. El compose viejo montaba secretos de Docker desde
+#     ./secrets/*.txt, archivos que (correctamente) NO están en el repo.
+#     Docker Compose falla al arrancar si un `file:` declarado no existe,
+#     así que en Coolify nunca podría levantar. Ahora los valores llegan
+#     como variables de entorno, que es donde Coolify las guarda cifradas.
+#
+#  2. `expose` en vez de `ports`. Ya no publicamos 3005/3006 en el host:
+#     el proxy de Coolify (Traefik) llega a los contenedores por la red
+#     interna. Publicar puertos acá solo abriría superficie de más.
+#
+#  3. Sin servicio `db`. La base es un recurso Postgres administrado por
+#     Coolify — se crea aparte y se conecta por DATABASE_URL. Así queda
+#     dentro de su sistema de backups programados.
+#
+# El único dominio público apunta al servicio `mecanografia`; nginx
+# reenvía /api/* al servicio `api` por la red interna (ver nginx.conf).
+# =====================================================================
+
 services:
   # ------------------------------------------------------------------
-  # Postgres now runs on Supabase (sa-east-1 pooler) — the single source
-  # of truth for users, sedes, classes, progress and the audit log. The
-  # local `db` container was retired to free RAM on this 1 GB VM; the API
-  # connects via DATABASE_URL (secrets/database_url.txt → Supabase pooler,
-  # transaction mode 6543, sslmode=require). The `dbdata` volume and the
-  # `db_password` secret are kept only as a rollback path.
-  # ------------------------------------------------------------------
-
-  # ------------------------------------------------------------------
-  # Fastify API — handles auth (manual + Google), users, sedes,
-  # classes, progress reporting, and teacher analytics. Bound to
-  # loopback only (port 3006 on the host). Caddy reverse-proxies
-  # /api/* to this service.
+  # API Fastify — auth, usuarios, grupos, progreso y analítica.
+  # No lleva dominio propio: se llega a ella por /api/* del frontend.
   # ------------------------------------------------------------------
   api:
     build:
       context: .
       dockerfile: Dockerfile.api
-    container_name: mecanografia_api
     restart: unless-stopped
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL_FILE: /run/secrets/database_url
-      JWT_SECRET_FILE: /run/secrets/jwt_secret
-      RESEND_API_KEY_FILE: /run/secrets/resend_api_key
+      # Postgres administrado por Coolify. Usá la URL INTERNA que muestra
+      # el recurso, no la pública.
+      DATABASE_URL: "${DATABASE_URL}"
+      # Secreto de firma de los JWT. Si cambia, se caen todas las sesiones.
+      JWT_SECRET: "${JWT_SECRET}"
+      # Public Client ID de Google — el mismo que usa el frontend.
       GOOGLE_CLIENT_ID: "${VITE_GOOGLE_CLIENT_ID:-}"
-      INVITE_FROM: "${INVITE_FROM:-Typely <no-reply@example.com>}"
-      # Absolute origin used to build invitation links inside emails.
-      PUBLIC_ORIGIN: "${PUBLIC_ORIGIN:-https://typely.bauhub.online}"
-    secrets:
-      - database_url
-      - jwt_secret
-      - resend_api_key
-    ports:
-      - "127.0.0.1:3006:3000"
+      # Orígenes permitidos por CORS, separados por coma.
+      CORS_ORIGIN: "${CORS_ORIGIN:-https://typely.becode.com.ar,https://www.typely.becode.com.ar}"
+      PUBLIC_ORIGIN: "${PUBLIC_ORIGIN:-https://typely.becode.com.ar}"
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
 
   # ------------------------------------------------------------------
-  # Existing static-site container. Vite builds the frontend bundle,
-  # nginx serves /dist on port 80 (mapped to 127.0.0.1:3005 on host).
+  # Frontend — Vite compilado a estáticos, servidos por nginx, que además
+  # hace de proxy hacia la API. Este es el servicio que lleva el dominio.
   # ------------------------------------------------------------------
   mecanografia:
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        # Vite inlines these at build time. Provide them on the host
-        # (e.g. via a sibling .env file or `VITE_GOOGLE_CLIENT_ID=… docker
-        # compose up -d --build`). Only the public Client ID and the
-        # public domain allowlist — NEVER the OAuth client secret.
+        # OJO: Vite inlinea estas variables en tiempo de BUILD. Si faltan
+        # acá, el bundle sale sin ellas y el login con Google deja de
+        # funcionar SIN dejar rastro en los logs (CLAUDE.md §13.1).
         VITE_GOOGLE_CLIENT_ID: "${VITE_GOOGLE_CLIENT_ID:-}"
         VITE_GOOGLE_ALLOWED_DOMAINS: "${VITE_GOOGLE_ALLOWED_DOMAINS:-}"
-    container_name: mecanografia
     restart: unless-stopped
-    ports:
-      # Bind to loopback so the container is only reachable via the Caddy
-      # reverse proxy on the host, never directly from the public internet.
-      - "127.0.0.1:3005:80"
-
-volumes:
-  dbdata:
-
-secrets:
-  db_password:
-    file: ./secrets/db_password.txt
-  database_url:
-    file: ./secrets/database_url.txt
-  jwt_secret:
-    file: ./secrets/jwt_secret.txt
-  resend_api_key:
-    file: ./secrets/resend_api_key.txt
+    environment:
+      # Coolify inyecta acá el dominio que le asignes al servicio.
+      SERVICE_FQDN_MECANOGRAFIA_80: "${SERVICE_FQDN_MECANOGRAFIA_80:-}"
+    expose:
+      - "80"
+    depends_on:
+      - api

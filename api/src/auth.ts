@@ -27,14 +27,13 @@ const googleJwks = GOOGLE_CLIENT_ID ? createRemoteJWKSet(new URL("https://www.go
 export interface AccessClaims {
   sub: string;        // user id
   role: Role;
+  /** Sede a la que pertenece. `null` solo para el superadmin. */
   sede: string | null;
-  email: string;
+  /** Identidad primaria — la tienen todos, incluido el alumno sin email. */
+  username: string;
+  /** Opcional: solo quien usa Google o puede recuperar la cuenta. */
+  email: string | null;
   name: string;
-  /** Sesión de soporte en modo lectura (impersonación). Cuando es true,
-   *  el servidor rechaza toda mutación. */
-  readOnly?: boolean;
-  /** Actor real que inició la sesión de soporte (auditoría / banner). */
-  act?: { sub: string; name: string; role: Role } | null;
 }
 
 export async function signAccessToken(claims: AccessClaims, ttlSeconds = ACCESS_TTL_SECONDS): Promise<string> {
@@ -51,10 +50,9 @@ export async function verifyAccessToken(token: string): Promise<AccessClaims> {
     sub: String(payload.sub),
     role: payload.role as Role,
     sede: (payload.sede as string | null) ?? null,
-    email: String(payload.email),
+    username: String(payload.username),
+    email: (payload.email as string | null) ?? null,
     name: String(payload.name),
-    readOnly: payload.readOnly === true,
-    act: (payload.act as AccessClaims["act"]) ?? null,
   };
 }
 
@@ -104,6 +102,19 @@ export async function consumeRefreshToken(token: string) {
     .set({ revokedAt: new Date() })
     .where(eq(schema.refreshTokens.id, row.id));
   return row;
+}
+
+/* Corta TODAS las sesiones de una cuenta. Se llama al desactivarla,
+   borrarla o cambiarle la contraseña: sin esto, el usuario seguiría
+   renovando su access token con un refresh viejo y la desactivación no
+   tendría efecto real. */
+export async function revokeAllRefreshTokens(userId: string): Promise<void> {
+  await db
+    .update(schema.refreshTokens)
+    .set({ revokedAt: new Date() })
+    .where(
+      and(eq(schema.refreshTokens.userId, userId), isNull(schema.refreshTokens.revokedAt)),
+    );
 }
 
 /* ---------------------------------------------------------------- */

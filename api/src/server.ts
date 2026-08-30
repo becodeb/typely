@@ -11,161 +11,26 @@
 import Fastify from "fastify";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
-import { sql } from "drizzle-orm";
-import { db } from "./db/index.js";
+import { sql } from "./db/index.js";
+import { runMigrations } from "./db/migrate.js";
 import { authRoutes } from "./routes/auth.js";
 
-/* Idempotent migration for tables added after the initial 001_schema.sql
-  (which only runs on a fresh DB). Safe to run on every boot. */
-async function ensureSchema() {
-  /* F5 — gamification tables. */
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS student_stats (
-      user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-      xp integer NOT NULL DEFAULT 0,
-      stars integer NOT NULL DEFAULT 0,
-      levels_completed integer NOT NULL DEFAULT 0,
-      streak_days integer NOT NULL DEFAULT 0,
-      longest_streak integer NOT NULL DEFAULT 0,
-      last_active_day date,
-      updated_at timestamptz NOT NULL DEFAULT now()
-    );`);
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS student_achievements (
-      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      achievement_id text NOT NULL,
-      unlocked_at timestamptz NOT NULL DEFAULT now(),
-      PRIMARY KEY (user_id, achievement_id)
-    );`);
-
-  /* F6 — academic year + soft-delete + audit log. */
-  /* Postgres does NOT support `CREATE TYPE ... IF NOT EXISTS` for enums
-   * (the IF NOT EXISTS form is rejected with `syntax error at or near
-   * "NOT"`), so we guard with a pg_type lookup. Idempotent on every boot. */
-  await db.execute(sql`
-    DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'class_status') THEN
-        CREATE TYPE class_status AS ENUM ('active', 'archived');
-      END IF;
-    END $$`);
-  await db.execute(sql`
-    DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enrollment_status') THEN
-        CREATE TYPE enrollment_status AS ENUM ('cursando', 'promovido', 'egresado', 'retirado');
-      END IF;
-    END $$`);
-
-  await db.execute(sql`
-    ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at timestamptz`);
-  await db.execute(sql`
-    CREATE INDEX IF NOT EXISTS idx_users_deleted ON users (deleted_at) WHERE deleted_at IS NULL`);
-
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS academic_years (
-      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-      sede_id uuid NOT NULL REFERENCES sedes(id) ON DELETE CASCADE,
-      label text NOT NULL,
-      starts_at date,
-      ends_at date,
-      is_active boolean NOT NULL DEFAULT false,
-      closed_at timestamptz,
-      created_at timestamptz NOT NULL DEFAULT now()
-    );`);
-  await db.execute(sql`
-    CREATE UNIQUE INDEX IF NOT EXISTS academic_years_sede_label_unique
-      ON academic_years (sede_id, label)`);
-  await db.execute(sql`
-    CREATE INDEX IF NOT EXISTS idx_academic_years_sede ON academic_years (sede_id)`);
-
-  await db.execute(sql`
-    ALTER TABLE classes ADD COLUMN IF NOT EXISTS academic_year_id uuid REFERENCES academic_years(id) ON DELETE SET NULL`);
-  await db.execute(sql`
-    ALTER TABLE classes ADD COLUMN IF NOT EXISTS status class_status NOT NULL DEFAULT 'active'`);
-  await db.execute(sql`
-    CREATE INDEX IF NOT EXISTS idx_classes_year ON classes (academic_year_id)`);
-
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS class_enrollments (
-      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-      student_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      class_id uuid NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
-      academic_year_id uuid NOT NULL REFERENCES academic_years(id) ON DELETE CASCADE,
-      status enrollment_status NOT NULL DEFAULT 'cursando',
-      started_at timestamptz NOT NULL DEFAULT now(),
-      ended_at timestamptz
-    );`);
-  await db.execute(sql`
-    CREATE INDEX IF NOT EXISTS idx_class_enrollments_student ON class_enrollments (student_id)`);
-  await db.execute(sql`
-    CREATE INDEX IF NOT EXISTS idx_class_enrollments_class ON class_enrollments (class_id)`);
-  await db.execute(sql`
-    CREATE INDEX IF NOT EXISTS idx_class_enrollments_year ON class_enrollments (academic_year_id)`);
-
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS audit_log (
-      id bigserial PRIMARY KEY,
-      actor_id uuid REFERENCES users(id) ON DELETE SET NULL,
-      sede_id uuid REFERENCES sedes(id) ON DELETE SET NULL,
-      action text NOT NULL,
-      entity_type text NOT NULL,
-      entity_id text,
-      meta text,
-      at timestamptz NOT NULL DEFAULT now()
-    );`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log (at)`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_audit_sede ON audit_log (sede_id)`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_log (entity_type, entity_id)`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_log (actor_id)`);
-
-  /* One-shot backfill: make sure every sede has an active academic year
-     (the current calendar year) and every existing class + student
-     enrollment points at it. Safe to re-run: it only inserts when the
-     year row doesn't exist. */
-  const year = String(new Date().getUTCFullYear());
-  await db.execute(sql`
-    INSERT INTO academic_years (sede_id, label, is_active, starts_at, ends_at)
-    SELECT s.id, ${year}, true, make_date(${year}::int, 3, 1), make_date(${year}::int + 1, 2, 28)
-    FROM sedes s
-    WHERE NOT EXISTS (
-      SELECT 1 FROM academic_years ay
-      WHERE ay.sede_id = s.id AND ay.label = ${year}
-    )
-    ON CONFLICT (sede_id, label) DO NOTHING`);
-  await db.execute(sql`
-    UPDATE classes c
-    SET academic_year_id = ay.id
-    FROM academic_years ay
-    WHERE c.academic_year_id IS NULL
-      AND c.sede_id = ay.sede_id
-      AND ay.is_active = true`);
-  /* Backfill enrollments for every current roster link. */
-  await db.execute(sql`
-    INSERT INTO class_enrollments (student_id, class_id, academic_year_id, status)
-    SELECT cs.user_id, cs.class_id, c.academic_year_id, 'cursando'::enrollment_status
-    FROM class_students cs
-    INNER JOIN classes c ON c.id = cs.class_id
-    WHERE c.academic_year_id IS NOT NULL
-      AND NOT EXISTS (
-        SELECT 1 FROM class_enrollments ce
-        WHERE ce.student_id = cs.user_id
-          AND ce.class_id = cs.class_id
-          AND ce.academic_year_id = c.academic_year_id
-      )`);
-}
 import { sedeRoutes } from "./routes/sedes.js";
 import { userRoutes } from "./routes/users.js";
 import { progressRoutes } from "./routes/progress.js";
 import { importRoutes } from "./routes/import.js";
-import { invitationRoutes } from "./routes/invitations.js";
-import { classRoutes } from "./routes/classes.js";
+import { groupRoutes } from "./routes/groups.js";
 import { adminRoutes } from "./routes/admin.js";
-import { academicYearRoutes } from "./routes/academicYears.js";
 import { inspectorRoutes, registerRoute, recordError } from "./routes/inspector.js";
-import { supportRoutes } from "./routes/support.js";
-import { verifyAccessToken } from "./auth.js";
+import { registerAuthContext } from "./authContext.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
-const ORIGIN = process.env.CORS_ORIGIN ?? "https://typely.bauhub.online";
+/* Acepta una lista separada por comas: Coolify le asignó al sitio tanto el
+   dominio pelado como el www, y los dos tienen que poder llamar a la API. */
+const ORIGIN = (process.env.CORS_ORIGIN ?? "https://typely.becode.com.ar,https://www.typely.becode.com.ar")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
 
 async function main() {
   const app = Fastify({
@@ -186,11 +51,12 @@ async function main() {
     registerRoute(route.method as string | string[], route.url);
   });
 
-  /* Apply post-001 migrations (gamification / academic-year tables, etc.). */
-  try {
-    await ensureSchema();
-  } catch (e) {
-    app.log.error({ err: e }, "ensureSchema failed");
+  /* Migraciones pendientes + ventana de particiones de `attempts`.
+     Si esto falla NO se levanta: servir la API contra un esquema a medias
+     hace mucho más daño que no arrancar. Coolify reintenta el contenedor. */
+  const migrations = await runMigrations(sql, (m) => app.log.info(m));
+  if (migrations.applied.length) {
+    app.log.info({ applied: migrations.applied }, "migraciones aplicadas");
   }
 
   /* Top-level error handler: never leak stack traces, always Spanish.
@@ -213,25 +79,9 @@ async function main() {
     });
   });
 
-  /* Cumplimiento del MODO LECTURA (impersonación de soporte). Si el token
-     trae el claim readOnly, se rechaza cualquier método que mute datos.
-     Se hace acá, ANTES de las rutas, para que ninguna mutación se escape.
-     Las únicas excepciones POST son auth (cerrar/renovar sesión). */
-  const READONLY_POST_ALLOW = new Set(["/api/auth/logout", "/api/auth/refresh"]);
-  app.addHook("preHandler", async (req, reply) => {
-    if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") return;
-    const auth = req.headers.authorization;
-    if (!auth?.startsWith("Bearer ")) return; // que la ruta resuelva su propio 401
-    let claims;
-    try {
-      claims = await verifyAccessToken(auth.slice("Bearer ".length));
-    } catch {
-      return; // token inválido → la ruta responde 401
-    }
-    if (claims.readOnly && !READONLY_POST_ALLOW.has(req.url.split("?")[0]!)) {
-      return reply.code(403).send({ error: "Estás en modo lectura (sesión de soporte). No se pueden hacer cambios." });
-    }
-  });
+  /* Resolución de identidad: el token se verifica UNA vez acá y queda en
+     `req.actor`. Va ANTES de las rutas para que ninguna quede sin cubrir. */
+  registerAuthContext(app);
 
   /* Health check — used by the Caddy reverse-proxy to know we're up.
      Also exposed as /api/health so the PUBLIC https://…/api/health probe
@@ -246,12 +96,9 @@ async function main() {
   await app.register(userRoutes);
   await app.register(progressRoutes);
   await app.register(importRoutes);
-  await app.register(invitationRoutes);
-  await app.register(classRoutes);
+  await app.register(groupRoutes);
   await app.register(adminRoutes);
-  await app.register(academicYearRoutes);
   await app.register(inspectorRoutes);
-  await app.register(supportRoutes);
 
   /* Graceful shutdown. */
   const shutdown = async (signal: string) => {

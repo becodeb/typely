@@ -1,5 +1,5 @@
 import { activitiesByWorld, type Activity } from "../data/activities";
-import { api, getAccessToken } from "./api";
+import { api, getAccessToken, type ProgressItem } from "./api";
 import { isDemoMode } from "./storage";
 
 export type WorldKey = Activity["worldId"];
@@ -63,6 +63,100 @@ export function saveProgress(progress: CurriculumProgress) {
   }
 }
 
+/* ===================================================================
+   SINCRONIZACIÓN CON EL SERVIDOR
+
+   El camino caliente sigue siendo local: al terminar un nivel se escribe
+   en localStorage y la pantalla responde al instante, sin esperar la red.
+   El envío al servidor va por una COLA.
+
+   Por qué una cola. Antes el envío era `api.post(...).catch(() => [])`:
+   si el alumno estaba sin red —una sala con wifi flojo, que es el caso
+   normal en una escuela— ese nivel se perdía para siempre y nadie se
+   enteraba. Ahora el intento queda encolado y se reintenta al terminar el
+   siguiente nivel, al volver la conexión o al recargar la página.
+
+   El reintento es seguro porque el endpoint es idempotente: el servidor
+   guarda el MEJOR resultado por nivel, así que reenviar algo ya registrado
+   no lo duplica ni lo empeora.
+   =================================================================== */
+
+const QUEUE_KEY = "typely_progress_queue_v1";
+
+function readQueue(): ProgressItem[] {
+  try {
+    const raw = localStorage.getItem(QUEUE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? (parsed as ProgressItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeQueue(items: ProgressItem[]) {
+  try {
+    /* Tope defensivo: si alguien juega semanas sin conexión, no dejamos que
+       la cola crezca sin límite. Se conservan los más recientes. */
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(items.slice(-200)));
+  } catch {
+    /* Sin espacio: preferimos perder la cola antes que romper el juego. */
+  }
+}
+
+/** ¿Esta sesión manda progreso al servidor? El demo no tiene cuenta. */
+function syncEnabled(): boolean {
+  return Boolean(getAccessToken()) && !isDemoMode();
+}
+
+let flushing = false;
+
+/** Vacía la cola. Devuelve los logros recién desbloqueados. */
+export async function flushProgressQueue(): Promise<string[]> {
+  if (flushing || !syncEnabled()) return [];
+  const pending = readQueue();
+  if (!pending.length) return [];
+
+  flushing = true;
+  try {
+    const res = await api.postProgress(pending);
+    /* Solo se borra lo que se envió: si mientras tanto se encoló algo más,
+       eso queda para la próxima vuelta. */
+    writeQueue(readQueue().slice(pending.length));
+    return res.unlockedAchievements ?? [];
+  } catch {
+    /* Queda encolado para el próximo intento. */
+    return [];
+  } finally {
+    flushing = false;
+  }
+}
+
+/** Trae el progreso del servidor y lo fusiona con lo local.
+ *
+ *  Esto es lo que hace que el progreso sobreviva a cambiar de computadora
+ *  o a borrar el caché. El endpoint existía desde el principio y no lo
+ *  llamaba nadie. Se queda siempre el MEJOR resultado de cada lado, así
+ *  que jugar sin conexión y sincronizar después nunca pierde nada. */
+export async function hydrateProgress(): Promise<void> {
+  if (!syncEnabled()) return;
+  try {
+    const remote = await api.myProgress();
+    const local = loadProgress();
+    for (const row of remote) {
+      const world = (local[row.worldId as WorldKey] ??= {});
+      const mine = world[row.levelNumber];
+      world[row.levelNumber] = {
+        completed: mine?.completed || row.completed,
+        bestAccuracy: Math.max(mine?.bestAccuracy ?? 0, row.bestAccuracy),
+        attempts: Math.max(mine?.attempts ?? 0, row.attempts),
+      };
+    }
+    saveProgress(local);
+  } catch {
+    /* Sin red: se sigue con lo local, que es lo que el juego necesita. */
+  }
+}
+
 export function markLevelComplete(
   worldId: WorldKey,
   levelNumber: number,
@@ -78,26 +172,29 @@ export function markLevelComplete(
   };
   saveProgress(progress);
 
-  /* Mirror to the API for real (non-demo) students so cross-device sync,
-     dashboards, gamification stats and achievements actually populate.
-     Returns the newly-unlocked achievement ids (empty for demo/offline). */
-  if (getAccessToken() && !isDemoMode()) {
-    const endedAt = new Date();
-    const startedAt = new Date(endedAt.getTime() - 60_000);
-    const errorCount = Math.max(0, Math.round((100 - accuracy) / 8));
-    return api
-      .postProgressComplete({
-        worldId,
-        levelNumber,
-        accuracy: Math.round(accuracy),
-        errorCount,
-        startedAt: startedAt.toISOString(),
-        endedAt: endedAt.toISOString(),
-      })
-      .then((r) => (r as { unlockedAchievements?: string[] })?.unlockedAchievements ?? [])
-      .catch(() => []);
-  }
-  return Promise.resolve([]);
+  if (!syncEnabled()) return Promise.resolve([]);
+
+  const endedAt = new Date();
+  const startedAt = new Date(endedAt.getTime() - 60_000);
+  writeQueue([
+    ...readQueue(),
+    {
+      worldId,
+      levelNumber,
+      accuracy: Math.round(accuracy),
+      errorCount: Math.max(0, Math.round((100 - accuracy) / 8)),
+      startedAt: startedAt.toISOString(),
+      endedAt: endedAt.toISOString(),
+    },
+  ]);
+
+  return flushProgressQueue();
+}
+
+/* Al volver la conexión, se intenta vaciar lo pendiente sin que el alumno
+   tenga que hacer nada. */
+if (typeof window !== "undefined") {
+  window.addEventListener("online", () => void flushProgressQueue());
 }
 
 export function isLevelCompleted(progress: CurriculumProgress, worldId: WorldKey, levelNumber: number): boolean {

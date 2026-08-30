@@ -1,342 +1,435 @@
-/* Users routes — list, create, edit, delete, reset password.
+/* Usuarios — listar, crear, editar, borrar (lógico), restaurar y resetear
+ * contraseñas.
  *
- * Role-based:
- *   - superadmin: all users, all roles
- *   - admin-general: all users, but cannot create admin-general/superadmin
- *   - admin-sede: only users in their own sede; can only create profesor/alumno
- *   - profesor: read-only on students in their classes
+ * Qué cambió respecto de la versión anterior:
  *
- * Hard rule: an admin_sede can NEVER create another admin_sede. Enforced
- * via assertCanGrant() from rbac.ts. */
+ *  - Cuatro roles. `assertCanGrant` ahora sale de una matriz explícita, así
+ *    que "un admin no puede crear otro admin" es una regla escrita y no un
+ *    efecto colateral de comparar números.
+ *  - El email es OPCIONAL. Un alumno de primaria se crea solo con nombre;
+ *    el usuario y la contraseña temporal se los entrega el admin impresos.
+ *  - `groupId` reemplaza a `classId`, y es la ÚNICA representación de la
+ *    matrícula del alumno. Antes había que mantener `users.class_id` y la
+ *    tabla `class_students` en sincronía a mano, y se desincronizaban.
+ *  - Desactivar, borrar o resetear la contraseña ahora REVOCA los refresh
+ *    tokens. Sin eso, la sesión seguía viva hasta 30 días: el usuario
+ *    renovaba su token y la desactivación no tenía ningún efecto real.
+ */
 
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../db/index.js";
-import { and, eq, isNull, sql } from "drizzle-orm";
-import { verifyAccessToken, hashPassword } from "../auth.js";
-import { assertCanGrant, canActOnSede, ForbiddenError } from "../rbac.js";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { comparePassword, hashPassword, revokeAllRefreshTokens } from "../auth.js";
+import { requireActor, requirePermission } from "../authContext.js";
+import { assertCanGrant, canActOnSede, ForbiddenError, type Actor } from "../rbac.js";
+import { assignUsername, makeTempPassword } from "../userIdentity.js";
 import { audit } from "../audit.js";
-import type { AccessClaims } from "../auth.js";
 
-async function requireUser(req: FastifyRequest): Promise<AccessClaims> {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) {
-    throw Object.assign(new Error("Sin sesión."), { status: 401 });
-  }
-  return verifyAccessToken(auth.slice("Bearer ".length));
-}
+const ROLES = ["superadmin", "admin", "docente", "alumno"] as const;
 
 const createUserSchema = z.object({
-  fullName: z.string().trim().min(1),
-  email: z.string().trim().toLowerCase().email(),
-  username: z.string().trim().min(1).optional(),
-  // When provided, the account is created with this exact password (no
-  // forced change). When omitted, a temporary password is generated and
-  // returned once. Lets the superadmin set user+password directly.
+  fullName: z.string().trim().min(1, "Falta el nombre."),
+  role: z.enum(ROLES),
+  /* Opcional a propósito: el alumno curricular no tiene email. */
+  email: z.string().trim().toLowerCase().email().optional().nullable(),
+  username: z.string().trim().min(3).max(32).regex(/^[a-z0-9._-]+$/i, "El usuario solo admite letras, números, punto, guion y guion bajo.").optional(),
+  /* Si viene, la cuenta queda con esa contraseña y sin cambio forzado.
+     Si no, generamos una temporal y la devolvemos UNA vez. */
   password: z.string().min(6).optional(),
-  role: z.enum(["superadmin", "admin-general", "admin-sede", "profesor", "alumno"]),
   sedeId: z.string().uuid().optional().nullable(),
-  classId: z.string().uuid().optional().nullable(),
-  grade: z.enum(["inicial", "1ep", "2ep", "3ep", "4ep", "5ep", "6ep", "sec", "libre"]).optional(),
+  groupId: z.string().uuid().optional().nullable(),
 });
 
-const updateUserSchema = createUserSchema.partial().omit({ role: true }).extend({
+const updateUserSchema = z.object({
+  fullName: z.string().trim().min(1).optional(),
+  email: z.string().trim().toLowerCase().email().optional().nullable(),
+  username: z.string().trim().min(3).max(32).optional(),
+  sedeId: z.string().uuid().optional().nullable(),
+  groupId: z.string().uuid().optional().nullable(),
   active: z.boolean().optional(),
 });
 
-function makeUsername(name: string): string {
-  const base = name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "").slice(0, 10);
-  return base || `user${Date.now().toString().slice(-4)}`;
+/** Forma pública de un usuario. Nunca incluye el hash de la contraseña. */
+const publicColumns = {
+  id: schema.users.id,
+  role: schema.users.role,
+  sedeId: schema.users.sedeId,
+  groupId: schema.users.groupId,
+  username: schema.users.username,
+  email: schema.users.email,
+  fullName: schema.users.fullName,
+  active: schema.users.active,
+  mustChangePassword: schema.users.mustChangePassword,
+  lastLoginAt: schema.users.lastLoginAt,
+  deletedAt: schema.users.deletedAt,
+  createdAt: schema.users.createdAt,
+};
+
+async function teacherGroupIds(userId: string): Promise<string[]> {
+  const rows = await db
+    .select({ groupId: schema.groupTeachers.groupId })
+    .from(schema.groupTeachers)
+    .where(eq(schema.groupTeachers.userId, userId));
+  return rows.map((r) => r.groupId);
 }
 
-function makeTempPassword(): string {
-  return `tmp-${Math.random().toString(36).slice(2, 8)}`;
+/** Carga el usuario objetivo y verifica que el actor pueda tocarlo.
+ *  Responde 404/403 y devuelve null cuando no corresponde. */
+async function loadTarget(actor: Actor, id: string, reply: FastifyReply) {
+  const [target] = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
+  if (!target) {
+    reply.code(404).send({ error: "Usuario no encontrado." });
+    return null;
+  }
+  /* El superadmin solo se toca a sí mismo o lo toca otro superadmin. */
+  if (target.role === "superadmin" && actor.role !== "superadmin") {
+    reply.code(403).send({ error: "No podés modificar una cuenta de superadmin." });
+    return null;
+  }
+  if (!canActOnSede(actor, target.sedeId)) {
+    reply.code(403).send({ error: "Ese usuario pertenece a otra sede." });
+    return null;
+  }
+  return target;
+}
+
+/** Un docente solo puede tocar alumnos de SUS grupos. */
+async function assertTeacherOwnsStudent(actor: Actor, target: schema.DbUser): Promise<void> {
+  if (actor.role !== "docente") return;
+  if (target.role !== "alumno" || !target.groupId) {
+    throw new ForbiddenError("Solo podés gestionar alumnos de tus grupos.");
+  }
+  const ids = await teacherGroupIds(actor.id);
+  if (!ids.includes(target.groupId)) {
+    throw new ForbiddenError("Ese alumno no pertenece a ninguno de tus grupos.");
+  }
 }
 
 export async function userRoutes(app: FastifyInstance) {
-  /* ----- GET /api/users?role=&sedeId=&includeDeleted= ----- */
+  /* ----- GET /api/users?role=&sedeId=&groupId=&includeDeleted= ----- */
   app.get("/api/users", async (req, reply) => {
-    const actor = await requireUser(req);
-    // Solo superficies de administración listan usuarios. Un token de alumno
-    // o profesor no puede enumerar emails/usuarios de toda la plataforma
-    // (los profesores tienen /api/teacher/students para su propio alcance).
-    if (actor.role === "alumno" || actor.role === "profesor") {
-      return reply.code(403).send({ error: "No autorizado." });
-    }
-    const { role, sedeId, includeDeleted } = req.query as { role?: string; sedeId?: string; includeDeleted?: string };
+    const actor = requirePermission(req, "user:read");
+    const { role, sedeId, groupId, includeDeleted } = req.query as {
+      role?: string; sedeId?: string; groupId?: string; includeDeleted?: string;
+    };
+
     const conditions = [];
-    if (role) conditions.push(eq(schema.users.role, role as schema.Role));
-    // admin_sede can only see their own sede
-    if (actor.role === "admin-sede") {
-      if (actor.sede) conditions.push(eq(schema.users.sedeId, actor.sede));
-      else conditions.push(sql`false`); // admin_sede without sede binding → no results
+    if (actor.role === "admin") {
+      if (!actor.sedeId) return reply.send([]);
+      conditions.push(eq(schema.users.sedeId, actor.sedeId));
+    } else if (actor.role === "docente") {
+      /* Un docente ve los alumnos de sus grupos y nada más. Nunca la lista
+         completa de la sede ni los emails del resto del staff. */
+      const ids = await teacherGroupIds(actor.id);
+      if (!ids.length) return reply.send([]);
+      conditions.push(inArray(schema.users.groupId, ids));
+      conditions.push(eq(schema.users.role, "alumno"));
     } else if (sedeId) {
       conditions.push(eq(schema.users.sedeId, sedeId));
     }
-    // F6: by default we hide soft-deleted accounts (Borrar cuenta from
-    // the superadmin panel). Superadmin can opt in via ?includeDeleted=1.
-    if (!includeDeleted) conditions.push(isNull(schema.users.deletedAt));
-    const where = conditions.length ? and(...conditions) : undefined;
+
+    if (role && (ROLES as readonly string[]).includes(role)) {
+      conditions.push(eq(schema.users.role, role as schema.Role));
+    }
+    if (groupId) conditions.push(eq(schema.users.groupId, groupId));
+    /* Las cuentas borradas se ocultan salvo pedido explícito del superadmin. */
+    if (!includeDeleted || actor.role !== "superadmin") {
+      conditions.push(isNull(schema.users.deletedAt));
+    }
+
     const rows = await db
-      .select({
-        id: schema.users.id,
-        email: schema.users.email,
-        fullName: schema.users.fullName,
-        username: schema.users.username,
-        role: schema.users.role,
-        sedeId: schema.users.sedeId,
-        classId: schema.users.classId,
-        grade: schema.users.grade,
-        active: schema.users.active,
-        mustChangePassword: schema.users.mustChangePassword,
-        lastLoginAt: schema.users.lastLoginAt,
-        deletedAt: schema.users.deletedAt,
-      })
+      .select(publicColumns)
       .from(schema.users)
-      .where(where as any)
+      .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(schema.users.fullName);
     return reply.send(rows);
   });
 
   /* ----- POST /api/users ----- */
   app.post("/api/users", async (req, reply) => {
-    const actor = await requireUser(req);
+    const actor = requirePermission(req, "user:create");
     const parsed = createUserSchema.safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send({ error: "Datos inválidos.", details: parsed.error.flatten() });
+    if (!parsed.success) {
+      return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Datos inválidos." });
+    }
     const data = parsed.data;
-    try {
-      assertCanGrant(actor.role as schema.Role, data.role);
-    } catch (e) {
-      if (e instanceof ForbiddenError) return reply.code(e.status).send({ error: e.message });
-      throw e;
+
+    assertCanGrant(actor.role, data.role);
+
+    /* Un admin siempre crea dentro de SU sede: si manda otra, se ignora.
+       El superadmin tiene que indicarla, salvo que cree otro superadmin. */
+    const targetSede =
+      data.role === "superadmin" ? null : actor.role === "admin" ? actor.sedeId : (data.sedeId ?? null);
+    if (data.role !== "superadmin" && !targetSede) {
+      return reply.code(400).send({ error: "Falta indicar la sede." });
     }
-    // An admin-sede always creates within their OWN sede — never trust/require
-    // a client-sent sedeId for them. Superadmin/admin-general may target any.
-    const targetSede = actor.role === "admin-sede" ? (actor.sede ?? null) : (data.sedeId ?? null);
-    if (!canActOnSede({ role: actor.role as schema.Role, sedeId: actor.sede }, targetSede)) {
-      return reply.code(403).send({ error: "No podés crear usuarios en otra sede." });
+    if (!canActOnSede(actor, targetSede)) {
+      throw new ForbiddenError("No podés crear usuarios en otra sede.");
     }
-    const chosen = !!data.password;
-    const effectivePassword = data.password ?? makeTempPassword();
-    const passwordHash = await hashPassword(effectivePassword);
+
+    /* Solo un alumno puede pertenecer a un grupo, y el grupo tiene que ser
+       de la misma sede (la base lo exige con un CHECK; acá damos el error
+       claro en vez de un 500). */
+    let groupId: string | null = null;
+    if (data.groupId) {
+      if (data.role !== "alumno") {
+        return reply.code(400).send({ error: "Solo un alumno puede pertenecer a un grupo." });
+      }
+      const [group] = await db.select().from(schema.groups).where(eq(schema.groups.id, data.groupId)).limit(1);
+      if (!group) return reply.code(400).send({ error: "El grupo no existe." });
+      if (group.sedeId !== targetSede) {
+        return reply.code(400).send({ error: "Ese grupo es de otra sede." });
+      }
+      groupId = group.id;
+    }
+
+    const chosePassword = Boolean(data.password);
+    const password = data.password ?? makeTempPassword();
+    const username = data.username ?? (await assignUsername(data.fullName));
+
     let row;
     try {
       [row] = await db
         .insert(schema.users)
         .values({
-          fullName: data.fullName,
-          email: data.email,
-          username: data.username ?? makeUsername(data.fullName),
           role: data.role,
           sedeId: targetSede,
-          classId: data.classId ?? null,
-          grade: data.grade ?? "libre",
-          passwordHash,
-          mustChangePassword: !chosen,
-          temporaryPassword: !chosen,
+          groupId,
+          username,
+          email: data.email ?? null,
+          fullName: data.fullName,
+          passwordHash: await hashPassword(password),
+          mustChangePassword: !chosePassword,
         })
-        .returning();
-    } catch (e: any) {
-      // Unique violation on email/username → friendly message.
-      if (e?.code === "23505") return reply.code(409).send({ error: "Ya existe un usuario con ese email o usuario." });
-      throw e;
-    }
-    if (!row) return reply.code(500).send({ error: "No se pudo crear el usuario." });
-    if (data.classId) {
-      if (data.role === "alumno") {
-        await db.insert(schema.classStudents).values({ classId: data.classId, userId: row.id }).onConflictDoNothing();
-      } else if (data.role === "profesor") {
-        await db.insert(schema.classTeachers).values({ classId: data.classId, userId: row.id }).onConflictDoNothing();
+        .returning(publicColumns);
+    } catch (err) {
+      if (String((err as { code?: string }).code) === "23505") {
+        return reply.code(409).send({ error: "Ya existe una cuenta con ese usuario o email." });
       }
+      throw err;
     }
+
     await audit({
       actor,
       action: "create_user",
       entityType: "user",
-      entityId: row.id,
-      meta: { role: data.role, email: data.email, sedeId: targetSede, classId: data.classId ?? null, generatedPassword: !chosen },
+      entityId: row!.id,
+      meta: { role: data.role, username, sedeId: targetSede, groupId },
     });
-    return reply.send({
-      user: { id: row.id, email: row.email, name: row.fullName, username: row.username, role: row.role, sedeId: row.sedeId, classId: row.classId },
-      // Only surface a password when WE generated it; a chosen one is not echoed.
-      temporaryPassword: chosen ? null : effectivePassword,
+
+    return reply.code(201).send({
+      user: row,
+      /* La contraseña solo se devuelve si la generamos nosotros, y una vez.
+         Una elegida por el admin no se hace eco. */
+      temporaryPassword: chosePassword ? null : password,
     });
   });
 
   /* ----- PATCH /api/users/:id ----- */
   app.patch("/api/users/:id", async (req, reply) => {
-    const actor = await requireUser(req);
+    const actor = requirePermission(req, "user:update");
     const { id } = req.params as { id: string };
+    const target = await loadTarget(actor, id, reply);
+    if (!target) return;
+
     const parsed = updateUserSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "Datos inválidos." });
-    const [target] = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
-    if (!target) return reply.code(404).send({ error: "Usuario no encontrado." });
-    if (!canActOnSede({ role: actor.role as schema.Role, sedeId: actor.sede }, target.sedeId)) {
-      return reply.code(403).send({ error: "No podés modificar usuarios de otra sede." });
+    const data = parsed.data;
+
+    /* Mover a otra sede exige alcance sobre el DESTINO, no solo el origen. */
+    if (data.sedeId !== undefined && !canActOnSede(actor, data.sedeId ?? null)) {
+      throw new ForbiddenError("No podés mover usuarios a otra sede.");
     }
-    // El destino del cambio de sede también tiene que estar dentro del
-    // alcance del actor (un admin-sede no puede mover usuarios a otra sede).
-    if (
-      parsed.data.sedeId !== undefined &&
-      !canActOnSede({ role: actor.role as schema.Role, sedeId: actor.sede }, parsed.data.sedeId ?? null)
-    ) {
-      return reply.code(403).send({ error: "No podés mover usuarios a otra sede." });
-    }
-    if (target.role === "superadmin" && actor.role !== "superadmin") {
-      return reply.code(403).send({ error: "Solo el superadmin puede modificar al superadmin." });
-    }
-    // El curso destino también tiene que ser de una sede sobre la que el
-    // actor puede actuar.
-    if (parsed.data.classId) {
-      const [cls] = await db.select().from(schema.classes).where(eq(schema.classes.id, parsed.data.classId)).limit(1);
-      if (!cls) return reply.code(400).send({ error: "El curso no existe." });
-      if (!canActOnSede({ role: actor.role as schema.Role, sedeId: actor.sede }, cls.sedeId)) {
-        return reply.code(403).send({ error: "El curso es de otra sede." });
+    if (data.groupId) {
+      if (target.role !== "alumno") {
+        return reply.code(400).send({ error: "Solo un alumno puede pertenecer a un grupo." });
+      }
+      const [group] = await db.select().from(schema.groups).where(eq(schema.groups.id, data.groupId)).limit(1);
+      if (!group) return reply.code(400).send({ error: "El grupo no existe." });
+      if (!canActOnSede(actor, group.sedeId)) {
+        throw new ForbiddenError("Ese grupo es de otra sede.");
       }
     }
+
     let row;
     try {
       [row] = await db
         .update(schema.users)
         .set({
-          fullName: parsed.data.fullName ?? target.fullName,
-          email: parsed.data.email ?? target.email,
-          username: parsed.data.username ?? target.username,
-          sedeId: parsed.data.sedeId !== undefined ? parsed.data.sedeId : target.sedeId,
-          classId: parsed.data.classId !== undefined ? parsed.data.classId : target.classId,
-          grade: parsed.data.grade ?? target.grade,
-          active: parsed.data.active !== undefined ? parsed.data.active : target.active,
-          updatedAt: new Date(),
+          ...(data.fullName !== undefined ? { fullName: data.fullName } : {}),
+          ...(data.email !== undefined ? { email: data.email } : {}),
+          ...(data.username !== undefined ? { username: data.username } : {}),
+          ...(data.sedeId !== undefined ? { sedeId: data.sedeId } : {}),
+          ...(data.groupId !== undefined ? { groupId: data.groupId } : {}),
+          ...(data.active !== undefined ? { active: data.active } : {}),
         })
         .where(eq(schema.users.id, id))
-        .returning();
-    } catch (e: any) {
-      if (e?.code === "23505") return reply.code(409).send({ error: "Ya existe un usuario con ese email o usuario." });
-      throw e;
-    }
-    // Mantener el roster (class_students) en sincronía cuando se cambia el
-    // curso de un alumno desde la edición — igual que POST /classes/:id/students.
-    if (target.role === "alumno" && parsed.data.classId !== undefined && parsed.data.classId !== target.classId) {
-      await db.delete(schema.classStudents).where(eq(schema.classStudents.userId, id));
-      if (parsed.data.classId) {
-        await db.insert(schema.classStudents).values({ classId: parsed.data.classId, userId: id }).onConflictDoNothing();
+        .returning(publicColumns);
+    } catch (err) {
+      if (String((err as { code?: string }).code) === "23505") {
+        return reply.code(409).send({ error: "Ya existe una cuenta con ese usuario o email." });
       }
+      throw err;
     }
+
+    /* Desactivar tiene que cortar la sesión ya. Sin revocar los refresh
+       tokens, la persona seguiría renovando su acceso durante 30 días. */
+    if (data.active === false) await revokeAllRefreshTokens(id);
+
+    await audit({ actor, action: "update_user", entityType: "user", entityId: id, meta: data });
     return reply.send(row);
   });
 
-  /* ----- DELETE /api/users/:id (F6: soft delete) ----- */
+  /* ----- DELETE /api/users/:id — borrado lógico -----
+     Conserva progreso, intentos y auditoría. La cuenta deja de poder
+     entrar y desaparece de los listados. */
   app.delete("/api/users/:id", async (req, reply) => {
-    const actor = await requireUser(req);
+    const actor = requirePermission(req, "user:delete");
     const { id } = req.params as { id: string };
-    const [target] = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
-    if (!target) return reply.code(404).send({ error: "Usuario no encontrado." });
+    if (id === actor.id) {
+      return reply.code(400).send({ error: "No podés borrar tu propia cuenta." });
+    }
+    const target = await loadTarget(actor, id, reply);
+    if (!target) return;
     if (target.role === "superadmin") {
       return reply.code(403).send({ error: "El superadmin no se puede eliminar." });
     }
-    try {
-      assertCanGrant(actor.role as schema.Role, target.role);
-    } catch (e) {
-      if (e instanceof ForbiddenError) return reply.code(e.status).send({ error: e.message });
-      throw e;
-    }
-    if (!canActOnSede({ role: actor.role as schema.Role, sedeId: actor.sede }, target.sedeId)) {
-      return reply.code(403).send({ error: "No podés eliminar usuarios de otra sede." });
-    }
-    // F6: soft delete — keeps progress, attempts and audit history intact.
-    // The account can no longer log in, is hidden from listings, and is
-    // excluded from class rosters via the active=true filter (also flipped
-    // to false so any in-flight session sees "user inactive" on next call).
+    assertCanGrant(actor.role, target.role);
+
     await db
       .update(schema.users)
-      .set({ deletedAt: new Date(), active: false, updatedAt: new Date() })
+      .set({ deletedAt: new Date(), active: false })
       .where(eq(schema.users.id, id));
+    await revokeAllRefreshTokens(id);
+
     await audit({
-      actor,
-      action: "delete_user",
-      entityType: "user",
-      entityId: id,
-      meta: { email: target.email, role: target.role },
+      actor, action: "delete_user", entityType: "user", entityId: id,
+      meta: { username: target.username, role: target.role },
     });
     return reply.send({ ok: true });
   });
 
-  /* ----- POST /api/users/:id/restore (F6: re-activate a soft-deleted account) ----- */
+  /* ----- POST /api/users/:id/restore ----- */
   app.post("/api/users/:id/restore", async (req, reply) => {
-    const actor = await requireUser(req);
+    const actor = requirePermission(req, "user:delete");
     const { id } = req.params as { id: string };
-    const [target] = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
-    if (!target) return reply.code(404).send({ error: "Usuario no encontrado." });
-    try {
-      assertCanGrant(actor.role as schema.Role, target.role);
-    } catch (e) {
-      if (e instanceof ForbiddenError) return reply.code(e.status).send({ error: e.message });
-      throw e;
-    }
-    if (!canActOnSede({ role: actor.role as schema.Role, sedeId: actor.sede }, target.sedeId)) {
-      return reply.code(403).send({ error: "No podés restaurar usuarios de otra sede." });
-    }
+    const target = await loadTarget(actor, id, reply);
+    if (!target) return;
+    assertCanGrant(actor.role, target.role);
+
     await db
       .update(schema.users)
-      .set({ deletedAt: null, active: true, updatedAt: new Date() })
+      .set({ deletedAt: null, active: true })
       .where(eq(schema.users.id, id));
     await audit({
-      actor,
-      action: "restore_user",
-      entityType: "user",
-      entityId: id,
-      meta: { email: target.email, role: target.role },
+      actor, action: "restore_user", entityType: "user", entityId: id,
+      meta: { username: target.username, role: target.role },
     });
     return reply.send({ ok: true });
   });
 
-  /* ----- POST /api/users/:id/reset-password ----- */
+  /* ----- POST /api/users/:id/reset-password -----
+     Genera una temporal y la devuelve UNA vez. La contraseña anterior no
+     se lee, ni se devuelve, ni se muestra nunca. */
   app.post("/api/users/:id/reset-password", async (req, reply) => {
-    const actor = await requireUser(req);
+    const actor = requirePermission(req, "user:reset-password");
     const { id } = req.params as { id: string };
-    const [target] = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
-    if (!target) return reply.code(404).send({ error: "Usuario no encontrado." });
-    try {
-      assertCanGrant(actor.role as schema.Role, target.role);
-    } catch (e) {
-      if (e instanceof ForbiddenError) return reply.code(e.status).send({ error: e.message });
-      throw e;
+    const target = await loadTarget(actor, id, reply);
+    if (!target) return;
+
+    if (actor.role === "docente") {
+      /* El docente resuelve el "me olvidé la contraseña" de su propio
+         curso, sin depender del admin — pero solo el de sus alumnos. */
+      await assertTeacherOwnsStudent(actor, target);
+    } else {
+      assertCanGrant(actor.role, target.role);
     }
-    if (!canActOnSede({ role: actor.role as schema.Role, sedeId: actor.sede }, target.sedeId)) {
-      return reply.code(403).send({ error: "No podés resetear la contraseña de usuarios de otra sede." });
-    }
-    const tempPassword = makeTempPassword();
-    const passwordHash = await hashPassword(tempPassword);
+
+    const temporaryPassword = makeTempPassword();
     await db
       .update(schema.users)
-      .set({ passwordHash, mustChangePassword: true, temporaryPassword: true })
+      .set({ passwordHash: await hashPassword(temporaryPassword), mustChangePassword: true })
       .where(eq(schema.users.id, id));
+    await revokeAllRefreshTokens(id);
+
     await audit({
-      actor,
-      action: "reset_password",
-      entityType: "user",
-      entityId: id,
-      meta: { email: target.email, role: target.role },
+      actor, action: "reset_password", entityType: "user", entityId: id,
+      meta: { username: target.username, role: target.role },
     });
-    return reply.send({ temporaryPassword: tempPassword });
+    return reply.send({ temporaryPassword });
   });
 
-  /* ----- POST /api/users/:id/change-password (self-service) ----- */
-  app.post("/api/users/:id/change-password", async (req, reply) => {
-    const actor = await requireUser(req);
-    const { id } = req.params as { id: string };
-    if (actor.sub !== id) {
-      return reply.code(403).send({ error: "Solo podés cambiar tu propia contraseña." });
+  /* ----- POST /api/auth/change-password — la propia -----
+     Pide la contraseña actual. El endpoint anterior no lo hacía: con un
+     access token robado alcanzaba para quedarse con la cuenta sin conocer
+     la contraseña. La excepción es quien solo entra con Google y por lo
+     tanto nunca tuvo una. */
+  app.post("/api/auth/change-password", async (req, reply) => {
+    const actor = requireActor(req);
+    const parsed = z
+      .object({
+        currentPassword: z.string().optional(),
+        newPassword: z.string().min(6, "La contraseña nueva debe tener al menos 6 caracteres."),
+      })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Datos inválidos." });
     }
-    // Mínimo 6 — consistente con la creación de usuarios, la aceptación de
-    // invitaciones y el formulario "Cambiar contraseña" del frontend.
-    const body = z.object({ newPassword: z.string().min(6) }).safeParse(req.body);
-    if (!body.success) return reply.code(400).send({ error: "La contraseña nueva debe tener al menos 6 caracteres." });
-    const passwordHash = await hashPassword(body.data.newPassword);
+
+    const [me] = await db.select().from(schema.users).where(eq(schema.users.id, actor.id)).limit(1);
+    if (!me) return reply.code(401).send({ error: "Sesión inválida." });
+
+    /* Se pide la contraseña actual, con dos excepciones:
+       - quien solo entra con Google nunca tuvo una;
+       - quien está en el cambio OBLIGATORIO acaba de autenticarse con la
+         temporal hace segundos. Pedírsela de nuevo es fricción pura, y el
+         público de esta pantalla son chicos de primaria copiando una clave
+         de una tarjeta impresa. */
+    const mustVerify = Boolean(me.passwordHash) && !me.mustChangePassword;
+    if (mustVerify) {
+      const ok =
+        parsed.data.currentPassword &&
+        (await comparePassword(parsed.data.currentPassword, me.passwordHash!));
+      if (!ok) return reply.code(401).send({ error: "La contraseña actual no coincide." });
+    }
+
     await db
       .update(schema.users)
-      .set({ passwordHash, mustChangePassword: false, temporaryPassword: false })
-      .where(eq(schema.users.id, id));
+      .set({ passwordHash: await hashPassword(parsed.data.newPassword), mustChangePassword: false })
+      .where(eq(schema.users.id, actor.id));
+
+    await audit({ actor, action: "change_own_password", entityType: "user", entityId: actor.id });
     return reply.send({ ok: true });
+  });
+
+  /* ----- GET /api/users/:id/credentials-sheet -----
+     Lo que el admin imprime y reparte: nombre y usuario de cada alumno de
+     un grupo. NUNCA contraseñas — solo se ven en el momento de crearlas o
+     resetearlas. */
+  app.get("/api/groups/:id/credentials-sheet", async (req, reply) => {
+    const actor = requirePermission(req, "user:read");
+    const { id } = req.params as { id: string };
+    const [group] = await db.select().from(schema.groups).where(eq(schema.groups.id, id)).limit(1);
+    if (!group) return reply.code(404).send({ error: "Grupo no encontrado." });
+    if (!canActOnSede(actor, group.sedeId)) {
+      throw new ForbiddenError("Ese grupo pertenece a otra sede.");
+    }
+    const rows = await db
+      .select({
+        fullName: schema.users.fullName,
+        username: schema.users.username,
+        mustChangePassword: schema.users.mustChangePassword,
+      })
+      .from(schema.users)
+      .where(
+        and(
+          eq(schema.users.groupId, id),
+          eq(schema.users.role, "alumno"),
+          isNull(schema.users.deletedAt),
+        ),
+      )
+      .orderBy(schema.users.fullName);
+    return reply.send({ group: { id: group.id, name: group.name }, students: rows });
   });
 }

@@ -1,17 +1,18 @@
-/* Centralised audit-log writer. Every privileged mutation should call
- * `audit()` so the trail is consistent (and we never accidentally skip
- * logging on the happy path).
+/* Registro de auditoría centralizado. Toda mutación privilegiada llama a
+ * `audit()`, así el rastro es consistente y no depende de que alguien se
+ * acuerde de loguear en el camino feliz.
  *
- * `meta` is JSON-encoded as a text column on purpose: cheap, no jsonb
- * migration, and the dashboard just JSON.parses on read. */
+ * `meta` se guarda como texto JSON a propósito: barato, y evita migrar la
+ * columna a jsonb para algo que solo se lee en un panel. */
 
 import { db, schema } from "./db/index.js";
-import type { AccessClaims } from "./auth.js";
+import type { Actor } from "./rbac.js";
 
 export interface AuditInput {
-  actor: Pick<AccessClaims, "sub" | "role" | "sede"> | null;
-  action: string; // e.g. "delete_user", "close_academic_year", "archive_class"
-  entityType: "user" | "class" | "sede" | "invitation" | "academic_year" | "enrollment";
+  actor: Pick<Actor, "id" | "role" | "sedeId"> | null;
+  /** Verbo en snake_case: "create_user", "delete_group", "import_users". */
+  action: string;
+  entityType: "user" | "group" | "sede";
   entityId?: string | null;
   meta?: Record<string, unknown>;
 }
@@ -19,14 +20,14 @@ export interface AuditInput {
 export async function audit(input: AuditInput): Promise<void> {
   try {
     await db.insert(schema.auditLog).values({
-      actorId: input.actor?.sub ?? null,
-      sedeId: input.actor?.sede ?? null,
+      actorId: input.actor?.id ?? null,
+      sedeId: input.actor?.sedeId ?? null,
       action: input.action,
       entityType: input.entityType,
       entityId: input.entityId ?? null,
       meta: input.meta ? JSON.stringify(input.meta) : null,
     });
   } catch {
-    /* never fail the caller because of an audit write */
+    /* Nunca hacemos fallar al llamador por una escritura de auditoría. */
   }
 }
