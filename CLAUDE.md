@@ -94,10 +94,15 @@ lands on its own surface via `routeForRole` (`/admin-general`, `/admin-sede`,
 
 ### Typography
 - Loaded from Google Fonts in `index.html`:
-  - **Fredoka** (500/600/700) — display: headings, key labels, buttons, wordmark.
-  - **Nunito** (600–900) — body, inputs, paragraphs.
+  - **Baloo 2** (500/600/700/800) — display: headings, key labels, buttons,
+    wordmark, the big target letter.
+  - **Poppins** (400–800) — body, inputs, paragraphs.
 - CSS variables in `src/styles/global.css`:
-  `--font-display: "Fredoka", …` and `--font-body: "Nunito", …`.
+  `--font-display: "Baloo 2", "Fredoka", …` and
+  `--font-body: "Poppins", "Nunito", …`.
+- Fredoka and Nunito survive only as **fallbacks** in those stacks. This file
+  used to name them as the pair, which was wrong — always read the shipped
+  `index.html` link and the two CSS variables, not a remembered pair.
 
 ### Color palette
 - Sky blue `#9fc8ff` `#cfeeff`; deep navy `#17355f` `#153b78`; turquoise/mint
@@ -118,8 +123,8 @@ lands on its own surface via `routeForRole` (`/admin-general`, `/admin-sede`,
 Target proportions for the login card, kept from the original design reference.
 Where a number here disagrees with what `LoginPage.tsx` actually ships, **the
 shipped value wins** — notably the card is fixed at `w-[min(32rem,92vw)]`, and
-the fonts are Fredoka + Nunito (the reference also suggested Baloo 2 and
-Quicksand; do not introduce them).
+the fonts are the shipped pair (see "Typography" above); do not introduce
+Quicksand, which the original reference also suggested.
 
 - **Card:** radius 34–44px, background `rgba(255,255,255,0.58)`, backdrop blur
   22–30px, 1px border `rgba(255,255,255,0.85)`, outer shadow
@@ -153,9 +158,14 @@ before calling it done; fix spacing, proportions, blur, radius and shadows and
 repeat. One pass is rarely enough.
 
 ### Keyboard (GameplayPage)
-- Five rows (`num`, `top`, `home`, `bot`, `mod`), each with its own gradient so
-  kids can scan home-row position by colour. Per-key hover lift, shine sweep,
-  press-pop. Assisted mode highlights the `expectedKey` derived in `keyCapFor()`.
+- Five rows (`num`, `top`, `home`, `bot`, `mod`). Keys are frosted crystal
+  keycaps; **only the bottom edge carries the row colour**, which is what lets
+  a kid find the home row without reading. Assisted mode lights the
+  `expectedKey` derived in `keyCapFor()` as a glowing crystal.
+- **It is not clickable, and that is the point** — see §6.5.
+
+Full design language for the level screen (keyboard, target, mission, and the
+clickable-vs-inert rule) lives in **§6.5**.
 
 ## 6. Responsive System
 
@@ -367,7 +377,9 @@ public/assets/islands/islandN/     ← shipped, WebP only
   sky.webp             the background alone, no platforms — only once split
   island.webp          the island cut out, with alpha — only once split
   map.webp             the thumbnail on the world map
-  gameplay.webp        the scene behind the keyboard
+  gameplay.webp        the level scene: island seen from the ground, with a
+                       painted pedestal the keyboard rests on. 1672x941, all
+                       fifteen are their own painting — recipe in FONDOS.md
   button.webp          level button, free
   button-pressed.webp  level button, pressed
   ui/                  level interface (not built yet)
@@ -551,6 +563,76 @@ file explains why it cannot be automated: decoration spills outside the
 footprint asymmetrically and is painted in the same material as the base, so
 neither silhouette nor colour detection survives all fifteen cases.
 
+### 6.5 The level screen — one design language for all 103 levels
+
+Three different React views render levels (§7 says which `inputType` goes
+where), but the player must not be able to tell. These rules are shared by all
+three; where one differs, the difference is deliberate and named here.
+
+**The scene is the island, not a stack of panels.** Every level screen is that
+island's `gameplay.webp` — a scene with a **painted pedestal in the bottom
+third** (see `Images/islands/FONDOS.md` for how those are drawn and measured).
+Everything the game draws sits ON that pedestal or floats over the sky above
+it. The shortcut and skill screens used to be five stacked white panels —
+header, goal, a box around the simulator, metrics, footer — with the
+simulator's own glass panel inside the box, two whites deep, hiding the island
+completely. **Do not put a container around something that already has one.**
+The virtual browser and the virtual document draw their own chrome; they need
+no box. Metrics, hints and the level title are **loose text with a white halo**
+(`.nv-dato`), not pills.
+
+**The mission is the consigna, and it is the one thing allowed to shout.**
+Kids were not reading the instruction — not because of the words, but because
+the card looked like every other card on the screen, so nothing said "start
+here". The fix has three parts and all three matter:
+
+- It is the **only element on the screen with a lit gradient border**
+  (`.gp-mision`). **Keep that exclusive.** If another card ever takes the
+  gradient border, the consigna goes back to being invisible.
+- A gold badge **names** it — "Tu misión", "Paso 2 de 5", "Objetivo 1 de 5".
+  Game language, not school language.
+- The **listen button lives inside it**, big and in front. It used to be a
+  small round icon in the top-right corner among three others, where it did
+  not read as "this can be heard" — which is exactly what the kid who cannot
+  read fluently needs. It is never in the footer or the corner again.
+
+It announces itself on entering the level (bounce, gold halo, the audio button
+pulsing three times) and then drops to rest so it stops competing with the
+target. It lights up again on the **existing idle trigger** — the same one that
+pulses the hint key — because a kid who has gone quiet is a kid who does not
+know what to do. It does **not** re-fire per objective: by the third correct
+answer that is noise, and noise becomes invisible.
+
+It does **not** auto-read on entry. Twenty-five Chromebooks all speaking at
+once is a real classroom problem; the pulsing button is the affordance instead.
+That is a one-line change if it ever gets tested and wanted.
+
+**The keyboard is inert where you type and clickable where you cannot.** This
+is the one deliberate difference between the views, and getting it backwards
+breaks either the teaching or the level:
+
+| View | On-screen keys | Why |
+|---|---|---|
+| `GameplayPage` (typing) | **Inert.** `<span>` + `pointer-events: none` | The board is a *map* for finding the key on the real keyboard, which is the thing being taught. They were `<button>`s with hover that did nothing on click — promising an interaction that never came, and a kid who thinks the mouse can solve the level stops looking at their hands. |
+| `ShortcutLevelView` | **Clickable**, and visibly so — hover lift, pointer cursor, larger (`.nv-tecla`) | Ctrl+T and Ctrl+W never reach the page (§ the Keyboard Lock note in that file). Without tappable keys those levels are impossible to finish. |
+
+**Sizes and materials.** Keys are **52×46 px** at rest: the classroom
+Chromebooks are touch, and below 44 px a finger misses. The compact-height
+pass at the end of `global.css` shrinks them (2.35 / 2.00 / 1.75 rem) only when
+the window is genuinely too short. The target is an **ice plate** (`.gp-placa`)
+and the objective bar a **crystal vein** (`.gp-riel` / `.gp-veta`), both drawn
+to belong to the island rather than sit on top of it.
+
+**On the dark islands, loose text is the weak point.** Islands 6, 14 and 15
+have near-black pedestals, and dark navy text with a thin white shadow does not
+separate from them. `.nv-dato` therefore carries a **three-layer** halo. If a
+future island goes darker still, the next move is a faintly tinted pill behind
+the text — accepting that it costs some of the cleanliness.
+
+**Never restyle `glass-surface` to fix a level screen.** Half the app uses it
+(admin panels, toasts, map cards). The level-screen classes are their own:
+`.gp-*` for the typing screen, `.nv-*` for the shortcut and skill screens.
+
 ### Login mascots — flanking robots
 The two login robots are positioned inline in `LoginPage.tsx` with Tailwind
 viewport units (no dedicated CSS class anymore): female left
@@ -565,9 +647,18 @@ pushed buttons off-screen on short displays).
 ## 7. Gameplay Curriculum
 
 Defined in `src/data/activities.ts`. Each `Activity` carries `worldId`,
-`levelNumber`, `inputType` (`letter | word | phrase | symbol | correction`),
-`mode` (`assisted | independent`), optional `requiresShift` / `requiresAccent`,
-and a `targets[]` array.
+`levelNumber`, `inputType` (`letter | word | phrase | symbol | correction |
+shortcut | skill`), `mode` (`assisted | independent`), optional `requiresShift`
+/ `requiresAccent`, and a `targets[]` array.
+
+**`inputType` picks the view.** Three render levels, and the player must not be
+able to tell (§6.5):
+
+| `inputType` | View | Levels |
+|---|---|---|
+| `letter · word · phrase · symbol · correction` | `GameplayPage` | 74, on 11 islands |
+| `shortcut` | `ShortcutLevelView` | 22 — islands 11, 12, 14 and island 15 level 5 |
+| `skill` | `SkillLevelView` | 7 — island 5 |
 
 - There are **15 worlds** (`island1..island15`) in difficulty order. The
   **level count is per-island, NOT fixed** — it is driven by the number of
@@ -579,6 +670,43 @@ and a `targets[]` array.
 - Helpers: `getActivityById(id)` (falls back to first), `activitiesByWorld[worldId]`.
 - Level ↔ activity id mapping: `<worldId>-l<level>` for worlds 2+, legacy ids for
   world 1 (`letter-a1 … backspace-a1`).
+
+### 7.1 A level is ONE task, not a list of repetitions
+
+This is the rule the curriculum was rebuilt around, and it is worth stating
+plainly because the old shape looked reasonable and taught almost nothing.
+
+Levels used to be a list of the same shortcut repeated — `["Ctrl+T", "Ctrl+T",
+"Ctrl+T"]` — over a simulator that **reset on every attempt**: you opened a tab,
+it vanished, you opened the same tab again. Nothing you did stayed done, so the
+shortcut did nothing *within the level*. Worse, some orders were impossible and
+therefore taught the wrong model: copying before selecting, redoing before
+undoing.
+
+A level is now **one task told step by step**, via `steps` on the `Activity`:
+
+- Each `ShortcutStep` carries the `combo` **and the reason** — "cerrá el
+  anuncio que se abrió solo", not "hacé Ctrl+W".
+- **The simulator keeps its state between steps.** That is what makes
+  copy-and-paste legible: what you selected is still highlighted when you copy,
+  and the clipboard is full when you paste. Without it the pair never
+  connected.
+- Consequences are real and visible: what you open **stays open** until you
+  close it; what you close is gone.
+- Repetition needs a cause. Saving twice is fine if something changed in
+  between; three identical saves is not a level.
+
+Two mechanical constraints that bite when writing new levels:
+
+- **The simulator remounts when the *scene* changes**, so a level may go
+  browser → editor but **never back**. Returning to a previous scene restarts
+  it and cuts the task in half. Islands 6, 14 and 15 do all the browser work
+  first, then all the document work.
+- **A shortcut the browser owns never reaches the page** — Ctrl+T, Ctrl+W,
+  Ctrl+N, Ctrl+Tab and their Shift variants. `ShortcutLevelView` captures them
+  with the Keyboard Lock API in fullscreen, and always keeps the tappable
+  on-screen keys as the fallback (§6.5). **Alt+Tab belongs to the OS and cannot
+  be captured by any technique — never put it in a level.**
 
 ### Digital-skills scaffold
 `src/data/digitalSkills.ts` defines a parallel `SkillChallenge` model (mouse,
@@ -676,6 +804,14 @@ edge.
   helpers: raw two-state sheets in `Images/islands/islandN/`, turned into the
   shipped WebP by `scripts/import-level-button.mjs`. See §6.4 for the geometry
   contract and `Images/islands/BOTONES.md` for the step-by-step recipe.
+- **Level backgrounds too**: `gameplay-source.png` per island →
+  `scripts/import-gameplay-bg.mjs` → the shipped 1672×941 WebP. The importer
+  centre-crops anything that is not 16:9 (and says how much it took, from
+  where) and **measures the pedestal** against a keycap — the check that
+  matters, because a pedestal as pale as the keys makes the keyboard vanish
+  into the floor. Recipe, safe zones and the fifteen prompts:
+  `Images/islands/FONDOS.md`; `scripts/prompt-fondo.mjs` prints a ready prompt
+  per island and `scripts/medir-pedestal.mjs` re-checks one after the fact.
 
 ## 11. Mascots — Where They Appear
 
@@ -692,7 +828,8 @@ edge.
   so the keyboard/bg/robots never shift while typing. Adaptive `target-card`
   variants (`letter | word | phrase | symbol | long`); phrases scroll on a single
   line. Level complete → modal with 3-star rating + Reintentar / Volver (no auto-
-  advance).
+  advance). **The visual language of this screen is §6.5** — mission, inert
+  keyboard, ice plate — and it is shared with the shortcut and skill screens.
 - **Island map**: level bubbles sit on the painted platforms; colour = state
   (green Completado / violet Actual / grey Bloqueado). Positions are platform-
   center % coords in `src/data/levelPositions.ts`. Compact floating HUD
@@ -755,6 +892,15 @@ bundle. The DB is **Supabase**, not the local `db` container.
   frames; no white boxes behind transparent assets.
 - Keep student UI immersive and minimal — never make it look like an admin
   dashboard. Gameplay must be real and keyboard-driven, never placeholder.
+- **On a level screen, do not box what is already boxed**, and do not stack
+  panels over the island — the art is the scene, not a backdrop (§6.5).
+- **The lit gradient border belongs to the mission alone.** Give it to another
+  card and the consigna becomes invisible again, which is the bug it was
+  built to fix (§6.5).
+- **The typing keyboard is not clickable; the shortcut keyboard is.** Both
+  directions are deliberate — see the table in §6.5 before changing either.
+- **A level is one task, not a repeated key** (§7.1), and **Alt+Tab never
+  appears in a level**: the OS owns it and no technique captures it.
 - Respect RBAC: students only on student surfaces; demo can never be superadmin;
   lower roles never reach higher-role screens.
 - Never put secrets in `VITE_*` (inlined into the public bundle). Backend secrets
