@@ -119,9 +119,6 @@ function parseCsv(text: string): { rows: ParsedRow[]; errors: RowError[] } {
       email = e;
     }
 
-    /* Un docente sin email no puede usar Google, pero sí entrar con usuario
-       y contraseña. No es un error: se avisa en el preview. */
-
     const key = rawName.toLowerCase();
     if (seenNames.has(key)) {
       errors.push({ line, message: `"${rawName}" aparece más de una vez en el archivo.` });

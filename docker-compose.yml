@@ -39,8 +39,6 @@ services:
       DATABASE_URL: "${DATABASE_URL}"
       # Secreto de firma de los JWT. Si cambia, se caen todas las sesiones.
       JWT_SECRET: "${JWT_SECRET}"
-      # Public Client ID de Google — el mismo que usa el frontend.
-      GOOGLE_CLIENT_ID: "${VITE_GOOGLE_CLIENT_ID:-}"
       # Orígenes permitidos por CORS, separados por coma.
       CORS_ORIGIN: "${CORS_ORIGIN:-https://typely.becode.com.ar,https://www.typely.becode.com.ar}"
       PUBLIC_ORIGIN: "${PUBLIC_ORIGIN:-https://typely.becode.com.ar}"
@@ -61,12 +59,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        # OJO: Vite inlinea estas variables en tiempo de BUILD. Si faltan
-        # acá, el bundle sale sin ellas y el login con Google deja de
-        # funcionar SIN dejar rastro en los logs (CLAUDE.md §13.1).
-        VITE_GOOGLE_CLIENT_ID: "${VITE_GOOGLE_CLIENT_ID:-}"
-        VITE_GOOGLE_ALLOWED_DOMAINS: "${VITE_GOOGLE_ALLOWED_DOMAINS:-}"
     restart: unless-stopped
     environment:
       # Coolify inyecta acá el dominio que le asignes al servicio.

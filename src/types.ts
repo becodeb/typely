@@ -16,7 +16,7 @@ export interface ActiveUser {
   name: string;
   /** Identidad primaria: la tienen todos, incluido el alumno sin email. */
   username: string;
-  /** Opcional — solo quien usa Google o puede recuperar la cuenta. */
+  /** Opcional — para contacto y recuperación de cuenta. */
   email?: string | null;
   role: Role;
   /** Sede a la que pertenece. `null` para el superadmin. */

@@ -55,7 +55,7 @@ async function call<T = unknown>(path: string, opts: FetchOpts = {}): Promise<T>
     credentials: "include", // manda la cookie de refresh
   });
 
-  const isAuthPath = path === "/auth/refresh" || path === "/auth/login" || path === "/auth/google";
+  const isAuthPath = path === "/auth/refresh" || path === "/auth/login";
   if (res.status === 401 && retry && !isAuthPath) {
     if (await refresh()) return call<T>(path, { ...opts, retry: false });
   }
@@ -231,16 +231,6 @@ export const api = {
     return res.user;
   },
 
-  async google(credential: string): Promise<SessionUser> {
-    const res = await call<SessionResponse>("/auth/google", {
-      method: "POST",
-      json: { credential },
-      retry: false,
-    });
-    setAccessToken(res.access);
-    return res.user;
-  },
-
   /** Intenta recuperar la sesión desde la cookie de refresh. `null` si no hay. */
   async bootstrap(): Promise<SessionUser | null> {
     try {
@@ -263,7 +253,7 @@ export const api = {
     }
   },
 
-  /** La API exige la contraseña actual, salvo en cuentas solo-Google. */
+  /** La API exige la contraseña actual, salvo en el cambio obligatorio. */
   changePassword: (currentPassword: string | undefined, newPassword: string) =>
     call<{ ok: true }>("/auth/change-password", {
       method: "POST",

@@ -14,7 +14,6 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ActiveUser } from "../types";
 import { api, ApiError, setAccessToken, type SessionUser } from "../utils/api";
 import { clearDemoMode, isDemoMode, setDemoMode } from "../utils/storage";
-import { parseJwtCredential } from "../utils/googleAuth";
 
 /** Alumno de demostración. No existe en la base y no puede salir del juego. */
 const DEMO_USER: ActiveUser = {
@@ -29,10 +28,6 @@ const DEMO_USER: ActiveUser = {
 export type LoginResult =
   | { ok: true; user: ActiveUser }
   | { ok: false; message: string };
-
-export type GoogleLoginResult =
-  | { ok: true; user: ActiveUser }
-  | { ok: false; reason: "INVALID_TOKEN" | "USER_NOT_FOUND" | "NETWORK_ERROR"; message: string };
 
 function toActiveUser(u: SessionUser): ActiveUser {
   return {
@@ -54,7 +49,6 @@ interface AuthContextValue {
   /** True si esta sesión es el modo demo (partida local, sin cuenta). */
   demo: boolean;
   login: (identifier: string, password: string) => Promise<LoginResult>;
-  loginGoogle: (credential: string) => Promise<GoogleLoginResult>;
   loginDemo: () => ActiveUser;
   changePassword: (currentPassword: string | undefined, newPassword: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
@@ -112,36 +106,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const loginGoogle = useCallback(async (credential: string): Promise<GoogleLoginResult> => {
-    /* Se decodifica solo para dar un mensaje claro si el token viene roto.
-       La verificación de verdad la hace el servidor contra el JWKS de
-       Google — el payload del cliente nunca se considera confiable. */
-    if (!parseJwtCredential(credential)?.email) {
-      return { ok: false, reason: "INVALID_TOKEN", message: "La credencial de Google no es válida." };
-    }
-    try {
-      const session = await api.google(credential);
-      const active = toActiveUser(session);
-      clearDemoMode();
-      setDemo(false);
-      setUser(active);
-      return { ok: true, user: active };
-    } catch (err) {
-      if (err instanceof ApiError) {
-        return {
-          ok: false,
-          reason: err.status === 404 ? "USER_NOT_FOUND" : "INVALID_TOKEN",
-          message: err.message,
-        };
-      }
-      return {
-        ok: false,
-        reason: "NETWORK_ERROR",
-        message: "No pudimos conectarnos. Revisá tu conexión e intentá de nuevo.",
-      };
-    }
-  }, []);
-
   /* El demo nunca pide token ni toca la API: es una partida local que se
      guarda solo en este navegador. No puede llegar a ninguna pantalla de
      gestión — es alumno y nada más. */
@@ -184,8 +148,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, bootstrapping, demo, login, loginGoogle, loginDemo, changePassword, logout }),
-    [user, bootstrapping, demo, login, loginGoogle, loginDemo, changePassword, logout],
+    () => ({ user, bootstrapping, demo, login, loginDemo, changePassword, logout }),
+    [user, bootstrapping, demo, login, loginDemo, changePassword, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
