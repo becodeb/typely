@@ -16,7 +16,6 @@ import { Link, useParams } from "react-router-dom";
 import type { ApiUser, Group, GroupMember, IssuedCredentials } from "../../types";
 import { api, ApiError } from "../../utils/api";
 import { useSede } from "./ManageShell";
-import { CredentialsPanel } from "./Credentials";
 import {
   Button,
   Card,
@@ -39,11 +38,12 @@ interface Members {
 
 export function GroupDetailPage() {
   const { groupId = "" } = useParams();
-  const { sedeId } = useSede();
+  /* `reloadGroups` mantiene al día los contadores de la columna: sin eso,
+     agregar un alumno acá dejaba el total de la izquierda desfasado. */
+  const { sedeId, reloadGroups, showCredentials } = useSede();
 
   const [data, setData] = useState<Members | null>(null);
   const [error, setError] = useState("");
-  const [issued, setIssued] = useState<{ title: string; list: IssuedCredentials[] } | null>(null);
 
   const load = useCallback(async () => {
     setError("");
@@ -75,14 +75,6 @@ export function GroupDetailPage() {
         }
       />
 
-      {issued && (
-        <CredentialsPanel
-          title={issued.title}
-          credentials={issued.list}
-          onClose={() => setIssued(null)}
-        />
-      )}
-
       {error && !data ? (
         <ErrorBanner message={error} onRetry={() => void load()} />
       ) : !data ? (
@@ -95,14 +87,14 @@ export function GroupDetailPage() {
             groupId={groupId}
             sedeId={sedeId}
             teachers={data.teachers}
-            onChanged={() => void load()}
+            onChanged={() => { void load(); reloadGroups(); }}
           />
           <StudentsSection
             groupId={groupId}
             sedeId={sedeId}
             students={data.students}
-            onChanged={() => void load()}
-            onIssued={setIssued}
+            onChanged={() => { void load(); reloadGroups(); }}
+            onIssued={(v) => showCredentials(v.title, v.list)}
           />
         </div>
       )}
