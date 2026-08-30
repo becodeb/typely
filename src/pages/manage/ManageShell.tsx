@@ -213,11 +213,14 @@ export function ManageShell() {
         {current && (
           <NewAccountForm
             sedeId={current.id}
+            sedes={sedes}
+            isSuperadmin={isSuperadmin}
             groups={groups}
             onCreated={(title, list) => {
               setCredentials({ title, list });
               void loadGroups();
             }}
+            onSedesChanged={() => void loadSedes()}
           />
         )}
 
@@ -315,25 +318,49 @@ function RailStat({ label, value, last }: { label: string; value: number | null;
 /* Alta de cuentas                                                     */
 /* ------------------------------------------------------------------ */
 
-/** Un solo formulario para las dos altas. El rol no es un menú: es un
- *  control siempre visible, y lo único que cambia debajo es un campo. */
+/** Un solo formulario para las tres altas. El rol no es un menú: es un
+ *  control siempre visible, y lo único que cambia debajo es un campo.
+ *
+ *  **Admin solo lo ve el superadmin.** Un admin no puede crear otro admin
+ *  — es una regla dura del RBAC, y la API la vuelve a verificar: esconder
+ *  la opción es comodidad de la interfaz, nunca la defensa. */
 function NewAccountForm({
   sedeId,
+  sedes,
+  isSuperadmin,
   groups,
   onCreated,
+  onSedesChanged,
 }: {
   sedeId: string;
+  sedes: Sede[];
+  isSuperadmin: boolean;
   groups: Group[] | null;
   onCreated: (title: string, list: IssuedCredentials[]) => void;
+  onSedesChanged: () => void;
 }) {
-  const [role, setRole] = useState<"alumno" | "docente">("alumno");
+  const [role, setRole] = useState<"alumno" | "docente" | "admin">("alumno");
   const [fullName, setFullName] = useState("");
   const [groupId, setGroupId] = useState("");
   const [email, setEmail] = useState("");
+  /* Escuela destino del admin. Arranca en la que estás mirando, pero se
+     puede cambiar: podés crear el admin de otra escuela sin tener que
+     cambiar de contexto primero. */
+  const [adminSedeId, setAdminSedeId] = useState(sedeId);
+  /* null = elegir una existente; string = crear una en el momento. */
+  const [newSedeName, setNewSedeName] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const isAlumno = role === "alumno";
+  const roles: Array<"alumno" | "docente" | "admin"> = isSuperadmin
+    ? ["alumno", "docente", "admin"]
+    : ["alumno", "docente"];
+
+  /* Si cambiás de escuela en el marco, el destino sigue esa elección
+     mientras no lo hayas tocado a mano. */
+  useEffect(() => {
+    setAdminSedeId((prev) => (sedes.some((s) => s.id === prev) ? prev : sedeId));
+  }, [sedeId, sedes]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -342,18 +369,46 @@ function NewAccountForm({
       setError("Escribí el nombre y apellido.");
       return;
     }
+
     setSaving(true);
     setError("");
     try {
+      /* Un admin necesita SIEMPRE una escuela: la base lo exige con un
+         CHECK. Si pediste crearla en el momento, se crea primero — sin
+         ella la cuenta no puede existir. */
+      let targetSede = sedeId;
+      let createdSede = false;
+      if (role === "admin") {
+        if (newSedeName !== null) {
+          const cleanSede = newSedeName.trim();
+          if (!cleanSede) {
+            setError("Escribí el nombre de la escuela nueva.");
+            setSaving(false);
+            return;
+          }
+          const created = await api.createSede({ name: cleanSede });
+          targetSede = created.id;
+          createdSede = true;
+        } else {
+          targetSede = adminSedeId;
+        }
+      }
+
       const res = await api.createUser({
         fullName: clean,
         role,
-        sedeId,
-        groupId: isAlumno && groupId ? groupId : null,
-        email: !isAlumno && email.trim() ? email.trim().toLowerCase() : null,
+        sedeId: targetSede,
+        groupId: role === "alumno" && groupId ? groupId : null,
+        email: role !== "alumno" && email.trim() ? email.trim().toLowerCase() : null,
       });
+
       setFullName("");
       setEmail("");
+      if (createdSede) {
+        setNewSedeName(null);
+        onSedesChanged();
+      }
+
       /* La contraseña solo viene cuando la generó el servidor, y se ve una
          sola vez: por eso sube al panel en vez de quedarse acá. */
       if (res.temporaryPassword) {
@@ -376,6 +431,17 @@ function NewAccountForm({
   const fieldClass =
     "w-full rounded-[10px] border border-white/[0.13] bg-white/[0.06] px-3 py-2 text-[13px] text-white outline-none transition-colors placeholder:text-[#7d9ac6] focus:border-[#33c7f0] focus:bg-white/10";
 
+  const CTA: Record<string, string> = {
+    alumno: "Crear alumno",
+    docente: "Crear docente",
+    admin: "Crear admin",
+  };
+  const HINT: Record<string, string> = {
+    alumno: "No necesita email. El usuario y la contraseña se generan y se muestran una sola vez.",
+    docente: "Después de crearlo, se le asignan grupos desde el detalle de cada uno.",
+    admin: "Va a administrar esa escuela entera: sus grupos, sus alumnos y sus docentes.",
+  };
+
   return (
     <form onSubmit={submit} className="flex flex-col gap-2">
       <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em]" style={{ color: RAIL_MUTED }}>
@@ -383,13 +449,13 @@ function NewAccountForm({
       </div>
 
       <div className="flex rounded-[11px] bg-white/[0.08] p-[3px]" role="group" aria-label="Rol de la cuenta">
-        {(["alumno", "docente"] as const).map((r) => (
+        {roles.map((r) => (
           <button
             key={r}
             type="button"
             onClick={() => { setRole(r); setError(""); }}
             aria-pressed={role === r}
-            className={`flex-1 rounded-[9px] py-2 text-[13px] font-semibold capitalize transition-colors ${
+            className={`flex-1 rounded-[9px] py-2 text-[12.5px] font-semibold capitalize transition-colors ${
               role === r ? "bg-white text-[#17355f]" : "text-[#a9c0e0] hover:text-white"
             }`}
           >
@@ -406,7 +472,7 @@ function NewAccountForm({
         className={fieldClass}
       />
 
-      {isAlumno ? (
+      {role === "alumno" && (
         <select
           value={groupId}
           onChange={(e) => setGroupId(e.target.value)}
@@ -420,7 +486,48 @@ function NewAccountForm({
             </option>
           ))}
         </select>
-      ) : (
+      )}
+
+      {role === "admin" &&
+        (newSedeName === null ? (
+          <select
+            value={adminSedeId}
+            onChange={(e) => {
+              if (e.target.value === "__new__") setNewSedeName("");
+              else setAdminSedeId(e.target.value);
+            }}
+            aria-label="Escuela que va a administrar"
+            className={`${fieldClass} cursor-pointer`}
+          >
+            {sedes.map((s) => (
+              <option key={s.id} value={s.id} className="text-[#17355f]">
+                {s.name}
+              </option>
+            ))}
+            <option value="__new__" className="text-[#17355f]">+ Crear escuela nueva…</option>
+          </select>
+        ) : (
+          <div className="flex gap-1.5">
+            <input
+              value={newSedeName}
+              onChange={(e) => { setNewSedeName(e.target.value); if (error) setError(""); }}
+              placeholder="Nombre de la escuela"
+              aria-label="Nombre de la escuela nueva"
+              autoFocus
+              className={fieldClass}
+            />
+            <button
+              type="button"
+              onClick={() => setNewSedeName(null)}
+              aria-label="Elegir una escuela existente"
+              className="shrink-0 rounded-[10px] border border-white/[0.13] bg-white/[0.06] px-2.5 text-[13px] font-semibold text-[#a9c0e0] hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+
+      {role !== "alumno" && (
         <input
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -444,13 +551,11 @@ function NewAccountForm({
         style={{ background: "linear-gradient(135deg, #22c7b8, #33c7f0)" }}
       >
         {saving && <Spinner />}
-        {isAlumno ? "Crear alumno" : "Crear docente"}
+        {CTA[role]}
       </button>
 
       <p className="mt-0.5 text-[11.5px] leading-snug" style={{ color: RAIL_MUTED }}>
-        {isAlumno
-          ? "No necesita email. El usuario y la contraseña se generan y se muestran una sola vez."
-          : "Después de crearlo, se le asignan grupos desde el detalle de cada uno."}
+        {HINT[role]}
       </p>
     </form>
   );
