@@ -12,6 +12,8 @@ import { IslandDetailPage } from "./pages/IslandDetailPage";
 import { RewardsPage } from "./pages/RewardsPage";
 import { AccountPage } from "./pages/AccountPage";
 import { MissionsPage } from "./pages/MissionsPage";
+import { ManageShell } from "./pages/manage/ManageShell";
+import { GroupsPage } from "./pages/manage/GroupsPage";
 import { useAuth } from "./hooks/useAuth";
 
 /* La pantalla de juego es la más pesada: se carga bajo demanda para que el
@@ -148,8 +150,18 @@ export function App() {
           <Route path="/misiones" element={<MissionsPage />} />
         </Route>
 
-        {/* Docente y administración: sin pantallas todavía. */}
-        <Route element={<ProtectedRoute roles={["superadmin", "admin", "docente"]} />}>
+        {/* Gestión — superadmin y admin. Las dos comparten pantallas: el
+            superadmin tiene los mismos permisos más el alcance, y elige
+            sede con un selector en la barra. */}
+        <Route element={<ProtectedRoute roles={["superadmin", "admin"]} />}>
+          <Route path="/gestion" element={<ManageShell />}>
+            <Route index element={<Navigate to="/gestion/grupos" replace />} />
+            <Route path="grupos" element={<GroupsPage />} />
+          </Route>
+        </Route>
+
+        {/* El docente todavía no tiene pantalla propia. */}
+        <Route element={<ProtectedRoute roles={["docente"]} />}>
           <Route path="/sin-pantalla" element={<SinPantallaPage />} />
         </Route>
 
