@@ -45,6 +45,7 @@ public/assets/edutic-art/skins/*.png
 screenshots/
 
 # Salida del preview de posiciones de nivel (scripts/preview-level-positions.mjs)
-# Prompts de fondo armados desde FONDOS.md (scripts/prompt-fondo.mjs)
 .preview-niveles/
+
+# Prompts de fondo armados desde FONDOS.md (scripts/prompt-fondo.mjs)
 .prompts-fondos/
