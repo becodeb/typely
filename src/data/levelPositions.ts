@@ -164,13 +164,13 @@ export const islandLevelLayouts: Record<Activity["worldId"], LevelPosition[]> = 
        "bottom-right small platform" in earlier art isn't a real platform
        in the painted scene (it's just decorative clouds), so all 6 levels
        ride the main chain in a path. */
-    { x: 52.7, y: 55.8, scale: 1.45, rotateX: 21, numX: -0.5, numY: -18 },   // N1 — upper-centre of the main chain
-    { x: 38.6, y: 64 },   // N2 — centre-right
-    { x: 26.2, y: 54.3 },   // N3 — centre of the main chain
-    { x: 37, y: 43.2 },   // N4 — bottom-centre
-    { x: 57.4, y: 36.7 },   // N5 — mid-left of the main chain
-    { x: 75.4, y: 45.5 },   // N6 — bottom-right of the main chain
-    { x: 82, y: 56.2 },   // N7 - provisoria, hueco arriba a la derecha
+    { x: 53.2, y: 55.9, scale: 2.5, rotateX: 21, numX: -4.5, numY: -17 },   // N1 — upper-centre of the main chain
+    { x: 37.6, y: 63.2, scale: 2.5, rotateX: 21, numX: -2.5, numY: -21 },   // N2 — centre-right
+    { x: 26, y: 52.9, scale: 2.5, rotateX: 30.5, numX: -1.5, numY: -17 },   // N3 — centre of the main chain
+    { x: 36.4, y: 42.6, scale: 2.5, rotateX: 34, numX: -1, numY: -17.5 },   // N4 — bottom-centre
+    { x: 58.5, y: 36.8, scale: 2.22, rotateX: 34, numY: -14 },   // N5 — mid-left of the main chain
+    { x: 74.8, y: 45.4, scale: 2.32, rotateX: 37.5, numX: -2.5, numY: -14 },   // N6 — bottom-right of the main chain
+    { x: 82.4, y: 56.3, scale: 2.5, rotateX: 36, numY: -15.5 },   // N7 - provisoria, hueco arriba a la derecha
   ],
 
   island5: [
@@ -207,13 +207,13 @@ export const islandLevelLayouts: Record<Activity["worldId"], LevelPosition[]> = 
        OJO: las rotaciones ahora afectan SOLO a la imagen del botón, no al
        número ni a los badges — antes el CSS rotaba el botón entero y dejaba
        los números de esta isla muy achatados. Verificar island6 a ojo. */
-    { x: 24.5, y: 72.8, scale: 2.5, rotateX: -35, rotateY: 2, perspective: 4000, numX: -1, numY: -21 },  // N1 — disco rúnico abajo-izquierda (inicio, lleva la nave)
-    { x: 20.6, y: 44.9, scale: 1.53, rotateX: 54, rotateZ: -10.5, perspective: 4000, numX: -4, numY: -6 },               // N2 — disco de la cornisa izquierda (más grande)
-    { x: 8.1, y: 32.5, scale: 1.51, rotateX: 71, rotateY: 1.5, rotateZ: -19, perspective: 4000, numX: -2.5, numSize: 0.66 },                  // N3 — terraza verde sobre la cornisa
-    { x: 31.8, y: 38, scale: 1.36, rotateX: 64.5, perspective: 4000, numX: -0.5, numY: -1 },               // N4 — escalones de piedra hacia el centro
-    { x: 77.1, y: 55.3, scale: 2.37, rotateX: 49, rotateY: 3, rotateZ: 4, perspective: 4000, numX: 2.5, numY: -11.5 },   // N5 — disco rúnico central
-    { x: 60.1, y: 42.4, scale: 1.51, rotateX: -57.5, rotateY: -3.5, rotateZ: -2.5, perspective: 4000, numX: -1.5, numY: -3.5 },   // N6 — disco rúnico derecho (abajo)
-    { x: 63.8, y: 27.4, scale: 1.62, rotateX: 61.5, rotateY: 2, rotateZ: 0.5, perspective: 4000, numY: -2.5, numSize: 0.88 }, // N7 — explanada al pie del portal
+    { x: 21.8, y: 78.9, scale: 2.09, rotateX: -35, rotateY: 2, perspective: 4000, numX: 1, numY: -19 },  // N1 — disco rúnico abajo-izquierda (inicio, lleva la nave)
+    { x: 17.5, y: 52.5, scale: 1.53, rotateX: 54, rotateZ: -10.5, perspective: 4000, numX: -4, numY: -6 },               // N2 — disco de la cornisa izquierda (más grande)
+    { x: 39.3, y: 40.9, scale: 1.55, rotateX: 57, rotateY: 1.5, perspective: 4000, numX: 0.5, numY: -6.5, numSize: 0.92 },                  // N3 — terraza verde sobre la cornisa
+    { x: 43.4, y: 76.8, scale: 1.43, rotateX: 27, perspective: 4000, numX: -0.5, numY: -10.5 },               // N4 — escalones de piedra hacia el centro
+    { x: 82, y: 64.2, scale: 1.89, rotateX: 56, rotateY: 3, rotateZ: 4, perspective: 4000, numX: 4, numY: -9 },   // N5 — disco rúnico central
+    { x: 63.9, y: 45.6, scale: 1.51, rotateX: -57.5, rotateY: -3.5, rotateZ: -2.5, perspective: 4000, numX: -1.5, numY: -3.5 },   // N6 — disco rúnico derecho (abajo)
+    { x: 69.3, y: 25.3, scale: 1.62, rotateX: 61.5, rotateY: 2, rotateZ: 0.5, perspective: 4000, numY: -2.5, numSize: 0.88 }, // N7 — explanada al pie del portal
   ],
 
   island7: [
@@ -239,46 +239,46 @@ export const islandLevelLayouts: Record<Activity["worldId"], LevelPosition[]> = 
   ],
 
   island9: [
-    { x: 23.2, y: 90 },
-    { x: 37.4, y: 76.6 },
-    { x: 33.8, y: 50.7 },
-    { x: 47.1, y: 43.2 },
-    { x: 54.9, y: 18.3 },
-    { x: 67.1, y: 35 },
-    { x: 83.5, y: 17 },
+    { x: 26.3, y: 73.3, scale: 2.5, rotateX: 44, numX: -3.5, numY: -27 },
+    { x: 8.9, y: 55.5, scale: 2.04, rotateX: 39.5, numY: -23 },
+    { x: 32, y: 48.4, scale: 1.74, rotateX: 44, numY: -18.5 },
+    { x: 53.1, y: 24.2, scale: 2.02, rotateX: 57, numX: -2.5, numY: -15, numSize: 0.81 },
+    { x: 65.2, y: 37.5, scale: 1.89, rotateX: 57, rotateZ: 10, numX: 4.5, numY: -15.5, numSize: 0.78 },
+    { x: 77.7, y: 51.1, scale: 2.01, rotateX: 53.5, rotateZ: 17.5, numX: 9, numY: -16, numSize: 0.77 },
+    { x: 83.4, y: 25.2, scale: 1.66, rotateX: 49, rotateZ: 10, numX: 3.5, numY: -14 },
     { x: 46, y: 56 },
   ],
 
   island10: [
-    { x: 16.8, y: 20.3 },
-    { x: 32.8, y: 32.3 },
-    { x: 15.8, y: 64 },
-    { x: 36.2, y: 90.3 },
-    { x: 61.3, y: 64.9 },
-    { x: 76.4, y: 40.9 },
-    { x: 58, y: 74 },
+    { x: 21.7, y: 32.9, scale: 1.45, rotateX: 46.5, numX: -0.5, numY: -7.5 },
+    { x: 33.8, y: 41.4, scale: 1.42, rotateX: 49, numX: 1, numY: -9, numSize: 0.9 },
+    { x: 18.6, y: 60.2, scale: 1.38, rotateX: 17.5, numY: -12.5 },
+    { x: 44, y: 76.3, scale: 1.5, rotateX: 30.5, numX: -1, numY: -12.5 },
+    { x: 62.1, y: 61.7, scale: 1.28, rotateX: 41, numY: -7.5 },
+    { x: 77.4, y: 46.5, scale: 1.45, rotateX: 38.5, numX: -0.5, numY: -9 },
+    { x: 57, y: 28.1, scale: 1.1, rotateX: 42, numY: -4 },
     { x: 44, y: 68 },
   ],
 
   island11: [
-    { x: 28.2, y: 73.9, scale: 1.97, rotateX: 43.5 },
-    { x: 22.7, y: 47.4, scale: 1.5, rotateX: 38, perspective: 580 },
-    { x: 43.2, y: 45, scale: 1.65, rotateX: 47.5 },
-    { x: 61.1, y: 40.4, scale: 1.72, rotateX: 53.5, rotateY: 4.5, rotateZ: -3 },
-    { x: 82.1, y: 34.9, scale: 1.76, rotateX: 48, rotateY: 8 },
-    { x: 70.8, y: 60, scale: 1.8, rotateX: -51, rotateY: -6, rotateZ: -3.5 },
-    { x: 50.5, y: 73.9, scale: 1.87, rotateX: 32.5 },
+    { x: 29.2, y: 70.5, scale: 1.97, rotateX: 43.5, numY: -15.5 },
+    { x: 52.2, y: 71.2, scale: 1.76, rotateX: 38, perspective: 580, numY: -13 },
+    { x: 85.2, y: 73.9, scale: 1.88, rotateX: 47.5, numY: -10.5 },
+    { x: 73, y: 57.3, scale: 1.72, rotateX: 53.5, rotateY: 4.5, rotateZ: -3, numX: -4, numY: -10 },
+    { x: 41.5, y: 43.4, scale: 1.76, rotateX: 51, rotateY: 2.5, numY: -11.5 },
+    { x: 63.1, y: 39.2, scale: 1.8, rotateX: -51, rotateY: -2.5, rotateZ: -3.5, numY: -14 },
+    { x: 85.4, y: 33.4, scale: 1.87, rotateX: 50, rotateZ: 10, numX: 4.5, numY: -10.5 },
     { x: 46, y: 56 },
   ],
 
   island12: [
-    { x: 13.8, y: 43.6 },
-    { x: 29.5, y: 75.3 },
-    { x: 41, y: 22.4 },
-    { x: 58.6, y: 40.8 },
-    { x: 71.2, y: 68.1 },
-    { x: 81.1, y: 41.5 },
-    { x: 58, y: 74 },
+    { x: 13.8, y: 36.2, scale: 2.01, rotateX: 32.5, numY: -18.5 },
+    { x: 38.9, y: 23.2, scale: 1.73, rotateX: 36, numY: -15.5 },
+    { x: 29.3, y: 59.8, scale: 2.01, rotateX: 22, numY: -19.5 },
+    { x: 43.7, y: 73.8, scale: 2.11, rotateX: 35, numY: -21.5 },
+    { x: 81.3, y: 73.8, scale: 1.79, rotateX: 22, numY: -19 },
+    { x: 69.9, y: 57.3, scale: 1.79, rotateX: 25.5, numY: -18.5 },
+    { x: 82.9, y: 38.4, scale: 1.78, rotateX: 45.5, numY: -11 },
     { x: 44, y: 68 },
   ],
 
@@ -294,13 +294,13 @@ export const islandLevelLayouts: Record<Activity["worldId"], LevelPosition[]> = 
   ],
 
   island14: [
-    { x: 21.1, y: 48.8 },
-    { x: 41.7, y: 30.9 },
-    { x: 57.1, y: 44.2 },
-    { x: 46.7, y: 78.1 },
-    { x: 64.3, y: 75.2 },
-    { x: 81.1, y: 65.8 },
-    { x: 58, y: 74 },
+    { x: 20.5, y: 45.3, scale: 1.89, rotateX: 49, numX: -0.5, numY: -14 },
+    { x: 20, y: 68.1, scale: 1.99, rotateX: 36, numY: -21 },
+    { x: 45.5, y: 63.3, scale: 1.89, rotateX: 35, numY: -19.5, numSize: 1.22 },
+    { x: 73.5, y: 74, scale: 1.71, rotateX: 43, numY: -15.5, numSize: 0.99 },
+    { x: 83.7, y: 55.1, scale: 1.76, rotateX: 49, numY: -12, numSize: 1.02 },
+    { x: 62.9, y: 44, scale: 1.78, rotateX: 45.5, numY: -11.5, numSize: 0.92 },
+    { x: 44, y: 33.3, scale: 1.78, rotateX: 53.5, perspective: 480, numY: -9.5, numSize: 0.93 },
     { x: 44, y: 68 },
   ],
 
