@@ -45,6 +45,14 @@ async function main() {
     credentials: true,
   });
 
+  /* Fastify solo trae parsers para `application/json` y `text/plain`. La
+     importación manda el CSV como `text/csv`, que sin esto se rechaza con
+     un 415 ANTES de llegar al handler — la petición nunca se ejecuta y el
+     error no se parece en nada a la causa. */
+  app.addContentTypeParser("text/csv", { parseAs: "string" }, (_req, body, done) => {
+    done(null, body);
+  });
+
   /* Inventario de rutas para el inspector de API (/api/admin/inspector).
      El hook tiene que registrarse ANTES de las rutas para verlas todas. */
   app.addHook("onRoute", (route) => {
