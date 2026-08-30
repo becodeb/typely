@@ -135,6 +135,18 @@ export async function groupRoutes(app: FastifyInstance) {
           SELECT count(*)::int FROM group_teachers gt
           WHERE gt.group_id = ${schema.groups.id}
         )`,
+        /* Precisión media de los alumnos del grupo, sobre su mejor
+           resultado en cada nivel. Es el mismo número que usa el detalle
+           del alumno, para que la barra de la lista y la ficha no digan
+           cosas distintas. Un grupo sin progreso da 0, no null: así la
+           barra siempre tiene algo que dibujar. */
+        avgProgress: sql<number>`(
+          SELECT coalesce(round(avg(lp.best_accuracy)), 0)::int
+          FROM level_progress lp
+          INNER JOIN users su ON su.id = lp.user_id
+          WHERE su.group_id = ${schema.groups.id}
+            AND su.deleted_at IS NULL
+        )`,
       })
       .from(schema.groups)
       .where(conditions.length ? and(...conditions) : undefined)

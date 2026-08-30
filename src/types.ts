@@ -55,6 +55,8 @@ export interface Group {
   active: boolean;
   studentCount?: number;
   teacherCount?: number;
+  /** Precisión media de los alumnos del grupo, 0-100. */
+  avgProgress?: number;
 }
 
 export interface GroupMember {

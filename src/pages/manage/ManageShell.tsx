@@ -1,75 +1,87 @@
-/* Marco de las pantallas de gestión.
+/* Marco de las pantallas de gestión — dos columnas.
  *
- * Resuelve una cosa que las pantallas de adentro no deberían tener que
- * resolver cada una: **sobre qué sede se está trabajando**.
+ * La izquierda es CONTEXTO y no cambia al navegar: en qué escuela estás,
+ * el alta de cuentas y los totales. La derecha es trabajo.
  *
- *   - Un `admin` pertenece a UNA sede y no elige: es la suya.
- *   - El `superadmin` no pertenece a ninguna y las administra todas, así
- *     que elige con un desplegable.
+ * Por qué el alta vive en la columna y no detrás de un botón: crear
+ * cuentas es la tarea que más se repite al arrancar un año, y esconderla
+ * en un menú cuesta un click por alumno. Acá el rol es un control siempre
+ * visible, así que dar de alta es escribir un nombre y apretar.
  *
- * Las dos pantallas de gestión son las mismas para los dos roles —el
- * superadmin tiene exactamente los mismos permisos que el admin, más el
- * alcance— así que en vez de duplicarlas, el selector vive acá y abajo
- * todo lee `useSede()`.
+ * El marco también resuelve el alcance:
+ *   - un `admin` pertenece a UNA escuela y no elige;
+ *   - el `superadmin` no pertenece a ninguna y las administra todas.
+ * Las pantallas de adentro solo preguntan `useSede()`.
  *
- * Si el superadmin todavía no creó ninguna sede, esta pantalla no deja
- * pasar: sin sede no hay grupos, ni usuarios, ni nada que administrar.
- * Mostrarle una lista vacía sería decirle "no hay nada" cuando el
- * problema real es "falta crear la primera".
+ * Y es dueño de dos datos compartidos —los grupos y las credenciales
+ * recién emitidas— porque los usan tanto la columna como la pantalla de
+ * la derecha, y cargarlos dos veces los haría discrepar entre sí.
  */
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import type { Sede } from "../../types";
+import type { Group, IssuedCredentials, Sede } from "../../types";
 import { api, ApiError } from "../../utils/api";
 import { useAuth } from "../../hooks/useAuth";
-import { roleLabel } from "../../utils/storage";
+import { CredentialsPanel } from "./Credentials";
 import { Button, Card, ErrorBanner, Field, Input, Spinner } from "./ui";
 
-interface SedeContextValue {
+interface ManageContextValue {
   sedeId: string;
   sedeName: string;
-  /** Solo el superadmin puede cambiar de sede. */
+  /** Solo el superadmin puede cambiar de escuela. */
   canSwitch: boolean;
-  /** Vuelve a pedir la lista de sedes. La usa la pantalla de Sedes tras
-   *  crear o editar una, para que el selector de arriba quede al día. */
+  /** Relee las escuelas: la usa la pantalla de Escuelas tras crear o editar. */
   reloadSedes: () => void;
+  /** `null` mientras carga. Lo comparten la columna y la lista. */
+  groups: Group[] | null;
+  groupsError: string;
+  reloadGroups: () => void;
+  /** Muestra el panel de credenciales recién emitidas. */
+  showCredentials: (title: string, list: IssuedCredentials[]) => void;
 }
 
-const SedeContext = createContext<SedeContextValue | null>(null);
+const ManageContext = createContext<ManageContextValue | null>(null);
 
-export function useSede(): SedeContextValue {
-  const ctx = useContext(SedeContext);
+export function useSede(): ManageContextValue {
+  const ctx = useContext(ManageContext);
   if (!ctx) throw new Error("useSede tiene que usarse dentro de ManageShell");
   return ctx;
 }
 
-/* El ítem de Sedes es solo del superadmin: un admin pertenece a una y no
-   administra ninguna. */
 const NAV_ALL = [
-  { to: "/gestion/sedes", label: "Escuelas", superadminOnly: true },
   { to: "/gestion/grupos", label: "Grupos", superadminOnly: false },
+  { to: "/gestion/sedes", label: "Escuelas", superadminOnly: true },
 ];
+
+/* Paleta de la marca (src/styles/global.css). El navy es estructura, no
+   decoración: por eso ocupa una columna entera y no un borde. */
+const NAVY = "#17355f";
+const RAIL_MUTED = "#7d9ac6";
+const RAIL_TEXT = "#a9c0e0";
 
 export function ManageShell() {
   const { user, logout } = useAuth();
   const isSuperadmin = user?.role === "superadmin";
-  const NAV = NAV_ALL.filter((i) => !i.superadminOnly || isSuperadmin);
+  const nav = NAV_ALL.filter((i) => !i.superadminOnly || isSuperadmin);
 
   const [sedes, setSedes] = useState<Sede[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [loadingSedes, setLoadingSedes] = useState(true);
+  const [sedeError, setSedeError] = useState("");
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
+  const [groups, setGroups] = useState<Group[] | null>(null);
+  const [groupsError, setGroupsError] = useState("");
+  const [teacherCount, setTeacherCount] = useState<number | null>(null);
+  const [credentials, setCredentials] = useState<{ title: string; list: IssuedCredentials[] } | null>(null);
+
+  const loadSedes = useCallback(async () => {
+    setLoadingSedes(true);
+    setSedeError("");
     try {
       if (isSuperadmin) {
         const all = await api.sedes();
         setSedes(all);
-        /* Se conserva la elección previa si esa sede sigue existiendo; si
-           no, se cae a la primera. */
         setSelected((prev) => (prev && all.some((s) => s.id === prev) ? prev : (all[0]?.id ?? null)));
       } else {
         const mine = await api.mySede();
@@ -77,71 +89,116 @@ export function ManageShell() {
         setSelected(mine.id);
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No pudimos cargar tus sedes.");
+      setSedeError(err instanceof ApiError ? err.message : "No pudimos cargar tus escuelas.");
     } finally {
-      setLoading(false);
+      setLoadingSedes(false);
     }
   }, [isSuperadmin]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void loadSedes();
+  }, [loadSedes]);
 
   const current = sedes.find((s) => s.id === selected) ?? null;
+  const sedeId = current?.id ?? null;
+
+  const loadGroups = useCallback(async () => {
+    if (!sedeId) return;
+    setGroupsError("");
+    try {
+      const [gs, teachers] = await Promise.all([
+        api.groups(sedeId),
+        api.users({ role: "docente", sedeId }),
+      ]);
+      setGroups(gs);
+      setTeacherCount(teachers.length);
+    } catch (err) {
+      setGroups(null);
+      setGroupsError(err instanceof ApiError ? err.message : "No pudimos cargar los grupos.");
+    }
+  }, [sedeId]);
+
+  /* Al cambiar de escuela se vacía antes de pedir: si no, se ven un
+     instante los grupos de la anterior bajo el nombre de la nueva. */
+  useEffect(() => {
+    setGroups(null);
+    setTeacherCount(null);
+    void loadGroups();
+  }, [loadGroups]);
+
+  const studentTotal = groups ? groups.reduce((a, g) => a + (g.studentCount ?? 0), 0) : null;
+
+  const ctx = useMemo<ManageContextValue | null>(
+    () =>
+      current
+        ? {
+            sedeId: current.id,
+            sedeName: current.name,
+            canSwitch: isSuperadmin,
+            reloadSedes: () => void loadSedes(),
+            groups,
+            groupsError,
+            reloadGroups: () => void loadGroups(),
+            showCredentials: (title, list) => setCredentials({ title, list }),
+          }
+        : null,
+    [current, isSuperadmin, loadSedes, groups, groupsError, loadGroups],
+  );
 
   return (
-    <div className="min-h-dvh bg-[#f6f7f9] font-body text-[#1a2233]">
-      {/* ---- Barra superior ---- */}
-      <header className="sticky top-0 z-20 flex h-14 items-center gap-4 border-b border-[#e3e6ec] bg-white px-4 sm:px-6">
-        <span className="font-display text-lg font-extrabold tracking-tight text-[#101828]">TYPELY</span>
-        <span className="hidden text-xs font-semibold uppercase tracking-wider text-[#98a2b3] sm:inline">
-          Gestión
-        </span>
+    <div className="font-body flex min-h-dvh bg-[#fbfcfe] text-[#17355f]">
 
-        {/* Sede: desplegable para el superadmin, texto fijo para el admin. */}
-        {current && (
-          <div className="ml-2 min-w-0">
-            {isSuperadmin && sedes.length > 1 ? (
-              <select
-                value={selected ?? ""}
-                onChange={(e) => setSelected(e.target.value)}
-                aria-label="Sede"
-                className="max-w-[14rem] rounded-lg border border-[#d5d9e2] bg-white px-2.5 py-1.5 text-sm font-semibold outline-none focus:border-[#3159e8]"
-              >
-                {sedes.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span className="truncate text-sm font-semibold text-[#344054]">{current.name}</span>
-            )}
-          </div>
-        )}
-
-        <div className="ml-auto flex items-center gap-3">
-          <div className="hidden text-right leading-tight sm:block">
-            <p className="text-sm font-semibold text-[#344054]">{user?.name}</p>
-            <p className="text-xs text-[#98a2b3]">{user ? roleLabel(user.role) : ""}</p>
-          </div>
-          <Button variant="ghost" onClick={() => void logout()}>
-            Cerrar sesión
-          </Button>
+      {/* ================= Columna de contexto ================= */}
+      <aside
+        style={{ background: NAVY }}
+        className="hidden w-[296px] shrink-0 flex-col gap-6 px-[22px] py-[26px] text-white md:flex"
+      >
+        <div className="flex items-center gap-2.5">
+          <span className="font-display text-[21px] font-extrabold">TYPELY</span>
+          <span className="text-[10.5px] font-semibold uppercase tracking-[0.1em]" style={{ color: RAIL_MUTED }}>
+            Gestión
+          </span>
         </div>
-      </header>
 
-      <div className="mx-auto flex w-full max-w-[80rem] gap-6 px-4 py-6 sm:px-6">
-        {/* ---- Navegación ---- */}
-        <nav className="hidden w-48 shrink-0 md:block" aria-label="Secciones">
-          <ul className="flex flex-col gap-1">
-            {NAV.map((item) => (
+        {/* Escuela */}
+        <div className="rounded-[13px] border border-white/10 bg-white/[0.07] px-[15px] py-3.5">
+          <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em]" style={{ color: RAIL_MUTED }}>
+            Escuela
+          </div>
+          {loadingSedes ? (
+            <div className="mt-2 flex items-center gap-2 text-sm" style={{ color: RAIL_TEXT }}>
+              <Spinner /> Cargando…
+            </div>
+          ) : !current ? (
+            <div className="mt-1.5 text-sm font-semibold text-white">Todavía no hay ninguna</div>
+          ) : isSuperadmin && sedes.length > 1 ? (
+            <select
+              value={selected ?? ""}
+              onChange={(e) => setSelected(e.target.value)}
+              aria-label="Escuela"
+              className="mt-1.5 w-full cursor-pointer rounded-lg border border-white/15 bg-white/10 px-2 py-1.5 text-sm font-semibold text-white outline-none focus:border-[#33c7f0]"
+            >
+              {sedes.map((s) => (
+                <option key={s.id} value={s.id} className="text-[#17355f]">
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="mt-1.5 text-sm font-semibold leading-snug text-white">{current.name}</div>
+          )}
+        </div>
+
+        {/* Navegación */}
+        <nav aria-label="Secciones">
+          <ul className="flex flex-col gap-0.5">
+            {nav.map((item) => (
               <li key={item.to}>
                 <NavLink
                   to={item.to}
                   className={({ isActive }) =>
-                    `block rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-                      isActive ? "bg-[#eaefff] text-[#3159e8]" : "text-[#475069] hover:bg-[#eef1f6]"
+                    `block rounded-[9px] px-3 py-2 text-[13.5px] font-semibold transition-colors ${
+                      isActive ? "bg-white/[0.14] text-white" : "text-[#a9c0e0] hover:bg-white/[0.07]"
                     }`
                   }
                 >
@@ -152,56 +209,258 @@ export function ManageShell() {
           </ul>
         </nav>
 
-        <main className="min-w-0 flex-1">
-          {loading ? (
-            <div className="flex items-center gap-2 py-16 text-sm text-[#667085]">
-              <Spinner /> Cargando…
+        {/* Alta de cuentas */}
+        {current && (
+          <NewAccountForm
+            sedeId={current.id}
+            groups={groups}
+            onCreated={(title, list) => {
+              setCredentials({ title, list });
+              void loadGroups();
+            }}
+          />
+        )}
+
+        {/* Totales */}
+        <div className="mt-auto flex flex-col">
+          <RailStat label="Grupos" value={groups ? groups.length : null} />
+          <RailStat label="Alumnos" value={studentTotal} />
+          <RailStat label="Docentes" value={teacherCount} last />
+        </div>
+
+        <div className="border-t border-white/10 pt-4">
+          <div className="mb-2.5 leading-tight">
+            <div className="truncate text-[13px] font-semibold text-white">{user?.name}</div>
+            <div className="text-[11px]" style={{ color: RAIL_MUTED }}>
+              {isSuperadmin ? "Superadmin" : "Administrador"}
             </div>
-          ) : error ? (
-            <ErrorBanner message={error} onRetry={() => void load()} />
-          ) : !current ? (
-            <FirstSede onCreated={() => void load()} />
-          ) : (
-            <SedeContext.Provider
-              value={{
-                sedeId: current.id,
-                sedeName: current.name,
-                canSwitch: isSuperadmin,
-                reloadSedes: () => void load(),
-              }}
+          </div>
+          <button
+            type="button"
+            onClick={() => void logout()}
+            className="w-full rounded-[9px] border border-white/15 bg-white/[0.06] px-3 py-2 text-[13px] font-semibold text-[#a9c0e0] transition-colors hover:bg-white/10 hover:text-white"
+          >
+            Cerrar sesión
+          </button>
+        </div>
+      </aside>
+
+      {/* ================= Columna de trabajo ================= */}
+      <main className="min-w-0 flex-1 px-4 py-6 sm:px-8">
+        {/* Barra compacta donde la columna no entra. */}
+        <div className="mb-5 flex items-center gap-2 md:hidden">
+          <span className="font-display text-lg font-extrabold">TYPELY</span>
+          {nav.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                `rounded-lg px-2.5 py-1.5 text-sm font-semibold ${
+                  isActive ? "bg-[#eaefff] text-[#3159e8]" : "text-[#475069]"
+                }`
+              }
             >
-              {/* Navegación en pantallas angostas, debajo del encabezado. */}
-              <nav className="mb-4 flex gap-1 md:hidden" aria-label="Secciones">
-                {NAV.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    className={({ isActive }) =>
-                      `rounded-lg px-3 py-1.5 text-sm font-semibold ${
-                        isActive ? "bg-[#eaefff] text-[#3159e8]" : "text-[#475069]"
-                      }`
-                    }
-                  >
-                    {item.label}
-                  </NavLink>
-                ))}
-              </nav>
-              <Outlet />
-            </SedeContext.Provider>
-          )}
-        </main>
-      </div>
+              {item.label}
+            </NavLink>
+          ))}
+          <button
+            type="button"
+            onClick={() => void logout()}
+            className="ml-auto text-sm font-semibold text-[#475069]"
+          >
+            Salir
+          </button>
+        </div>
+
+        {credentials && (
+          <CredentialsPanel
+            title={credentials.title}
+            credentials={credentials.list}
+            onClose={() => setCredentials(null)}
+          />
+        )}
+
+        {loadingSedes ? (
+          <div className="flex items-center gap-2 py-16 text-sm text-[#667085]">
+            <Spinner /> Cargando…
+          </div>
+        ) : sedeError ? (
+          <ErrorBanner message={sedeError} onRetry={() => void loadSedes()} />
+        ) : !ctx ? (
+          <FirstSede onCreated={() => void loadSedes()} />
+        ) : (
+          <ManageContext.Provider value={ctx}>
+            <Outlet />
+          </ManageContext.Provider>
+        )}
+      </main>
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* Primera sede                                                        */
+
+function RailStat({ label, value, last }: { label: string; value: number | null; last?: boolean }) {
+  return (
+    <div className={`flex items-baseline justify-between py-2.5 ${last ? "" : "border-b border-white/[0.09]"}`}>
+      <span className="text-[12.5px]" style={{ color: RAIL_TEXT }}>
+        {label}
+      </span>
+      <span className="font-display text-[18px] font-bold text-white">{value === null ? "—" : value}</span>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Alta de cuentas                                                     */
 /* ------------------------------------------------------------------ */
 
-/** Sin sedes no hay nada que administrar, así que en vez de una lista
- *  vacía se pide crear la primera. Solo la ve el superadmin: un admin sin
- *  sede es un estado que la base impide. */
+/** Un solo formulario para las dos altas. El rol no es un menú: es un
+ *  control siempre visible, y lo único que cambia debajo es un campo. */
+function NewAccountForm({
+  sedeId,
+  groups,
+  onCreated,
+}: {
+  sedeId: string;
+  groups: Group[] | null;
+  onCreated: (title: string, list: IssuedCredentials[]) => void;
+}) {
+  const [role, setRole] = useState<"alumno" | "docente">("alumno");
+  const [fullName, setFullName] = useState("");
+  const [groupId, setGroupId] = useState("");
+  const [email, setEmail] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const isAlumno = role === "alumno";
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const clean = fullName.trim();
+    if (!clean) {
+      setError("Escribí el nombre y apellido.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const res = await api.createUser({
+        fullName: clean,
+        role,
+        sedeId,
+        groupId: isAlumno && groupId ? groupId : null,
+        email: !isAlumno && email.trim() ? email.trim().toLowerCase() : null,
+      });
+      setFullName("");
+      setEmail("");
+      /* La contraseña solo viene cuando la generó el servidor, y se ve una
+         sola vez: por eso sube al panel en vez de quedarse acá. */
+      if (res.temporaryPassword) {
+        onCreated(`Credenciales de ${res.user.fullName}`, [
+          {
+            fullName: res.user.fullName,
+            username: res.user.username,
+            temporaryPassword: res.temporaryPassword,
+            role,
+          },
+        ]);
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No pudimos crear la cuenta.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const fieldClass =
+    "w-full rounded-[10px] border border-white/[0.13] bg-white/[0.06] px-3 py-2 text-[13px] text-white outline-none transition-colors placeholder:text-[#7d9ac6] focus:border-[#33c7f0] focus:bg-white/10";
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-2">
+      <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em]" style={{ color: RAIL_MUTED }}>
+        Crear cuenta
+      </div>
+
+      <div className="flex rounded-[11px] bg-white/[0.08] p-[3px]" role="group" aria-label="Rol de la cuenta">
+        {(["alumno", "docente"] as const).map((r) => (
+          <button
+            key={r}
+            type="button"
+            onClick={() => { setRole(r); setError(""); }}
+            aria-pressed={role === r}
+            className={`flex-1 rounded-[9px] py-2 text-[13px] font-semibold capitalize transition-colors ${
+              role === r ? "bg-white text-[#17355f]" : "text-[#a9c0e0] hover:text-white"
+            }`}
+          >
+            {r}
+          </button>
+        ))}
+      </div>
+
+      <input
+        value={fullName}
+        onChange={(e) => { setFullName(e.target.value); if (error) setError(""); }}
+        placeholder="Nombre y apellido"
+        aria-label="Nombre y apellido"
+        className={fieldClass}
+      />
+
+      {isAlumno ? (
+        <select
+          value={groupId}
+          onChange={(e) => setGroupId(e.target.value)}
+          aria-label="Grupo"
+          className={`${fieldClass} cursor-pointer`}
+        >
+          <option value="" className="text-[#17355f]">Sin grupo</option>
+          {(groups ?? []).map((g) => (
+            <option key={g.id} value={g.id} className="text-[#17355f]">
+              {g.name}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email (opcional)"
+          aria-label="Email"
+          type="email"
+          className={fieldClass}
+        />
+      )}
+
+      {error && (
+        <p role="alert" className="text-[11.5px] font-semibold text-[#ffb4c4]">
+          {error}
+        </p>
+      )}
+
+      <button
+        type="submit"
+        disabled={saving}
+        className="mt-0.5 flex h-10 items-center justify-center gap-2 rounded-[10px] border-0 text-[13.5px] font-bold text-[#0d2646] transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
+        style={{ background: "linear-gradient(135deg, #22c7b8, #33c7f0)" }}
+      >
+        {saving && <Spinner />}
+        {isAlumno ? "Crear alumno" : "Crear docente"}
+      </button>
+
+      <p className="mt-0.5 text-[11.5px] leading-snug" style={{ color: RAIL_MUTED }}>
+        {isAlumno
+          ? "No necesita email. El usuario y la contraseña se generan y se muestran una sola vez."
+          : "Después de crearlo, se le asignan grupos desde el detalle de cada uno."}
+      </p>
+    </form>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+/** Sin escuelas no hay nada que administrar, así que se pide crear la
+ *  primera en vez de mostrar una lista vacía. Decir "no hay grupos"
+ *  cuando lo que falta es la escuela manda al lugar equivocado. */
 function FirstSede({ onCreated }: { onCreated: () => void }) {
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
@@ -221,14 +480,14 @@ function FirstSede({ onCreated }: { onCreated: () => void }) {
       await api.createSede({ name: clean, city: city.trim() || undefined });
       onCreated();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No pudimos crear la sede.");
+      setError(err instanceof ApiError ? err.message : "No pudimos crear la escuela.");
       setSaving(false);
     }
   }
 
   return (
     <Card className="mx-auto max-w-lg p-6">
-      <h1 className="text-lg font-bold text-[#101828]">Creá tu primera escuela</h1>
+      <h1 className="font-display text-lg font-bold text-[#101828]">Creá tu primera escuela</h1>
       <p className="mt-1.5 text-sm text-[#667085]">
         Todo cuelga de acá: los grupos, los docentes y los alumnos pertenecen a una escuela.
       </p>
@@ -244,12 +503,7 @@ function FirstSede({ onCreated }: { onCreated: () => void }) {
           />
         </Field>
         <Field label="Localidad" htmlFor="sede-city" hint="Opcional.">
-          <Input
-            id="sede-city"
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            placeholder="Rosario"
-          />
+          <Input id="sede-city" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Rosario" />
         </Field>
         <Button type="submit" variant="primary" loading={saving} className="self-start">
           Crear escuela
