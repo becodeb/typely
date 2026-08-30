@@ -870,10 +870,18 @@ The slow on-VM build (`DOCKER_BUILDKIT=0` + detached `nohup`, never BuildKit) is
 the fallback ONLY for the **API** image, which can't be shipped as a static
 bundle. The DB is **Supabase**, not the local `db` container.
 
-> **Check this on the VM.** It used to track `origin/dev` through a local branch
-> confusingly named `main`. `dev` no longer exists, so a `git pull` there will
-> fail or sit on a stale ref until its remote-tracking branch is repointed at
-> `origin/main`.
+> **Check this on the VM — it points at the OLD repo.** `/opt/apps/typely`
+> still has `origin` = `bautigoni/Mecanografia-BAU-EZES`, tracked through a
+> local branch confusingly named `main`. The project moved to
+> `becodeb/typely` with `production` as its default branch (§17), so a
+> `git pull` there fetches the old repo. Repoint it before the next deploy:
+>
+> ```bash
+> git remote set-url origin https://github.com/becodeb/typely.git
+> git fetch origin
+> git branch -m main production 2>/dev/null || true
+> git branch --set-upstream-to=origin/production production
+> ```
 
 ## 14. Skills (for agents)
 
@@ -976,20 +984,32 @@ Two things are broken in it today, and both need fixing before it can work:
 So today the app is deployed by hand, per `DEPLOY.md`. Do not tell anyone a
 merge to `production` publishes anything until both points above are resolved.
 
-> **Pending admin step — this is not done yet.** The deployed branch is still
-> named `main` on GitHub: it is the default branch, it carries the
-> `protect-main` ruleset, and renaming it needs admin rights that the day-to-day
-> account does not have. Someone with admin on `bautigoni/Mecanografia-BAU-EZES`
-> has to **rename `main` → `production`** (Settings → Branches), then confirm
-> the ruleset condition followed the rename to `refs/heads/production`. Until
-> that happens the docs above describe the intended state, not the live one, and
-> nothing auto-deploys — the workflow waits for a branch called `production`.
->
-> While renaming, also point the VM at the right branch: `/opt/apps/typely` on
-> the VPS runs `git pull`, and its tracking ref is stale (§13.1).
+**The rename is DONE (2026-08-30).** The repo moved to
+**`becodeb/typely`** and its default branch is now **`production`**; `main` no
+longer exists. Only two branches remain, `production` and `dev`, which is
+exactly the model described above. GitHub's rename keeps the history and
+redirects old `main` links, so nothing had to be recreated.
+
+Three loose ends that came with the move and are NOT done:
+
+1. **The branch ruleset did not travel.** `protect-main` lived on the old repo.
+   `becodeb/typely` has no protection on `production` today — anyone with
+   write access can push straight to it. Add a ruleset on
+   `refs/heads/production` if that matters.
+2. **The Actions secrets did not travel either**, `SSH_PRIVATE_KEY` among them
+   — and it was broken anyway (see above).
+3. **The VM still points at the old remote.** `/opt/apps/typely` on the VPS
+   runs `git pull` against `bautigoni/Mecanografia-BAU-EZES` on a local branch
+   confusingly named `main`. Until it is repointed at `becodeb/typely` and
+   `production`, a pull there fetches the old repo (§13.1).
+
+The old remote is still configured locally as **`bautigoni`**, so the previous
+repo stays reachable for reference:
+`git fetch bautigoni`. Drop it once the move is settled.
 
 **History note.** This repo previously ran `dev` → `master`/`main`, then briefly
-a single `main`. Older docs describing either are stale — fix them.
+a single `main`, and lived at `bautigoni/Mecanografia-BAU-EZES`. Older docs
+describing any of that are stale — fix them.
 
 ## 18. Agent Working Rules
 
