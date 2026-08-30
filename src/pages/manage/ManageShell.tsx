@@ -23,6 +23,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import type { Group, IssuedCredentials, Sede } from "../../types";
 import { api, ApiError } from "../../utils/api";
 import { useAuth } from "../../hooks/useAuth";
+import { assets } from "../../utils/assets";
 import { CredentialsPanel } from "./Credentials";
 import { Button, Card, ErrorBanner, Field, Input, Spinner } from "./ui";
 
@@ -56,8 +57,8 @@ const NAV_ALL = [
 
 /* Paleta de la marca (src/styles/global.css). El navy es estructura, no
    decoración: por eso ocupa una columna entera y no un borde. */
-const NAVY = "#17355f";
-const RAIL_MUTED = "#7d9ac6";
+const RAIL_BG = "linear-gradient(170deg, #1b3f73 0%, #17355f 55%, #10284b 100%)";
+const RAIL_MUTED = "#8fb0da";
 const RAIL_TEXT = "#a9c0e0";
 
 export function ManageShell() {
@@ -146,22 +147,22 @@ export function ManageShell() {
   );
 
   return (
-    <div className="font-body flex min-h-dvh bg-[#fbfcfe] text-[#17355f]">
+    <div className="font-body flex min-h-dvh bg-[#eef6fd] text-[#17355f]">
 
       {/* ================= Columna de contexto ================= */}
       <aside
-        style={{ background: NAVY }}
-        className="hidden w-[296px] shrink-0 flex-col gap-6 px-[22px] py-[26px] text-white md:flex"
+        style={{ background: RAIL_BG }}
+        className="relative hidden w-[300px] shrink-0 flex-col gap-[22px] overflow-hidden px-[22px] pb-0 pt-[26px] text-white md:flex"
       >
         <div className="flex items-center gap-2.5">
-          <span className="font-display text-[21px] font-extrabold">TYPELY</span>
-          <span className="text-[10.5px] font-semibold uppercase tracking-[0.1em]" style={{ color: RAIL_MUTED }}>
+          <span className="font-display text-[22px] font-extrabold">TYPELY</span>
+          <span className="rounded-full bg-[#5be8ba]/[0.16] px-2.5 py-[3px] text-[10px] font-bold uppercase tracking-[0.07em] text-[#5be8ba]">
             Gestión
           </span>
         </div>
 
         {/* Escuela */}
-        <div className="rounded-[13px] border border-white/10 bg-white/[0.07] px-[15px] py-3.5">
+        <div className="rounded-2xl border border-white/[0.13] bg-white/[0.08] px-4 py-3.5">
           <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em]" style={{ color: RAIL_MUTED }}>
             Escuela
           </div>
@@ -197,7 +198,7 @@ export function ManageShell() {
                 <NavLink
                   to={item.to}
                   className={({ isActive }) =>
-                    `block rounded-[9px] px-3 py-2 text-[13.5px] font-semibold transition-colors ${
+                    `block rounded-[11px] px-3.5 py-2 text-[13.5px] font-semibold transition-colors ${
                       isActive ? "bg-white/[0.14] text-white" : "text-[#a9c0e0] hover:bg-white/[0.07]"
                     }`
                   }
@@ -225,10 +226,10 @@ export function ManageShell() {
         )}
 
         {/* Totales */}
-        <div className="mt-auto flex flex-col">
-          <RailStat label="Grupos" value={groups ? groups.length : null} />
-          <RailStat label="Alumnos" value={studentTotal} />
-          <RailStat label="Docentes" value={teacherCount} last />
+        <div className="mt-auto flex gap-2">
+          <RailStat label="grupos" value={groups ? groups.length : null} />
+          <RailStat label="alumnos" value={studentTotal} />
+          <RailStat label="docentes" value={teacherCount} />
         </div>
 
         <div className="border-t border-white/10 pt-4">
@@ -246,6 +247,17 @@ export function ManageShell() {
             Cerrar sesión
           </button>
         </div>
+
+        {/* La mascota del juego cierra la columna: el panel es del mismo
+            mundo. Espejada para que mire hacia el contenido, no hacia
+            afuera de la pantalla. */}
+        <img
+          src={assets.mascotMaleLaptop}
+          alt=""
+          aria-hidden="true"
+          className="-mb-3.5 w-[168px] self-center"
+          style={{ transform: "scaleX(-1)" }}
+        />
       </aside>
 
       {/* ================= Columna de trabajo ================= */}
@@ -303,13 +315,15 @@ export function ManageShell() {
 
 /* ------------------------------------------------------------------ */
 
-function RailStat({ label, value, last }: { label: string; value: number | null; last?: boolean }) {
+function RailStat({ label, value }: { label: string; value: number | null }) {
   return (
-    <div className={`flex items-baseline justify-between py-2.5 ${last ? "" : "border-b border-white/[0.09]"}`}>
-      <span className="text-[12.5px]" style={{ color: RAIL_TEXT }}>
+    <div className="flex-1 rounded-[14px] bg-white/[0.07] px-3 py-[11px]">
+      <div className="font-display text-[20px] font-bold leading-none text-white">
+        {value === null ? "—" : value}
+      </div>
+      <div className="mt-0.5 text-[10.5px]" style={{ color: RAIL_MUTED }}>
         {label}
-      </span>
-      <span className="font-display text-[18px] font-bold text-white">{value === null ? "—" : value}</span>
+      </div>
     </div>
   );
 }

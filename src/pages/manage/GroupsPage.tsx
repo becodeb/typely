@@ -1,9 +1,13 @@
 /* Grupos — la lista de cursos de una escuela.
  *
- * Cada fila es un enlace al detalle: nombre, cuánta gente hay y cómo viene
- * el curso, en una línea legible de un vistazo. El progreso es la precisión
- * media de sus alumnos — el mismo número que muestra la ficha de cada uno,
- * para que la lista y el detalle no digan cosas distintas.
+ * Cada grupo lleva la ISLA de su grado, la misma que ven los chicos en el
+ * mapa. No es adorno: es lo que deja reconocer un curso de un vistazo,
+ * antes de leer el nombre, y lo que hace que el panel y el juego se sientan
+ * el mismo producto.
+ *
+ * El progreso es la precisión media de sus alumnos — el mismo número que
+ * muestra la ficha de cada uno, para que la lista y el detalle no digan
+ * cosas distintas.
  *
  * Los datos vienen del marco (`useSede()`), que también los usa para los
  * totales de la columna izquierda: cargarlos dos veces los haría discrepar.
@@ -13,6 +17,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { Group } from "../../types";
 import { api, ApiError } from "../../utils/api";
+import { assets, islandMapThumb } from "../../utils/assets";
 import { useSede } from "./ManageShell";
 import {
   Button,
@@ -22,36 +27,12 @@ import {
   Field,
   GRADES,
   Input,
-  PageHeader,
+  RowsSkeleton,
   Select,
-  TableSkeleton,
   gradeLabel,
+  islandForGrade,
+  tintForGrade,
 } from "./ui";
-
-/* Un color por grado, del rango de la marca. No es decoración: es lo que
-   deja reconocer un curso en la lista sin llegar a leer el nombre. */
-const GRADE_TINT: Record<string, { fg: string; bg: string }> = {
-  inicial: { fg: "#c4568f", bg: "#fdeaf3" },
-  "1ep": { fg: "#0f9fc4", bg: "#e2f5fb" },
-  "2ep": { fg: "#0f9fc4", bg: "#e2f5fb" },
-  "3ep": { fg: "#12a294", bg: "#ddf3f0" },
-  "4ep": { fg: "#12a294", bg: "#ddf3f0" },
-  "5ep": { fg: "#3159e8", bg: "#e6ecff" },
-  "6ep": { fg: "#3159e8", bg: "#e6ecff" },
-  sec: { fg: "#7c5ce0", bg: "#eee9fd" },
-  libre: { fg: "#60769c", bg: "#eef2f8" },
-};
-
-function tintFor(grade: string) {
-  return GRADE_TINT[grade] ?? GRADE_TINT.libre!;
-}
-
-/** "4.º B" → "4B": se descarta lo que no sea letra o número y se toman
- *  los dos primeros caracteres. */
-function shortLabel(name: string): string {
-  const clean = name.replace(/[^A-Za-z0-9]/g, "");
-  return (clean.slice(0, 2) || name.slice(0, 2)).toUpperCase();
-}
 
 export function GroupsPage() {
   const { sedeId, groups, groupsError, reloadGroups } = useSede();
@@ -59,14 +40,33 @@ export function GroupsPage() {
 
   return (
     <>
-      <PageHeader
-        title="Grupos"
-        subtitle="Entrá a un grupo para ver sus alumnos, sus docentes y su progreso."
-        action={
+      {/* Banda de cielo: el mismo del juego, desvanecido hacia el fondo
+          del panel para que el encabezado se apoye en él sin taparlo. */}
+      <div className="relative -mx-4 -mt-6 mb-1 h-[132px] overflow-hidden sm:-mx-8">
+        <img
+          src={assets.homeBg}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full object-cover"
+          style={{ objectPosition: "center 62%" }}
+        />
+        <div
+          className="absolute inset-0"
+          style={{ background: "linear-gradient(180deg, rgba(238,246,253,0) 40%, rgba(238,246,253,0.94) 100%)" }}
+        />
+        <div className="relative flex flex-wrap items-start justify-between gap-3 px-4 pt-6 sm:px-8">
+          <div>
+            <h1 className="font-display text-[30px] font-extrabold leading-tight tracking-[-0.018em] text-[#133463]">
+              Grupos
+            </h1>
+            <p className="mt-0.5 text-[13.5px] font-medium text-[#456494]">
+              Cada grupo tiene su isla. Entrá para ver quiénes son y cómo van.
+            </p>
+          </div>
           <div className="flex gap-2">
             <Link
               to="/gestion/importar"
-              className="inline-flex h-[38px] items-center gap-2 rounded-[10px] border border-[#dde5f0] bg-white px-3.5 text-[13px] font-semibold text-[#17355f] transition-colors hover:bg-[#f4f6fa]"
+              className="inline-flex h-[38px] items-center gap-2 rounded-xl border border-white/90 bg-white/80 px-4 text-[13px] font-semibold text-[#17355f] backdrop-blur transition-colors hover:bg-white"
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -81,8 +81,8 @@ export function GroupsPage() {
               </Button>
             )}
           </div>
-        }
-      />
+        </div>
+      </div>
 
       {creating && (
         <NewGroupForm
@@ -98,9 +98,7 @@ export function GroupsPage() {
       {groupsError && !groups ? (
         <ErrorBanner message={groupsError} onRetry={reloadGroups} />
       ) : groups === null ? (
-        <Card className="overflow-hidden">
-          <TableSkeleton />
-        </Card>
+        <RowsSkeleton />
       ) : groups.length === 0 ? (
         <Card>
           <EmptyState
@@ -116,7 +114,7 @@ export function GroupsPage() {
           />
         </Card>
       ) : (
-        <ul className="flex flex-col gap-2.5">
+        <ul className="flex flex-col gap-3">
           {groups.map((g) => (
             <li key={g.id}>
               <GroupRow group={g} />
@@ -131,7 +129,7 @@ export function GroupsPage() {
 /* ------------------------------------------------------------------ */
 
 function GroupRow({ group: g }: { group: Group }) {
-  const tint = tintFor(g.grade);
+  const tint = tintForGrade(g.grade);
   const students = g.studentCount ?? 0;
   const teachers = g.teacherCount ?? 0;
   const progress = g.avgProgress ?? 0;
@@ -139,62 +137,76 @@ function GroupRow({ group: g }: { group: Group }) {
   return (
     <Link
       to={`/gestion/grupos/${g.id}`}
-      className="flex items-center gap-4 rounded-[13px] border border-[#e6ecf4] bg-white px-[18px] py-[15px] transition-colors hover:border-[#cfdcf0] hover:bg-[#fcfdff]"
+      className="flex items-center gap-4 rounded-[20px] bg-white py-[14px] pl-[14px] pr-[18px] shadow-[0_6px_22px_rgba(58,89,132,0.09)] transition-shadow hover:shadow-[0_10px_28px_rgba(58,89,132,0.15)]"
     >
+      {/* La isla del grado. `loading="lazy"` porque una escuela grande
+          puede tener veinte grupos y no hace falta traerlas todas de una. */}
       <span
-        className="font-display grid h-[46px] w-[46px] shrink-0 place-items-center rounded-xl text-[17px] font-bold"
-        style={{ background: tint.bg, color: tint.fg }}
-        aria-hidden="true"
+        className="grid h-[68px] w-[68px] shrink-0 place-items-center overflow-hidden rounded-[18px]"
+        style={{ background: tint.soft }}
       >
-        {shortLabel(g.name)}
+        <img
+          src={islandMapThumb(islandForGrade(g.grade))}
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          className="h-[62px] w-[62px] object-contain"
+        />
       </span>
 
-      <span className="min-w-0 sm:min-w-[168px]">
-        <span className="block truncate text-[15px] font-semibold text-[#17355f]">{g.name}</span>
+      <span className="min-w-0 sm:min-w-[150px]">
+        <span className="font-display block truncate text-[20px] font-bold leading-tight text-[#17355f]">
+          {g.name}
+        </span>
         <span className="mt-px block text-[12.5px] text-[#7f92b0]">{gradeLabel(g.grade)}</span>
       </span>
 
-      <span className="hidden gap-7 sm:flex">
-        <span className="block">
-          <span className="block text-[15px] font-semibold tabular-nums text-[#17355f]">{students}</span>
-          <span className="block text-[11.5px] text-[#93a5c2]">{students === 1 ? "alumno" : "alumnos"}</span>
-        </span>
-        <span className="block">
-          <span
-            className="block text-[15px] font-semibold tabular-nums"
-            style={{ color: teachers === 0 ? "#d1436a" : "#17355f" }}
-          >
-            {teachers === 0 ? "—" : teachers}
+      <span className="hidden gap-2.5 md:flex">
+        <span className="rounded-xl bg-[#f2f7fd] px-3.5 py-[7px]">
+          <b className="text-[15px] font-bold text-[#17355f]">{students}</b>
+          <span className="ml-1 text-[11.5px] text-[#7f92b0]">
+            {students === 1 ? "alumno" : "alumnos"}
           </span>
-          <span className="block text-[11.5px] text-[#93a5c2]">{teachers === 1 ? "docente" : "docentes"}</span>
         </span>
+
+        {/* Un grupo sin docente es un problema real —nadie ve el progreso
+            de esos alumnos— así que se avisa en vez de mostrar un cero. */}
+        {teachers === 0 ? (
+          <span className="flex items-center gap-1.5 rounded-xl bg-[#ffeef3] px-3.5 py-[7px]">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d1436a" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 9v4" />
+              <path d="M12 17h.01" />
+            </svg>
+            <span className="text-[12px] font-semibold text-[#d1436a]">Sin docente</span>
+          </span>
+        ) : (
+          <span className="rounded-xl bg-[#f2f7fd] px-3.5 py-[7px]">
+            <b className="text-[15px] font-bold text-[#17355f]">{teachers}</b>
+            <span className="ml-1 text-[11.5px] text-[#7f92b0]">
+              {teachers === 1 ? "docente" : "docentes"}
+            </span>
+          </span>
+        )}
       </span>
 
-      <span className="hidden min-w-[90px] flex-1 lg:block">
+      <span className="hidden min-w-[96px] flex-1 lg:block">
         <span className="mb-1.5 flex justify-between">
           <span className="text-[11.5px] text-[#93a5c2]">Progreso</span>
-          <span className="text-[11.5px] font-semibold text-[#60769c]">
+          <span className="text-[12px] font-bold" style={{ color: tint.fg }}>
             {students === 0 ? "—" : `${progress}%`}
           </span>
         </span>
-        <span className="block h-1.5 overflow-hidden rounded-full bg-[#eef2f8]">
+        <span className="block h-2 overflow-hidden rounded-full bg-[#eaf1f9]">
           <span
             className="block h-full rounded-full"
-            style={{ width: `${students === 0 ? 0 : progress}%`, background: tint.fg }}
+            style={{ width: `${students === 0 ? 0 : progress}%`, background: tint.bar }}
           />
         </span>
       </span>
 
-      {/* Un grupo sin docente es un problema real —nadie ve el progreso de
-          esos alumnos— así que se marca en vez de mostrar un cero mudo. */}
-      {teachers === 0 && (
-        <span className="whitespace-nowrap rounded-[7px] bg-[#fff1f4] px-2.5 py-1 text-[11.5px] font-semibold text-[#d1436a]">
-          Sin docente
-        </span>
-      )}
-
-      <span className="ml-auto grid h-[30px] w-[30px] shrink-0 place-items-center rounded-[9px] bg-[#f2f6fc] text-[#3159e8]">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <span className="ml-auto grid h-[34px] w-[34px] shrink-0 place-items-center rounded-xl bg-[#eef3ff] text-[#3159e8]">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <polyline points="9 18 15 12 9 6" />
         </svg>
       </span>
@@ -218,6 +230,8 @@ function NewGroupForm({
   const [saving, setSaving] = useState(false);
   const [nameError, setNameError] = useState("");
   const [formError, setFormError] = useState("");
+
+  const tint = tintForGrade(grade);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -243,28 +257,47 @@ function NewGroupForm({
   }
 
   return (
-    <Card className="mb-4 p-5">
+    <Card className="mb-3 p-5">
       <form onSubmit={submit} className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-[1fr_12rem]">
-          <Field label="Nombre del grupo" htmlFor="group-name" error={nameError || undefined}>
-            <Input
-              id="group-name"
-              value={name}
-              onChange={(e) => { setName(e.target.value); if (nameError) setNameError(""); }}
-              placeholder="4.º B"
-              invalid={Boolean(nameError)}
-              autoFocus
+        <div className="flex flex-wrap items-end gap-4">
+          {/* Vista previa de la isla: al elegir el grado se ve qué mundo
+              le toca al grupo, que es lo que después ven los chicos. */}
+          <span
+            className="grid h-[68px] w-[68px] shrink-0 place-items-center overflow-hidden rounded-[18px]"
+            style={{ background: tint.soft }}
+          >
+            <img
+              src={islandMapThumb(islandForGrade(grade))}
+              alt=""
+              aria-hidden="true"
+              className="h-[62px] w-[62px] object-contain"
             />
-          </Field>
-          <Field label="Grado" htmlFor="group-grade" hint="Define qué islas ve el grupo.">
-            <Select id="group-grade" value={grade} onChange={(e) => setGrade(e.target.value)}>
-              {GRADES.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          </span>
+
+          <div className="min-w-[12rem] flex-1">
+            <Field label="Nombre del grupo" htmlFor="group-name" error={nameError || undefined}>
+              <Input
+                id="group-name"
+                value={name}
+                onChange={(e) => { setName(e.target.value); if (nameError) setNameError(""); }}
+                placeholder="4.º B"
+                invalid={Boolean(nameError)}
+                autoFocus
+              />
+            </Field>
+          </div>
+
+          <div className="w-[12rem]">
+            <Field label="Grado" htmlFor="group-grade" hint="Define qué islas ve el grupo.">
+              <Select id="group-grade" value={grade} onChange={(e) => setGrade(e.target.value)}>
+                {GRADES.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
         </div>
 
         {formError && <ErrorBanner message={formError} />}

@@ -26,7 +26,7 @@ import {
   PageHeader,
   Select,
   Spinner,
-  TableSkeleton,
+  RowsSkeleton,
   gradeLabel,
 } from "./ui";
 
@@ -79,7 +79,7 @@ export function GroupDetailPage() {
         <ErrorBanner message={error} onRetry={() => void load()} />
       ) : !data ? (
         <Card className="overflow-hidden">
-          <TableSkeleton />
+          <RowsSkeleton />
         </Card>
       ) : (
         <div className="flex flex-col gap-6">
