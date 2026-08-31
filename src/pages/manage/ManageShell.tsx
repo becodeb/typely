@@ -278,13 +278,18 @@ export function ManageShell() {
 
           {/* La mascota toma lo que sobra y se achica sola: en una pantalla
               baja desaparece antes que empujar algo útil fuera de vista.
-              Espejada para que mire hacia el contenido. */}
-          <div className="flex min-h-0 flex-1 items-end justify-center overflow-hidden">
+              Espejada para que mire hacia el contenido.
+
+              El aire de abajo va como `pb-4` del contenedor, no como margen
+              de la imagen: `max-h-full` se mide contra la caja de contenido,
+              así que el padding entra en la cuenta y la mascota se despega
+              del borde sin que se le recorte la cabeza. */}
+          <div className="flex min-h-0 flex-1 items-end justify-center overflow-hidden pb-4">
             <img
               src={assets.mascotMaleLaptop}
               alt=""
               aria-hidden="true"
-              className="mb-[-10px] max-h-full w-auto max-w-[150px] object-contain"
+              className="max-h-full w-auto max-w-[150px] object-contain"
               style={{ transform: "scaleX(-1)" }}
             />
           </div>
