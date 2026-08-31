@@ -189,10 +189,14 @@ targets three device classes:
 - **Small laptops / Chromebooks (1280–1366 wide but SHORT, ~768/800 tall):** the
   real constraint is *height* — handled by the existing `@media (max-height: …)`
   blocks (720/620/560). Width layout = desktop.
-- **Phones (≤768px):** handled by a single consolidated **"RESPONSIVE PASS"
-  section appended at the END of `global.css`** (width-only `≤768 / ≤600 / ≤430`
-  queries, placed last so they win the cascade without editing the scattered
-  earlier overrides). Desktop/Chromebook are untouched by it.
+- **Phones (≤768px):** **explore-only** — the whole game is browsable, no level
+  is playable. The full decision, and what it means screen by screen, is §6.2.
+  This file used to claim a consolidated "RESPONSIVE PASS" section existed at
+  the end of `global.css`. **It does not** — the only `max-width` in that file
+  is inside a comment, so there is no phone CSS at all today. When it gets
+  written it goes at the END of `global.css`, width-only, so it wins the
+  cascade without disturbing the scattered `max-height` overrides that the
+  Chromebooks depend on.
 
 ### 6.1 Island stage — the level-map coordinate system
 
@@ -317,60 +321,105 @@ It draws each node over the real art at its true relative size (the same
 and after editing `levelPositions.ts`; the `--zoom` view carries a fine
 percentage grid so you can read a platform's centre straight off the image.
 
-### 6.2 Planned: scrollable island map for phones (NOT implemented)
+### 6.2 Phones — explore-only (DECIDED, not implemented)
 
-`contain` guarantees the whole island is visible, which is right on Chromebooks
-but cramped on a phone: at 375×812 the stage is only 375×211, and the 44 px
-minimum touch target inflates each node to 11.7 % of the stage (vs the correct
-5.34 %), leaving buttons overlapping. Phones are not a target yet, so this is
-deliberately left undone.
+**The decision.** On a phone the whole game is browsable and **no level is
+playable**. A kid can log in, walk the world map, open any island, tap a level
+and read its card — and progress nothing. Everything earned on a computer shows
+up here read-only.
 
-When phones do become a target, do NOT try to make the whole island fit. Let it
-take the full height and **pan horizontally** — the same thing Candy Crush and
-Duolingo do with their maps. At 375×812 that yields a 1443×812 stage and 77 px
-nodes: correct proportions, comfortable touch targets, no clamping. Note this is
-the exact stage size the old `cover` code already produced — what was missing
-was a way to *reach* the parts beyond the screen edge.
+The reason is not laziness about layout: TYPELY teaches touch-typing on a
+**physical keyboard**, and a phone has none. Making levels "work" on a phone
+would mean turning the on-screen keyboard into the input, and that contradicts
+the rule in §6.5 that it is a *map for finding the real key*, not a thing to
+tap. A kid who passes levels by tapping the screen is not learning what this
+game teaches.
 
-Coordinates do not change. The stage stays the same reference system; only the
-window onto it moves. The sketch:
+#### The breakpoint
+
+**Width ≤768px. Never touch detection** — the classroom Chromebooks are touch
+and must stay fully playable; a pointer/hover query would lock out the primary
+device.
+
+A phone in landscape is ~812 wide and would slip through a width-only rule with
+375px of height, so it needs its own condition, narrow enough that a short
+desktop window is not caught by it:
 
 ```css
-@media (max-width: 768px) {
-  .island-stage-wrap { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; }
-  .island-stage {
-    position: relative; inset: auto; margin: 0;
-    height: 100%;
-    width: auto;          /* aspect-ratio derives the width */
-  }
-}
+@media (max-width: 768px),
+       (max-height: 480px) and (max-width: 950px) { … }
 ```
 
-Three things still have to be built on top of that sketch:
+Tablets (768–1024) count as computers and play normally.
 
-1. **Auto-centre on entry.** Without it the student opens the map on a random
-   slice. `scrollIntoView({ inline: "center", block: "nearest" })` on the
-   "Actual" node when the world mounts.
-2. **A scroll affordance.** A primary-school kid will not guess there is more map
-   to the right. An edge gradient, or a one-time nudge animation.
-3. **Pick the scale.** Full height is 3.85 screens of panning. The minimum that
-   keeps a node at 44 px without the clamp kicking in is an 824 px stage, i.e.
-   2.2 screens. Choose somewhere in that range.
+#### Inside an island — zoom and pan
+
+Do NOT try to fit the whole island on screen. `contain` on a 375×812 phone
+leaves the stage at 375×211 — a strip — and since each node has a 44px touch
+floor it swells to 11.7 % of the stage instead of the correct 5.34 %, so the
+nodes overlap.
+
+Instead the island gets **zoom + drag**, the same gesture as the visual editor:
+pinch or double-tap to zoom, one finger to pan around it. **Level coordinates
+do not change.** `levelPositions.ts` stays the same reference system — only the
+window onto it moves, so every placement done with the dev tool keeps working.
+
+**The opening animation is the tutorial, and its timing is the point.** The
+island opens **unzoomed, whole**, so the kid sees where they are. Then — *only
+once the island art has actually loaded*, never before — it plays a **slow zoom
+toward the ship**, which sits on the current level. Two things fall out of that
+one move: the kid arrives already looking at what they have to play next, and
+they have just *seen* the map zoom, so they know it is something they can do
+themselves. Firing it before the art loads wastes it: there is nothing to watch
+zoom in.
+
+Reuse what §6.1 already documents about the editor's lens, because the traps
+are the same: the transform goes on **its own layer**, not on `.island-stage`
+— that element's entrance animation also animates `transform` and the two
+fight — and the HUD is rendered through a portal so the zoom does not magnify
+it. `getBoundingClientRect()` already returns the transformed rect, so the
+percentage maths keeps working untouched.
 
 One known wrinkle: the popover's collision logic (`useLayoutEffect` in
 `IslandDetailPage`, keyed on `viewportTick`) clamps against the **viewport**.
-Inside a scrolling container that maths has to account for scroll offset.
+With a zoomed, pannable stage that maths has to account for the pan offset.
 
-The `.island-backdrop` sits outside the scrolling wrapper, so it stays put while
-the map pans — a free parallax effect.
+`.island-backdrop` sits outside the moving layer, so it stays put while the map
+moves — a free parallax.
 
-Key responsive rules in that section:
-- Global `overflow-x: hidden` safety ≤768px.
-- **Gameplay:** the keyboard's per-key `min-width` is reduced so all rows fit a
-  phone (keys shrink, stay centred); target card / status / stage go full-width;
-  decorative robots hidden; compact exit button.
-- **Island detail:** back/profile become icon-only, compact HUD, no collision.
-- **Logros:** the 4-column reward grid collapses to 2×2.
+#### The world map — fewer islands, bigger
+
+`/mundos` already scrolls horizontally and that stays. What changes is how much
+it shows at once: **one island, at most two**, instead of compressing the whole
+desktop layout into a narrow screen, which is what it does today and looks bad.
+
+- Horizontal is free: on a screen that already scrolls sideways, content
+  hidden past the edge costs nothing.
+- **Vertical must keep showing the same** as on a computer — nothing gets cut
+  off the top or bottom.
+- Islands can be drawn **bigger** so they fill the screen properly.
+- The mascots shrink to fit instead of crowding the map.
+
+#### Levels — closed, and closed at the URL too
+
+Tapping a node **opens its card as usual** — name, subtitle, stars earned — but
+**without the play button**, replaced by a line saying the level is played on a
+computer. The kid keeps exploring instead of hitting a dead end, and still sees
+what they earned.
+
+Blocking the button is not enough: `/gameplay/<id>` has to be **guarded on the
+route**, or a shared link, a bookmark or a rotation drops a phone straight into
+an unplayable screen. Today that screen is genuinely broken — the keyboard
+overflows past the right edge with no way to reach the missing keys, the
+mission sits under the corner buttons, and the mascot speech bubbles cover the
+home row.
+
+#### Scope
+
+**Every student screen except the level itself**: login, the world map, the
+island, achievements/rewards, missions and the account. All of them browsable
+on a phone. Only `GameplayPage`, `ShortcutLevelView` and `SkillLevelView` are
+closed.
 
 ### 6.3 Island art — one folder per island
 
