@@ -1,220 +1,201 @@
-# TYPELY (formerly EduTic)
+# TYPELY
 
-TYPELY is a gamified Primary School digital-literacy and keyboard-skills
-platform. Frontend: **Vite + React 19 + TypeScript + Tailwind 4**. It is backed
-by a **Fastify + Drizzle + Postgres 16 API** and ships as three Docker
-containers (Nginx frontend, API, Postgres) behind a reverse proxy. The typing engine keeps
-reading/writing `localStorage` so play never blocks on the network, and falls
-back to localStorage-only when the API is offline (demo mode).
+App de mecanografía y alfabetización digital para chicos de primaria. En
+español rioplatense, pensada para Chromebooks táctiles de aula.
 
-> **Authoritative doc:** `CLAUDE.md` — architecture, design and responsive
-> systems, asset layout, curriculum, deployment, branching and the working rules
-> for agents. It is the single source of truth; `AGENTS.md` and
-> `.cursor/rules/project.mdc` are stubs that point at it. Two companion docs
-> carry their own content: `dbnew.md` (backend log) and `DEPLOY.md` (ops).
+El alumno recorre quince islas flotantes: aprende a ubicar las teclas,
+escribir letras, palabras y frases, usar Shift, Backspace, tildes y la ñ, y
+más adelante atajos de teclado y habilidades digitales. Gana estrellas,
+desbloquea personajes y avanza por un mapa.
 
-## Branching workflow
+Alrededor del juego hay un sistema de gestión: una escuela carga sus cursos,
+sus alumnos y sus docentes, y sigue cómo va cada uno.
 
-Two long-lived branches. **`dev`** is where the work happens. **`production`**
-is what is deployed, and only receives changes that already build, run and are
-ready to go live — through a pull request from `dev`. Never commit to
-`production` directly. See `CLAUDE.md` §17 for the full rules. Deploys are
-**manual**, through Coolify — merging into `production` publishes nothing by
-itself.
+**En producción:** https://typely.becode.com.ar
 
-```bash
-git checkout dev && git pull
-# …work, commit, push to dev…
-# when it is genuinely ready to ship:
-gh pr create --base production --head dev && gh pr merge --merge
-```
+---
 
-## Roles & dashboards
+## Qué necesitás para empezar
 
-After login each role lands on its own experience (see `routeForRole`):
+Pedile estos accesos a **Ezequiel Fernández Cruz** (`ezequiel@fernandezcruz.com.ar`),
+que es quien mantiene el proyecto y hace los despliegues:
 
-| Role | Lands on | Experience |
+| Acceso | Para qué |
+| --- | --- |
+| Repo `becodeb/typely` en GitHub | El código. Trabajás en `dev`. |
+| Panel de Coolify (`coolify.becode.com.ar`) | Ver logs, variables de entorno y desplegar. |
+| Una cuenta de superadmin en la app | Entrar al panel de gestión y probar el circuito real. |
+
+**Los secretos no están en el repo y no tienen que estarlo.** `DATABASE_URL`
+y `JWT_SECRET` viven como variables de entorno en Coolify (Typely →
+*Environment Variables*). Si necesitás correr la API contra una base propia,
+armá las tuyas: nunca copies las de producción a tu máquina.
+
+Para el juego solo —que es la mayor parte del código— **no necesitás ningún
+acceso**: cloná, `npm install`, `npm run dev` y entrá en modo demo.
+
+---
+
+## Cómo está armado
+
+Tres piezas, desplegadas por Coolify en `typely.becode.com.ar`:
+
+| Pieza | Stack | Dónde |
 | --- | --- | --- |
-| `superadmin` | `/admin-general` | **Global control center** — create/edit sedes, create sede admins, ecosystem counters. |
-| `admin-sede` | `/admin-sede` | **Sede dashboard** — courses, teachers, students, invitations, progress (scoped to one sede). |
-| `profesor` | `/profesor` | Teacher panel — assigned class, students, island enablement. |
-| `alumno` | `/mundos` | The gamified world map (islands/levels). |
+| Frontend | Vite 7 + React 19 + TypeScript + Tailwind 4, servido por Nginx | `src/`, `Dockerfile` |
+| API | Fastify + Drizzle ORM (TypeScript, ESM) | `api/`, `Dockerfile.api` |
+| Base | Postgres 16, recurso administrado por Coolify | `api/migrations/*.sql` |
 
-The student game map is **exclusive to students**: the `/mundos` route group is
-marked `exclusive`, so an admin/teacher who tries to open it is redirected to
-their own dashboard.
+Un solo dominio: Nginx sirve el frontend y **reenvía `/api/*`** al contenedor
+de la API por la red interna (`nginx.conf`).
 
-**Superadmin login (always works):** username `admin`, password `admin`. A
-defensive fallback in `authenticateAny` restores the seeded `SUPERADMIN_USER`
-even if persisted localStorage is stale/corrupt.
+**El camino caliente es local.** El motor de tipeo lee y escribe
+`localStorage` para no esperar nunca a la red. Los niveles terminados van al
+servidor por una **cola con reintento**, y al entrar el progreso se hidrata
+desde la API — así sobrevive a cambiar de computadora.
 
-### Email invitations (teachers)
+**Las migraciones corren al arrancar la API**, bajo un lock. Si una falla, la
+API no levanta: servir contra un esquema a medias hace más daño que no
+servir.
 
-A sede admin can invite a teacher by email (Invitaciones tab). This creates an
-`Invitation` record with a token + `pending` status and a shareable link. The
-frontend calls an **internal backend endpoint** (`/api/invitations/send`,
-configurable via `VITE_INVITE_API_URL`) — it never talks to the email provider
-directly and holds no API key. If the backend isn't deployed, the invitation
-stays `pending` and the UI offers a copyable invite link.
+### Roles
 
-To enable real delivery, run the optional server scaffold (`server/index.mjs`):
+| Rol | Alcance |
+| --- | --- |
+| `superadmin` | La plataforma. Crea escuelas y administradores. No pertenece a ninguna escuela. |
+| `admin` | Una escuela: sus grupos, sus alumnos y sus docentes. |
+| `docente` | Los grupos que tiene a cargo. |
+| `alumno` | Él mismo. Es quien juega. |
 
-```bash
-npm i express resend
-RESEND_API_KEY=re_xxx INVITE_FROM="Typely <no-reply@typely.bauhub.online>" node server/index.mjs
-```
+**Se entra con usuario y contraseña, y nada más.** No hay login social: en
+una escuela las cuentas las reparte un administrador. El `username` es la
+identidad principal y **el email es opcional** — un chico de primaria no
+tiene, y no lo necesita: el admin le entrega usuario y contraseña impresos.
 
-> **Security:** `RESEND_API_KEY` lives ONLY in the server environment. Never put
-> it in a `VITE_` variable — those are inlined into the public browser bundle.
+Un `admin` nunca puede crear otro `admin`. Es una regla del control de
+acceso (`api/src/rbac.ts`) que la API verifica en cada alta.
 
-## Install
+---
+
+## Levantarlo en tu máquina
+
+Node 22 (es la versión de las imágenes de producción).
+
+### Solo el juego
 
 ```bash
 npm install
-```
-
-## Local setup — environment variables
-
-The app reads its config from a local `.env` file (loaded by Vite). The file
-is gitignored — never commit it.
-
-1. Copy the example:
-   ```bash
-   cp .env.example .env
-   ```
-2. Fill in your Google Identity Services Client ID:
-   ```env
-   VITE_GOOGLE_CLIENT_ID=404366112555-2rsl9af3vqdr5pv62m09r434vl7qdmor.apps.googleusercontent.com
-   # Optional — comma-separated institutional domains. Empty = allow any.
-   VITE_GOOGLE_ALLOWED_DOMAINS=
-   ```
-3. Start the dev server:
-   ```bash
-   npm run dev
-   ```
-
-If `VITE_GOOGLE_CLIENT_ID` is missing, the "Login with Google" button shows
-*"Google Login no está configurado."* and does nothing.
-
-> **Security:** never put `GOOGLE_CLIENT_SECRET` (or any private key) in this
-> repo or in a `VITE_…` variable — Vite inlines those into the public browser
-> bundle. Backend secrets (`JWT_SECRET`, `RESEND_API_KEY`, OAuth client secret)
-> live only in the API's server-side environment / `secrets/` — never in the
-> frontend. Google sign-in is verified server-side against Google's JWKS.
-
-## Google Cloud setup
-
-In **Google Cloud Console → APIs & Services → Credentials → OAuth 2.0
-Client IDs**, edit the Web application client and add:
-
-**Authorized JavaScript origins:**
-- `http://localhost:5173`
-- `https://typely.bauhub.online`
-
-**Authorized redirect URIs** (only needed if you ever add a server-side
-code-exchange callback — not used by the current frontend-only flow):
-- `http://localhost:5173/auth/google/callback`
-- `https://typely.bauhub.online/auth/google/callback`
-
-After login, the email returned by Google is matched against the local user
-store. Unknown emails are rejected with *"Tu cuenta todavía no está
-habilitada en Typely."* — unknown Google accounts never receive admin
-privileges automatically.
-
-> If you change the seed data (e.g. add an email to a user), wipe demo
-> storage so the change is picked up — see **Reset Demo Data** below.
-
-## Production / Docker
-
-Vite inlines `VITE_…` variables at **build** time, so the production Docker
-build must receive them as build args. `Dockerfile` and `docker-compose.yml`
-already declare the args. Either export them in your shell and run compose:
-
-```bash
-export VITE_GOOGLE_CLIENT_ID=404366112555-2rsl9af3vqdr5pv62m09r434vl7qdmor.apps.googleusercontent.com
-export VITE_GOOGLE_ALLOWED_DOMAINS=northfield.edu.ar,reditinere.com
-docker compose up -d --build
-```
-
-…or pass them inline:
-
-```bash
-VITE_GOOGLE_CLIENT_ID=… docker compose up -d --build
-```
-
-…or place a `.env` file next to `docker-compose.yml` on the host (compose
-reads it automatically). The file is gitignored.
-
-## Run
-
-```bash
 npm run dev
 ```
 
-## Demo Credentials
+Abrí http://localhost:5173 y entrá con **"Entrar en modo demo"**. El modo
+demo es una partida local, sin cuenta ni servidor: alcanza para trabajar en
+las islas, los niveles, el arte y el motor de tipeo, que es casi todo.
 
-| Role | Username | Password | Route |
-| --- | --- | --- | --- |
-| Admin general | `admin` | `admin123` | `/admin-general` |
-| Admin de sede | `sede` | `sede123` | `/admin-sede` |
-| Profesor | `profe` | `profe123` | `/profesor` |
-| Alumno | `sofia` | `alumno123` | `/mundos` |
+El login real y el panel de gestión **no van a funcionar** sin la API.
 
-The login page also has an "Entrar en modo demo" button for the selected role.
+### Con la API
 
-## Routes
+La API necesita un Postgres. Levantá uno como quieras (Docker es lo más
+simple) y pasale la URL:
 
-- `/` and `/login`: login
-- `/mundos`: student world selection
-- `/worlds/island1` through `/worlds/island4`: island detail pages
-- `/gameplay/encuentro-letras`: playable assisted letter activity
-- `/gameplay/letra-rapida`: playable speed letter activity
-- `/gameplay/tecla-correcta`: playable key accuracy activity
-- `/gameplay/encuentro-palabras`: playable word typing activity
-- `/gameplay/espacio-magico`: playable spacebar activity
-- `/gameplay/borro-y-corrijo`: playable correction activity
-- `/logros`: student rewards
-- `/mi-cuenta`: student account
-- `/admin-general`: general administration
-- `/admin-sede`: site administration
-- `/profesor`: teacher panel
-
-## Assets
-
-Original image files are stored in:
-
-```text
-Images/
+```bash
+cd api
+npm ci
+DATABASE_URL=postgres://usuario:clave@localhost:5432/typely \
+JWT_SECRET=$(openssl rand -base64 48) \
+npm run dev
 ```
 
-Required app copies are stored in:
+Al arrancar aplica las migraciones sola. Después creá el primer superadmin
+—la base arranca vacía y no existe ninguna cuenta por defecto—:
 
-```text
-public/assets/edutic-art/
+```bash
+SUPERADMIN_USERNAME=tu.usuario \
+SUPERADMIN_NAME="Tu Nombre" \
+npm run bootstrap:dev
 ```
 
-Transparent world-selection island copies are stored in:
+Te imprime una contraseña temporal **una sola vez** y te la pide cambiar al
+entrar.
 
-```text
-public/assets/processed/
+### Antes de dar algo por terminado
+
+```bash
+npm run build                      # tsc --noEmit && vite build
+cd api && npx tsc -p tsconfig.json --noEmit
 ```
 
-Do not modify, overwrite, crop, compress, recolor, or rename the original files inside `Images/`. Any processed versions must be copies in a separate folder such as `public/assets/processed/`.
+---
 
-## Reset Demo Data
+## Cómo se trabaja
 
-Open the browser console and run:
+Dos ramas largas:
 
-```js
-localStorage.removeItem("edutic_active_user");
-localStorage.removeItem("edutic_demo_data");
-localStorage.removeItem("edutic_sites");
-localStorage.removeItem("edutic_classes");
-localStorage.removeItem("edutic_users");
-localStorage.removeItem("edutic_access_codes");
-localStorage.removeItem("edutic_activities");
-localStorage.removeItem("edutic_assignments");
-localStorage.removeItem("edutic_attempts");
-localStorage.removeItem("edutic_rewards");
-location.reload();
+- **`dev`** — acá se trabaja. Puede estar rota un rato; para eso está.
+- **`production`** — lo que está desplegado. Solo recibe cambios terminados.
+
+`dev` llega a `production` por pull request, y solo cuando el cambio
+funciona de verdad. Nunca commitees directo a `production`.
+
+**Nada se despliega solo.** No hay CI de deploy: mergear a `production` no
+publica nada, solo registra qué está listo. El deploy se dispara a mano
+desde Coolify.
+
+Después de cada despliegue, la prueba que cubre más de una vez:
+
+```bash
+curl -s https://typely.becode.com.ar/api/health
 ```
+
+Si da 502, la API no levantó — mirá sus logs, porque una migración fallida
+corta el arranque a propósito.
+
+---
+
+## Qué hay y qué falta
+
+**Andando:**
+
+- El juego completo: 15 islas, 103 niveles, progreso sincronizado
+- Login para los cuatro roles
+- Gestión del superadmin y del admin: escuelas, grupos, alumnos, docentes,
+  alta masiva por planilla CSV y credenciales para imprimir
+
+**Todavía no:**
+
+- El panel del docente
+- Los tableros de seguimiento. La API ya calcula estrellas, precisión,
+  racha, progreso por isla y logros (`api/src/stats.ts`); falta la pantalla.
+
+---
+
+## Dónde está cada cosa
+
+`CLAUDE.md` es la fuente de verdad del proyecto: arquitectura, sistema de
+diseño, currículum, reglas de trabajo y despliegue. Si algún otro documento
+lo contradice, gana `CLAUDE.md` — y hay que corregir el otro.
+
+| Archivo | Para qué |
+| --- | --- |
+| `CLAUDE.md` | El reglamento. Empezá por acá. |
+| `DEPLOY.md` | Manual de operaciones del despliegue. |
+| `dbnew.md` | Bitácora del backend (historia, no reglas). |
+| `Images/islands/ISLAS.md` | Cómo separar una escena en cielo + isla. |
+| `Images/islands/BOTONES.md` | Cómo dibujar e importar el botón de nivel de una isla. |
+| `Images/islands/FONDOS.md` | Cómo se hace el fondo de la pantalla de juego. |
+
+### El código
+
+- `src/pages/` — el juego: login, mapa de mundos, isla, gameplay, atajos,
+  habilidades, logros. Y `src/pages/manage/`, las pantallas de gestión.
+- `src/data/` — el currículum: `activities.ts` (los 103 niveles),
+  `worlds.ts`, `levelPositions.ts` (dónde va cada nodo en el mapa).
+- `src/utils/progress.ts` — progreso local y su sincronización.
+- `api/src/routes/` — auth, usuarios, grupos, progreso, importación,
+  tableros.
+- `api/migrations/` — el esquema. Es la fuente de verdad de la base.
+- `public/assets/islands/islandN/` — todo el arte de una isla junto.
+
+Los originales de arte viven en `Images/` e `Images-new/` y **no se
+modifican**: las copias web se generan con los scripts de `scripts/`.
