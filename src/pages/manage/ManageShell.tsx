@@ -525,7 +525,9 @@ function NewAccountForm({
         fullName: clean,
         role,
         sedeId: targetSede,
-        groupId: role === "alumno" && groupId ? groupId : null,
+        /* La API sabe dónde guardarlo: columna `group_id` si es alumno,
+           fila en `group_teachers` si es docente. */
+        groupId: (role === "alumno" || role === "docente") && groupId ? groupId : null,
         email: role !== "alumno" && email.trim() ? email.trim().toLowerCase() : null,
       });
 
@@ -575,7 +577,7 @@ function NewAccountForm({
           <button
             key={r}
             type="button"
-            onClick={() => { setRole(r); setError(""); }}
+            onClick={() => { setRole(r); setGroupId(""); setError(""); }}
             aria-pressed={role === r}
             className={`flex-1 rounded-[9px] py-[6px] text-[12px] font-semibold capitalize transition-colors ${
               role === r ? "bg-white text-[#262456]" : "text-[#a6a7d8] hover:text-white"
@@ -594,14 +596,20 @@ function NewAccountForm({
         className={fieldClass}
       />
 
-      {role === "alumno" && (
+      {/* El curso se ofrece también al crear un docente, por si ya
+          existe: el alumno CURSA ahí y el docente queda A CARGO, así que
+          cambia la etiqueta. Para el docente es opcional — se puede sumar
+          después desde el grupo. */}
+      {(role === "alumno" || role === "docente") && (
         <select
           value={groupId}
           onChange={(e) => setGroupId(e.target.value)}
-          aria-label="Grupo"
+          aria-label={role === "alumno" ? "Grupo" : "Curso a cargo"}
           className={`${fieldClass} cursor-pointer`}
         >
-          <option value="" className="text-[#17355f]">Sin grupo</option>
+          <option value="" className="text-[#17355f]">
+            {role === "alumno" ? "Sin grupo" : "Sin curso a cargo"}
+          </option>
           {(groups ?? []).map((g) => (
             <option key={g.id} value={g.id} className="text-[#17355f]">
               {g.name}
