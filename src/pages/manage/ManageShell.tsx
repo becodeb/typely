@@ -291,7 +291,7 @@ export function ManageShell() {
               de la imagen: `max-h-full` se mide contra la caja de contenido,
               así que el padding entra en la cuenta y la mascota se despega
               del borde sin que se le recorte la cabeza. */}
-          <div className="flex min-h-0 flex-1 items-end justify-center overflow-hidden pb-4">
+          <div className="flex min-h-0 flex-1 items-end justify-center overflow-hidden pb-10">
             <img
               src={assets.mascotMaleLaptop}
               alt=""
