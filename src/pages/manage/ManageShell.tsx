@@ -309,10 +309,20 @@ export function ManageShell() {
                 explica por qué ves lo que ves, y acá cae junto a la persona
                 a la que le corresponde. Cada rol tiene su color, así se
                 reconoce de un vistazo al cambiar de cuenta. */}
-            <div className="mb-2 leading-tight">
-              <div className="truncate text-[12.5px] font-semibold text-white">{user?.name}</div>
+            {/* Nombre e insignia en el mismo renglón, centrados: leídos
+                juntos dicen una sola cosa —quién sos y con qué alcance— y
+                en renglones separados parecían dos datos sueltos.
+                `min-w-0` en el nombre para que recorte él y no empuje a la
+                insignia fuera de la columna. */}
+            <div className="mb-2 flex items-center justify-center gap-1.5">
+              <span className="min-w-0 truncate text-[12.5px] font-semibold text-white">
+                {user?.name}
+              </span>
               <span
-                className="mt-1 inline-block rounded-full px-2 py-[2px] text-[9.5px] font-bold uppercase tracking-[0.07em]"
+                /* Ajustada al mínimo: con el padding y el tracking
+                   anteriores, "Superadmin de Prueba" se recortaba por 2 px.
+                   Estos seis de más lo dejan entrar entero. */
+                className="shrink-0 rounded-full px-1.5 py-[2px] text-[9.5px] font-bold uppercase tracking-[0.04em]"
                 style={{ background: RAIL_ROLE[actorRole].bg, color: RAIL_ROLE[actorRole].fg }}
               >
                 {roleLabel(actorRole)}
