@@ -130,7 +130,7 @@ export function SkinProgressBar({ className = "" }: { className?: string }) {
        del menú/HUD superior (z-50) y del banner de impersonación (z-[60]). */
     <div
       className={[
-        "fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 w-full max-w-[34rem] px-3",
+        "fixed bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-40 max-w-[92vw] px-2",
         "pointer-events-none select-none",
         className,
       ]
@@ -142,7 +142,7 @@ export function SkinProgressBar({ className = "" }: { className?: string }) {
       <div className="relative animate-skin-bar-rise">
         {/* Aura pulsante detrás del panel (look soñado, paleta de marca). */}
         <div
-          className="absolute -inset-3 rounded-[2.6rem] blur-2xl opacity-70 animate-loader-halo"
+          className="absolute -inset-1.5 rounded-[2rem] blur-xl opacity-55 animate-loader-halo"
           style={{
             background:
               "radial-gradient(ellipse at 50% 50%, rgba(255,220,130,0.45), rgba(155,124,255,0.22) 45%, rgba(37,200,223,0.16) 65%, transparent 78%)",
@@ -173,8 +173,8 @@ export function SkinProgressBar({ className = "" }: { className?: string }) {
             para que el color del panel NO cambie según el arte que tiene detrás
             y coincida exactamente con el header de arriba en cualquier isla. */}
         <div
-          className="glass-card skin-bar-panel relative flex items-center gap-3 sm:gap-4 rounded-[1.75rem] px-3.5 py-3 sm:px-5 sm:py-4 border border-white/60 overflow-hidden"
-          style={{ background: "rgba(255,255,255,0.88)" }}
+          className="glass-card skin-bar-panel relative flex items-center gap-2.5 sm:gap-3 rounded-full pl-1.5 pr-3.5 py-1.5 sm:pr-4 border border-white/60 overflow-hidden"
+          style={{ background: "rgba(255,255,255,0.82)" }}
         >
           {/* Brillo superior que recorre el panel en loop (estilo marca). */}
           <span
@@ -187,7 +187,7 @@ export function SkinProgressBar({ className = "" }: { className?: string }) {
           />
 
           {/* ── Orbe del personaje ACTUAL ── */}
-          <span className="relative grid place-items-center shrink-0 w-14 h-14 sm:w-[4.5rem] sm:h-[4.5rem]">
+          <span className="relative grid place-items-center shrink-0 w-10 h-10 sm:w-11 sm:h-11">
             <span className="skin-orb-ring absolute inset-0 rounded-full animate-sparkle-spin blur-[1.5px]" aria-hidden="true" />
             <span
               className="absolute inset-[6%] rounded-full animate-loader-halo"
@@ -205,15 +205,15 @@ export function SkinProgressBar({ className = "" }: { className?: string }) {
           </span>
 
           {/* ── Centro: etiqueta + conteo + barra + evolución ── */}
-          <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+          <div className="min-w-0 w-[9.5rem] sm:w-[12rem] flex flex-col gap-1">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="font-display font-bold uppercase tracking-[0.16em] text-[0.62rem] sm:text-[0.7rem] text-accent-strong/80 truncate">
-                {prog.isMax ? "¡Evolución completa!" : "Próximo personaje"}
+              <span className="font-display font-bold uppercase tracking-[0.12em] text-[0.56rem] sm:text-[0.62rem] text-accent-strong/80 truncate">
+                {prog.isMax ? "¡Completa!" : "Próximo personaje"}
               </span>
-              <span className="flex items-center gap-1 font-display font-black text-text tabular-nums leading-none text-base sm:text-xl whitespace-nowrap">
+              <span className="flex items-center gap-0.5 font-display font-black text-text tabular-nums leading-none text-xs sm:text-sm whitespace-nowrap">
                 {prog.isMax ? prog.totalStars : `${prog.totalStars}/${prog.nextThreshold}`}
                 <Star
-                  className="w-3.5 h-3.5 sm:w-[1.05rem] sm:h-[1.05rem] text-amber-400 drop-shadow-[0_1px_3px_rgba(250,204,21,0.7)]"
+                  className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400 drop-shadow-[0_1px_3px_rgba(250,204,21,0.7)]"
                   strokeWidth={1.5}
                   fill="currentColor"
                 />
@@ -225,7 +225,7 @@ export function SkinProgressBar({ className = "" }: { className?: string }) {
                 (.skin-bar-tip) viaja con el % como hermano del riel (fuera del
                 overflow-hidden) para que su glow no se recorte. */}
             <div className="relative">
-              <span className="block h-3.5 sm:h-4 rounded-full bg-white/45 border border-white/60 overflow-hidden shadow-inner">
+              <span className="block h-2 sm:h-2.5 rounded-full bg-white/45 border border-white/60 overflow-hidden shadow-inner">
                 <span
                   className={`skin-bar-fill block h-full rounded-full ${gaining ? "animate-skin-bar-gain" : ""}`}
                   style={{ width: `${pct}%`, ...(instant ? { transition: "none" } : null) }}
@@ -240,28 +240,27 @@ export function SkinProgressBar({ className = "" }: { className?: string }) {
               )}
             </div>
 
-            {/* Puntos de evolución (fase X de 5) + leyenda. */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1" aria-hidden="true">
-                {Array.from({ length: TOTAL_PHASES }, (_, i) => (
-                  <span
-                    key={i}
-                    className={
-                      i <= prog.phaseIndex
-                        ? "w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-gradient-to-br from-amber-300 to-amber-500 shadow-[0_0_6px_rgba(250,204,21,0.8)]"
-                        : "w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-white/50 border border-white/70"
-                    }
-                  />
-                ))}
-              </div>
-              <span className="text-[10px] sm:text-xs font-semibold text-muted whitespace-nowrap">
-                {prog.isMax ? "¡Personajes al máximo!" : `Evolución ${prog.phaseIndex + 1} de ${TOTAL_PHASES}`}
-              </span>
+            {/* Los puntos de evolución. Antes iban en un TERCER renglón, con la
+                leyenda "Evolución 1 de 5" al lado, y ese renglón era el que más
+                alto le agregaba al panel para decir algo que los puntos ya
+                dicen solos. Ahora van pegados al riel, chiquitos, y la leyenda
+                vive en el aria-label para quien use lector de pantalla. */}
+            <div className="flex items-center gap-[3px]" aria-hidden="true">
+              {Array.from({ length: TOTAL_PHASES }, (_, i) => (
+                <span
+                  key={i}
+                  className={
+                    i <= prog.phaseIndex
+                      ? "w-1.5 h-1.5 rounded-full bg-gradient-to-br from-amber-300 to-amber-500 shadow-[0_0_5px_rgba(250,204,21,0.8)]"
+                      : "w-1.5 h-1.5 rounded-full bg-white/60 border border-white/70"
+                  }
+                />
+              ))}
             </div>
           </div>
 
           {/* ── Orbe MISTERIOSO (próxima fase) / personaje final en fase máxima ── */}
-          <span className="relative grid place-items-center shrink-0 w-14 h-14 sm:w-[4.5rem] sm:h-[4.5rem]">
+          <span className="relative grid place-items-center shrink-0 w-10 h-10 sm:w-11 sm:h-11">
             <span className="skin-orb-ring absolute inset-0 rounded-full animate-sparkle-spin blur-[1.5px]" aria-hidden="true" />
             <span
               className="absolute inset-[6%] rounded-full animate-loader-halo"

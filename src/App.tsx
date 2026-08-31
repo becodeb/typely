@@ -6,6 +6,7 @@ import { ChangePasswordPage } from "./pages/ChangePasswordPage";
 import { LoginLayoutEditorPage } from "./pages/LoginLayoutEditorPage";
 import { GlassEditorPage } from "./pages/GlassEditorPage";
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
+import { SoloEnComputadora } from "./components/common/SoloEnComputadora";
 import { DevLayoutEditorMount } from "./components/dev/layoutEditor";
 import { WorldsPage } from "./pages/WorldsPage";
 import { IslandDetailPage } from "./pages/IslandDetailPage";
@@ -143,12 +144,20 @@ export function App() {
         <Route element={<ProtectedRoute roles={["alumno"]} />}>
           <Route path="/mundos" element={<WorldsPage />} />
           <Route path="/worlds/:islandId" element={<IslandDetailPage />} />
+          {/* En el celular no se juega ningún nivel (CLAUDE.md §6.2). La
+              guarda va en la RUTA porque /gameplay/<id> es una URL: esconder
+              el botón en la isla no evita que se llegue por un link, un
+              favorito o girando el teléfono. Los tres motores —escritura,
+              atajos y habilidades— entran por acá, así que una sola puerta los
+              cubre a los tres. */}
           <Route
             path="/gameplay/:activityId"
             element={
-              <Suspense fallback={<PageFallback />}>
-                <GameplayPage />
-              </Suspense>
+              <SoloEnComputadora>
+                <Suspense fallback={<PageFallback />}>
+                  <GameplayPage />
+                </Suspense>
+              </SoloEnComputadora>
             }
           />
           <Route path="/logros" element={<RewardsPage />} />
