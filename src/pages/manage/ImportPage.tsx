@@ -19,7 +19,7 @@ import type { ImportPreview, ImportResult } from "../../utils/api";
 import { api, ApiError } from "../../utils/api";
 import { useSede } from "./ManageShell";
 import { CredentialsPanel } from "./Credentials";
-import { Button, Card, ErrorBanner, PageHeader } from "./ui";
+import { Button, Card, ErrorBanner, PageBody, PageHeader } from "./ui";
 
 const EJEMPLO = `nombre,rol,grupo,email
 Sofía Gómez,alumno,,
@@ -82,7 +82,7 @@ export function ImportPage() {
   /* ---- Paso 3: listo, con las credenciales para repartir ---- */
   if (result) {
     return (
-      <>
+      <PageBody>
         <PageHeader
           title="Importación lista"
           subtitle={`Se crearon ${result.created} cuenta${result.created === 1 ? "" : "s"}.`}
@@ -111,12 +111,12 @@ export function ImportPage() {
             </ul>
           </Card>
         )}
-      </>
+      </PageBody>
     );
   }
 
   return (
-    <>
+    <PageBody>
       <PageHeader
         title="Importar lista"
         subtitle="Pegá la planilla del curso o subí un archivo CSV."
@@ -231,6 +231,6 @@ export function ImportPage() {
           </div>
         </Card>
       )}
-    </>
+    </PageBody>
   );
 }

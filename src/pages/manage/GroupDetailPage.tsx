@@ -23,6 +23,7 @@ import {
   ErrorBanner,
   Field,
   Input,
+  PageBody,
   PageHeader,
   Select,
   Spinner,
@@ -61,7 +62,7 @@ export function GroupDetailPage() {
   }, [load]);
 
   return (
-    <>
+    <PageBody>
       <PageHeader
         title={data?.group.name ?? "Grupo"}
         subtitle={data ? `${gradeLabel(data.group.grade)} · ${data.students.length} alumnos` : undefined}
@@ -98,7 +99,7 @@ export function GroupDetailPage() {
           />
         </div>
       )}
-    </>
+    </PageBody>
   );
 }
 

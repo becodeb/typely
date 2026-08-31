@@ -132,6 +132,22 @@ export function Card({ children, className = "" }: { children: ReactNode; classN
   );
 }
 
+/** El cuerpo scrolleable de una pantalla.
+ *
+ *  El marco (`ManageShell`) tiene el alto exacto de la ventana y **no
+ *  scrollea**: eso lo hace una sola zona adentro, para que la columna de
+ *  la izquierda y el encabezado queden siempre a la vista. Una pantalla
+ *  que no maneje su propio scroll —como hace Grupos, que deja fija su
+ *  banda de cielo— se envuelve acá y listo.
+ *
+ *  `min-h-0` no es decorativo: sin él un hijo flex se niega a achicarse
+ *  por debajo de su contenido y el scroll se escapa a la página. */
+export function PageBody({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={`min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8 ${className}`}>{children}</div>
+  );
+}
+
 export function PageHeader({
   title,
   subtitle,

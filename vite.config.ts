@@ -9,12 +9,19 @@ export default defineConfig({
      directo, sin copiar y pegar. No existe en el build de producción. */
   plugins: [react(), tailwindcss(), levelPositionsWriter()],
   server: {
-    // Dev-only: proxy /api to the production API (which runs against
-    // Supabase). Keeps the browser same-origin so there are no CORS or
-    // cross-site cookie issues — local frontend uses the real backend/DB.
+    /* Solo en dev: `/api` va a la API de producción. Deja al navegador en
+       el mismo origen, así no hay CORS ni cookies cross-site, y el
+       frontend local trabaja contra la base real.
+
+       Apuntaba a `typely.bauhub.online` con un comentario sobre Supabase:
+       las dos cosas quedaron viejas —hoy corre en Coolify contra un
+       Postgres propio— y el proxy no llegaba a ningún lado.
+
+       Para trabajar contra una API local, cambiá el target a
+       `http://127.0.0.1:3000` y no lo commitees. */
     proxy: {
       "/api": {
-        target: "https://typely.bauhub.online",
+        target: "https://typely.becode.com.ar",
         changeOrigin: true,
         secure: true,
       },

@@ -1,7 +1,16 @@
-/* Marco de las pantallas de gestión — dos columnas.
+/* Marco de las pantallas de gestión — dos columnas, alto fijo.
  *
  * La izquierda es CONTEXTO y no cambia al navegar: en qué escuela estás,
  * el alta de cuentas y los totales. La derecha es trabajo.
+ *
+ * **La pantalla no scrollea.** Ocupa exactamente el alto de la ventana y
+ * lo que crece —la lista de grupos— scrollea adentro de su propia zona.
+ * Así la columna izquierda y el encabezado están siempre a la vista: con
+ * scroll de página, crear una cuenta obligaba a subir de nuevo.
+ *
+ * Lo que hace posible ese alto fijo es la cadena de `min-h-0`: sin ella un
+ * hijo flex se niega a achicarse por debajo de su contenido y el scroll se
+ * escapa a la página. Cada eslabón está marcado abajo.
  *
  * Por qué el alta vive en la columna y no detrás de un botón: crear
  * cuentas es la tarea que más se repite al arrancar un año, y esconderla
@@ -11,7 +20,6 @@
  * El marco también resuelve el alcance:
  *   - un `admin` pertenece a UNA escuela y no elige;
  *   - el `superadmin` no pertenece a ninguna y las administra todas.
- * Las pantallas de adentro solo preguntan `useSede()`.
  *
  * Y es dueño de dos datos compartidos —los grupos y las credenciales
  * recién emitidas— porque los usan tanto la columna como la pantalla de
@@ -55,11 +63,12 @@ const NAV_ALL = [
   { to: "/gestion/sedes", label: "Escuelas", superadminOnly: true },
 ];
 
-/* Paleta de la marca (src/styles/global.css). El navy es estructura, no
-   decoración: por eso ocupa una columna entera y no un borde. */
-const RAIL_BG = "linear-gradient(170deg, #1b3f73 0%, #17355f 55%, #10284b 100%)";
-const RAIL_MUTED = "#8fb0da";
-const RAIL_TEXT = "#a9c0e0";
+/* Crepúsculo: el cielo del juego al anochecer. El violeta sale del arte
+   real (`#7488fc` es su tono saturado), llevado a una profundidad donde el
+   texto de 10.5px se lee — el tono tal cual da 3.15 de contraste contra
+   blanco y las etiquetas no se leerían. */
+const RAIL_BG = "linear-gradient(168deg, #33306f 0%, #262456 52%, #1a1840 100%)";
+const RAIL_MUTED = "#a6a7d8";
 
 export function ManageShell() {
   const { user, logout } = useAuth();
@@ -147,123 +156,148 @@ export function ManageShell() {
   );
 
   return (
-    <div className="font-body flex min-h-dvh bg-[#eef6fd] text-[#17355f]">
+    /* `h-dvh` + `overflow-hidden`: la página nunca scrollea. */
+    <div className="font-body flex h-dvh overflow-hidden bg-[#eef6fd] text-[#17355f]">
 
       {/* ================= Columna de contexto ================= */}
       <aside
         style={{ background: RAIL_BG }}
-        className="relative hidden w-[300px] shrink-0 flex-col gap-[22px] overflow-hidden px-[22px] pb-0 pt-[26px] text-white md:flex"
+        className="relative hidden h-full w-[268px] shrink-0 flex-col overflow-hidden text-white md:flex"
       >
-        <div className="flex items-center gap-2.5">
-          <span className="font-display text-[22px] font-extrabold">TYPELY</span>
-          <span className="rounded-full bg-[#5be8ba]/[0.16] px-2.5 py-[3px] text-[10px] font-bold uppercase tracking-[0.07em] text-[#5be8ba]">
-            Gestión
-          </span>
-        </div>
-
-        {/* Escuela */}
-        <div className="rounded-2xl border border-white/[0.13] bg-white/[0.08] px-4 py-3.5">
-          <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em]" style={{ color: RAIL_MUTED }}>
-            Escuela
-          </div>
-          {loadingSedes ? (
-            <div className="mt-2 flex items-center gap-2 text-sm" style={{ color: RAIL_TEXT }}>
-              <Spinner /> Cargando…
-            </div>
-          ) : !current ? (
-            <div className="mt-1.5 text-sm font-semibold text-white">Todavía no hay ninguna</div>
-          ) : isSuperadmin && sedes.length > 1 ? (
-            <select
-              value={selected ?? ""}
-              onChange={(e) => setSelected(e.target.value)}
-              aria-label="Escuela"
-              className="mt-1.5 w-full cursor-pointer rounded-lg border border-white/15 bg-white/10 px-2 py-1.5 text-sm font-semibold text-white outline-none focus:border-[#33c7f0]"
-            >
-              {sedes.map((s) => (
-                <option key={s.id} value={s.id} className="text-[#17355f]">
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <div className="mt-1.5 text-sm font-semibold leading-snug text-white">{current.name}</div>
-          )}
-        </div>
-
-        {/* Navegación */}
-        <nav aria-label="Secciones">
-          <ul className="flex flex-col gap-0.5">
-            {nav.map((item) => (
-              <li key={item.to}>
-                <NavLink
-                  to={item.to}
-                  className={({ isActive }) =>
-                    `block rounded-[11px] px-3.5 py-2 text-[13.5px] font-semibold transition-colors ${
-                      isActive ? "bg-white/[0.14] text-white" : "text-[#a9c0e0] hover:bg-white/[0.07]"
-                    }`
-                  }
-                >
-                  {item.label}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </nav>
-
-        {/* Alta de cuentas */}
-        {current && (
-          <NewAccountForm
-            sedeId={current.id}
-            sedes={sedes}
-            isSuperadmin={isSuperadmin}
-            groups={groups}
-            onCreated={(title, list) => {
-              setCredentials({ title, list });
-              void loadGroups();
-            }}
-            onSedesChanged={() => void loadSedes()}
-          />
-        )}
-
-        {/* Totales */}
-        <div className="mt-auto flex gap-2">
-          <RailStat label="grupos" value={groups ? groups.length : null} />
-          <RailStat label="alumnos" value={studentTotal} />
-          <RailStat label="docentes" value={teacherCount} />
-        </div>
-
-        <div className="border-t border-white/10 pt-4">
-          <div className="mb-2.5 leading-tight">
-            <div className="truncate text-[13px] font-semibold text-white">{user?.name}</div>
-            <div className="text-[11px]" style={{ color: RAIL_MUTED }}>
-              {isSuperadmin ? "Superadmin" : "Administrador"}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => void logout()}
-            className="w-full rounded-[9px] border border-white/15 bg-white/[0.06] px-3 py-2 text-[13px] font-semibold text-[#a9c0e0] transition-colors hover:bg-white/10 hover:text-white"
-          >
-            Cerrar sesión
-          </button>
-        </div>
-
-        {/* La mascota del juego cierra la columna: el panel es del mismo
-            mundo. Espejada para que mire hacia el contenido, no hacia
-            afuera de la pantalla. */}
-        <img
-          src={assets.mascotMaleLaptop}
-          alt=""
+        {/* Halos del periwinkle del arte, para que no sea un bloque plano. */}
+        <div
           aria-hidden="true"
-          className="-mb-3.5 w-[168px] self-center"
-          style={{ transform: "scaleX(-1)" }}
+          className="pointer-events-none absolute -left-20 -top-32 h-[380px] w-[380px] rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(116,136,252,0.30), transparent 68%)" }}
         />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-28 bottom-20 h-[300px] w-[300px] rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(155,124,255,0.20), transparent 70%)" }}
+        />
+
+        {/* Red de seguridad: en una ventana muy baja el contenido fijo
+            scrollea acá adentro en vez de recortarse. */}
+        <div className="relative flex h-full min-h-0 flex-col gap-3.5 overflow-y-auto px-4 pb-0 pt-4">
+
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="font-display text-[20px] font-extrabold">TYPELY</span>
+            <span className="rounded-full bg-[#5be8ba]/[0.16] px-2 py-[2px] text-[9.5px] font-bold uppercase tracking-[0.07em] text-[#5be8ba]">
+              Gestión
+            </span>
+          </div>
+
+          {/* Escuela */}
+          <div className="shrink-0 rounded-[14px] border border-white/[0.13] bg-white/[0.08] px-3 py-2.5">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: RAIL_MUTED }}>
+              Escuela
+            </div>
+            {loadingSedes ? (
+              <div className="mt-1.5 flex items-center gap-2 text-[13px]" style={{ color: RAIL_MUTED }}>
+                <Spinner /> Cargando…
+              </div>
+            ) : !current ? (
+              <div className="mt-1 text-[13px] font-semibold text-white">Todavía no hay ninguna</div>
+            ) : isSuperadmin && sedes.length > 1 ? (
+              <select
+                value={selected ?? ""}
+                onChange={(e) => setSelected(e.target.value)}
+                aria-label="Escuela"
+                className="mt-1 w-full cursor-pointer rounded-lg border border-white/15 bg-white/10 px-2 py-1 text-[13px] font-semibold text-white outline-none focus:border-[#7488fc]"
+              >
+                {sedes.map((s) => (
+                  <option key={s.id} value={s.id} className="text-[#17355f]">
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="mt-1 line-clamp-2 text-[13px] font-semibold leading-snug text-white">
+                {current.name}
+              </div>
+            )}
+          </div>
+
+          {/* Navegación */}
+          <nav aria-label="Secciones" className="shrink-0">
+            <ul className="flex flex-col gap-0.5">
+              {nav.map((item) => (
+                <li key={item.to}>
+                  <NavLink
+                    to={item.to}
+                    className={({ isActive }) =>
+                      `block rounded-[10px] px-3 py-[7px] text-[13px] font-semibold transition-colors ${
+                        isActive ? "bg-white/[0.14] text-white" : "text-[#a6a7d8] hover:bg-white/[0.07]"
+                      }`
+                    }
+                  >
+                    {item.label}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          {/* Alta de cuentas */}
+          {current && (
+            <NewAccountForm
+              sedeId={current.id}
+              sedes={sedes}
+              isSuperadmin={isSuperadmin}
+              groups={groups}
+              onCreated={(title, list) => {
+                setCredentials({ title, list });
+                void loadGroups();
+              }}
+              onSedesChanged={() => void loadSedes()}
+            />
+          )}
+
+          {/* Totales */}
+          <div className="flex shrink-0 gap-1.5">
+            <RailStat label="grupos" value={groups ? groups.length : null} />
+            <RailStat label="alumnos" value={studentTotal} />
+            <RailStat label="docentes" value={teacherCount} />
+          </div>
+
+          <div className="shrink-0 border-t border-white/10 pt-2.5">
+            <div className="mb-2 leading-tight">
+              <div className="truncate text-[12.5px] font-semibold text-white">{user?.name}</div>
+              <div className="text-[10.5px]" style={{ color: RAIL_MUTED }}>
+                {isSuperadmin ? "Superadmin" : "Administrador"}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => void logout()}
+              className="w-full rounded-[10px] border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[12.5px] font-semibold text-[#c9cbef] transition-colors hover:bg-white/10 hover:text-white"
+            >
+              Cerrar sesión
+            </button>
+          </div>
+
+          {/* La mascota toma lo que sobra y se achica sola: en una pantalla
+              baja desaparece antes que empujar algo útil fuera de vista.
+              Espejada para que mire hacia el contenido. */}
+          <div className="flex min-h-0 flex-1 items-end justify-center overflow-hidden">
+            <img
+              src={assets.mascotMaleLaptop}
+              alt=""
+              aria-hidden="true"
+              className="mb-[-10px] max-h-full w-auto max-w-[150px] object-contain"
+              style={{ transform: "scaleX(-1)" }}
+            />
+          </div>
+        </div>
       </aside>
 
       {/* ================= Columna de trabajo ================= */}
-      <main className="min-w-0 flex-1 px-4 py-6 sm:px-8">
+      {/* `min-h-0` acá y en cada hijo: sin eso el scroll se escapa a la
+          página en vez de quedarse en la lista. */}
+      <main className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+
         {/* Barra compacta donde la columna no entra. */}
-        <div className="mb-5 flex items-center gap-2 md:hidden">
+        <div className="flex shrink-0 items-center gap-2 border-b border-[#dbe6f4] bg-white px-4 py-2 md:hidden">
           <span className="font-display text-lg font-extrabold">TYPELY</span>
           {nav.map((item) => (
             <NavLink
@@ -288,24 +322,34 @@ export function ManageShell() {
         </div>
 
         {credentials && (
-          <CredentialsPanel
-            title={credentials.title}
-            credentials={credentials.list}
-            onClose={() => setCredentials(null)}
-          />
+          <div className="shrink-0 px-4 pt-4 sm:px-7">
+            <CredentialsPanel
+              title={credentials.title}
+              credentials={credentials.list}
+              onClose={() => setCredentials(null)}
+            />
+          </div>
         )}
 
         {loadingSedes ? (
-          <div className="flex items-center gap-2 py-16 text-sm text-[#667085]">
+          <div className="flex items-center gap-2 px-7 py-16 text-sm text-[#667085]">
             <Spinner /> Cargando…
           </div>
         ) : sedeError ? (
-          <ErrorBanner message={sedeError} onRetry={() => void loadSedes()} />
+          <div className="px-4 py-6 sm:px-7">
+            <ErrorBanner message={sedeError} onRetry={() => void loadSedes()} />
+          </div>
         ) : !ctx ? (
-          <FirstSede onCreated={() => void loadSedes()} />
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-7">
+            <FirstSede onCreated={() => void loadSedes()} />
+          </div>
         ) : (
           <ManageContext.Provider value={ctx}>
-            <Outlet />
+            {/* Contenedor sin scroll propio: cada pantalla decide qué zona
+                suya scrollea. La de Grupos deja fijo el encabezado. */}
+            <div className="flex min-h-0 flex-1 flex-col">
+              <Outlet />
+            </div>
           </ManageContext.Provider>
         )}
       </main>
@@ -317,11 +361,11 @@ export function ManageShell() {
 
 function RailStat({ label, value }: { label: string; value: number | null }) {
   return (
-    <div className="flex-1 rounded-[14px] bg-white/[0.07] px-3 py-[11px]">
-      <div className="font-display text-[20px] font-bold leading-none text-white">
+    <div className="flex-1 rounded-xl bg-white/[0.07] px-2.5 py-2">
+      <div className="font-display text-[17px] font-bold leading-none text-white">
         {value === null ? "—" : value}
       </div>
-      <div className="mt-0.5 text-[10.5px]" style={{ color: RAIL_MUTED }}>
+      <div className="mt-0.5 text-[10px]" style={{ color: RAIL_MUTED }}>
         {label}
       </div>
     </div>
@@ -370,8 +414,6 @@ function NewAccountForm({
     ? ["alumno", "docente", "admin"]
     : ["alumno", "docente"];
 
-  /* Si cambiás de escuela en el marco, el destino sigue esa elección
-     mientras no lo hayas tocado a mano. */
   useEffect(() => {
     setAdminSedeId((prev) => (sedes.some((s) => s.id === prev) ? prev : sedeId));
   }, [sedeId, sedes]);
@@ -443,34 +485,29 @@ function NewAccountForm({
   }
 
   const fieldClass =
-    "w-full rounded-[10px] border border-white/[0.13] bg-white/[0.06] px-3 py-2 text-[13px] text-white outline-none transition-colors placeholder:text-[#7d9ac6] focus:border-[#33c7f0] focus:bg-white/10";
+    "w-full rounded-[10px] border border-white/[0.13] bg-white/[0.07] px-2.5 py-1.5 text-[12.5px] text-white outline-none transition-colors placeholder:text-[#a6a7d8] focus:border-[#7488fc] focus:bg-white/[0.11]";
 
   const CTA: Record<string, string> = {
     alumno: "Crear alumno",
     docente: "Crear docente",
     admin: "Crear admin",
   };
-  const HINT: Record<string, string> = {
-    alumno: "No necesita email. El usuario y la contraseña se generan y se muestran una sola vez.",
-    docente: "Después de crearlo, se le asignan grupos desde el detalle de cada uno.",
-    admin: "Va a administrar esa escuela entera: sus grupos, sus alumnos y sus docentes.",
-  };
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-2">
-      <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em]" style={{ color: RAIL_MUTED }}>
+    <form onSubmit={submit} className="flex shrink-0 flex-col gap-1.5">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: RAIL_MUTED }}>
         Crear cuenta
       </div>
 
-      <div className="flex rounded-[11px] bg-white/[0.08] p-[3px]" role="group" aria-label="Rol de la cuenta">
+      <div className="flex rounded-[11px] bg-white/[0.09] p-[3px]" role="group" aria-label="Rol de la cuenta">
         {roles.map((r) => (
           <button
             key={r}
             type="button"
             onClick={() => { setRole(r); setError(""); }}
             aria-pressed={role === r}
-            className={`flex-1 rounded-[9px] py-2 text-[12.5px] font-semibold capitalize transition-colors ${
-              role === r ? "bg-white text-[#17355f]" : "text-[#a9c0e0] hover:text-white"
+            className={`flex-1 rounded-[9px] py-[6px] text-[12px] font-semibold capitalize transition-colors ${
+              role === r ? "bg-white text-[#262456]" : "text-[#a6a7d8] hover:text-white"
             }`}
           >
             {r}
@@ -534,7 +571,7 @@ function NewAccountForm({
               type="button"
               onClick={() => setNewSedeName(null)}
               aria-label="Elegir una escuela existente"
-              className="shrink-0 rounded-[10px] border border-white/[0.13] bg-white/[0.06] px-2.5 text-[13px] font-semibold text-[#a9c0e0] hover:text-white"
+              className="shrink-0 rounded-[10px] border border-white/[0.13] bg-white/[0.07] px-2 text-[12.5px] font-semibold text-[#a6a7d8] hover:text-white"
             >
               ✕
             </button>
@@ -553,7 +590,7 @@ function NewAccountForm({
       )}
 
       {error && (
-        <p role="alert" className="text-[11.5px] font-semibold text-[#ffb4c4]">
+        <p role="alert" className="text-[11px] font-semibold text-[#ffb4c4]">
           {error}
         </p>
       )}
@@ -561,16 +598,12 @@ function NewAccountForm({
       <button
         type="submit"
         disabled={saving}
-        className="mt-0.5 flex h-10 items-center justify-center gap-2 rounded-[10px] border-0 text-[13.5px] font-bold text-[#0d2646] transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
-        style={{ background: "linear-gradient(135deg, #22c7b8, #33c7f0)" }}
+        className="mt-0.5 flex h-[36px] items-center justify-center gap-2 rounded-[11px] border-0 text-[13px] font-bold text-[#0d2646] transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
+        style={{ background: "linear-gradient(135deg, #5be8ba, #33c7f0)" }}
       >
         {saving && <Spinner />}
         {CTA[role]}
       </button>
-
-      <p className="mt-0.5 text-[11.5px] leading-snug" style={{ color: RAIL_MUTED }}>
-        {HINT[role]}
-      </p>
     </form>
   );
 }

@@ -41,8 +41,9 @@ export function GroupsPage() {
   return (
     <>
       {/* Banda de cielo: el mismo del juego, desvanecido hacia el fondo
-          del panel para que el encabezado se apoye en él sin taparlo. */}
-      <div className="relative -mx-4 -mt-6 mb-1 h-[132px] overflow-hidden sm:-mx-8">
+          del panel para que el encabezado se apoye en él sin taparlo.
+          Queda FIJA: es lo que scrollea debajo, no ella. */}
+      <div className="relative min-h-[128px] shrink-0 overflow-hidden">
         <img
           src={assets.homeBg}
           alt=""
@@ -54,7 +55,7 @@ export function GroupsPage() {
           className="absolute inset-0"
           style={{ background: "linear-gradient(180deg, rgba(238,246,253,0) 40%, rgba(238,246,253,0.94) 100%)" }}
         />
-        <div className="relative flex flex-wrap items-start justify-between gap-3 px-4 pt-6 sm:px-8">
+        <div className="relative flex flex-wrap items-start justify-between gap-3 px-4 pb-4 pt-6 sm:px-8">
           <div>
             <h1 className="font-display text-[30px] font-extrabold leading-tight tracking-[-0.018em] text-[#133463]">
               Grupos
@@ -84,44 +85,49 @@ export function GroupsPage() {
         </div>
       </div>
 
-      {creating && (
-        <NewGroupForm
-          sedeId={sedeId}
-          onCancel={() => setCreating(false)}
-          onCreated={() => {
-            setCreating(false);
-            reloadGroups();
-          }}
-        />
-      )}
-
-      {groupsError && !groups ? (
-        <ErrorBanner message={groupsError} onRetry={reloadGroups} />
-      ) : groups === null ? (
-        <RowsSkeleton />
-      ) : groups.length === 0 ? (
-        <Card>
-          <EmptyState
-            title="Todavía no hay grupos"
-            hint="Un grupo es un curso: 4.º B, 5.º A. Los alumnos y los docentes se cargan dentro de cada uno."
-            action={
-              !creating && (
-                <Button variant="primary" onClick={() => setCreating(true)}>
-                  Crear el primero
-                </Button>
-              )
-            }
+      {/* La única zona que scrollea. Una escuela puede tener veinte
+          cursos; que se recorran acá adentro deja el encabezado, los
+          botones y la columna de la izquierda siempre alcanzables. */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-1 sm:px-8">
+        {creating && (
+          <NewGroupForm
+            sedeId={sedeId}
+            onCancel={() => setCreating(false)}
+            onCreated={() => {
+              setCreating(false);
+              reloadGroups();
+            }}
           />
-        </Card>
-      ) : (
-        <ul className="flex flex-col gap-3">
-          {groups.map((g) => (
-            <li key={g.id}>
-              <GroupRow group={g} />
-            </li>
-          ))}
-        </ul>
-      )}
+        )}
+
+        {groupsError && !groups ? (
+          <ErrorBanner message={groupsError} onRetry={reloadGroups} />
+        ) : groups === null ? (
+          <RowsSkeleton />
+        ) : groups.length === 0 ? (
+          <Card>
+            <EmptyState
+              title="Todavía no hay grupos"
+              hint="Un grupo es un curso: 4.º B, 5.º A. Los alumnos y los docentes se cargan dentro de cada uno."
+              action={
+                !creating && (
+                  <Button variant="primary" onClick={() => setCreating(true)}>
+                    Crear el primero
+                  </Button>
+                )
+              }
+            />
+          </Card>
+        ) : (
+          <ul className="flex flex-col gap-2.5">
+            {groups.map((g) => (
+              <li key={g.id}>
+                <GroupRow group={g} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </>
   );
 }

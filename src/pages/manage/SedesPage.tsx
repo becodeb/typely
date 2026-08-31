@@ -21,6 +21,7 @@ import {
   ErrorBanner,
   Field,
   Input,
+  PageBody,
   PageHeader,
   RowsSkeleton,
 } from "./ui";
@@ -57,7 +58,7 @@ export function SedesPage() {
   }, [load, reloadSedes]);
 
   return (
-    <>
+    <PageBody>
       <PageHeader
         title="Escuelas"
         subtitle="Todo cuelga de acá: los grupos, los docentes y los alumnos pertenecen a una escuela."
@@ -143,7 +144,7 @@ export function SedesPage() {
           )}
         </Card>
       )}
-    </>
+    </PageBody>
   );
 }
 
