@@ -28,6 +28,9 @@ const worldNum = (w: string) => Number(w.replace("island", "")) || 0;
 
 interface Scope {
   groups: { id: string; name: string }[];
+  /** Los alumnos completos. `studentIds` y `studentNames` salen de acá y se
+   *  conservan porque media docena de consultas los usan tal cual. */
+  students: { id: string; fullName: string; username: string; groupId: string | null }[];
   studentIds: string[];
   studentNames: Map<string, string>;
   teachers: { id: string; lastLoginAt: Date | null }[];
@@ -58,7 +61,12 @@ async function resolveScope(actor: Actor, querySedeId?: string): Promise<Scope |
     .orderBy(schema.groups.name);
 
   const students = await db
-    .select({ id: schema.users.id, fullName: schema.users.fullName })
+    .select({
+      id: schema.users.id,
+      fullName: schema.users.fullName,
+      username: schema.users.username,
+      groupId: schema.users.groupId,
+    })
     .from(schema.users)
     .where(
       and(
@@ -88,6 +96,7 @@ async function resolveScope(actor: Actor, querySedeId?: string): Promise<Scope |
 
   return {
     groups,
+    students,
     studentIds: students.map((s) => s.id),
     studentNames: new Map(students.map((s) => [s.id, s.fullName])),
     teachers,
@@ -98,6 +107,8 @@ const EMPTY_OVERVIEW = {
   counts: { groups: 0, teachers: 0, students: 0 },
   activeToday: 0,
   avgProgress: 0,
+  totalStars: 0,
+  roster: [] as unknown[],
   weekly: [] as { date: string; label: string; count: number }[],
   alerts: { inactiveStudents: 0, lowPrecisionStudents: 0, inactiveTeachers: 0, groupsNoTeacher: 0 },
   attentionGroups: [] as { id: string; name: string; reason: string }[],
@@ -112,7 +123,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
     const scope = await resolveScope(actor, sedeId);
     if (!scope) return reply.send(EMPTY_OVERVIEW);
-    const { groups, studentIds, studentNames, teachers } = scope;
+    const { groups, students, studentIds, studentNames, teachers } = scope;
 
     const now = Date.now();
     const since7 = new Date(now - 7 * DAY);
@@ -186,6 +197,7 @@ export async function adminRoutes(app: FastifyInstance) {
             )
         : Promise.resolve([] as { groupId: string | null; userId: string }[]),
     ]);
+    const membership = roster;
 
     const lastById = new Map(lastAttempts.map((r) => [r.userId, new Date(r.last).getTime()]));
     const accById = new Map(perUser.map((r) => [r.userId, r.avg]));
@@ -208,7 +220,7 @@ export async function adminRoutes(app: FastifyInstance) {
     }
 
     const studentsByGroup = new Map<string, string[]>();
-    for (const r of roster) {
+    for (const r of membership) {
       if (!r.groupId) continue;
       const arr = studentsByGroup.get(r.groupId) ?? [];
       arr.push(r.userId);
@@ -234,8 +246,30 @@ export async function adminRoutes(app: FastifyInstance) {
         attentionGroups.push({ id: g.id, name: g.name, reason: `${atRisk} alumnos en riesgo` });
     }
 
+    /* El plantel con el progreso de cada uno. Sale de los agregados que
+       ya se calcularon para los totales, así que no cuesta una consulta
+       más — y le ahorra al navegador un pedido por alumno, que en un curso
+       de veinticinco es la diferencia entre una pantalla y una espera. */
+    const doneById = new Map(perUser.map((r) => [r.userId, r.done]));
+    const starsById = new Map(perUser.map((r) => [r.userId, r.stars]));
+    const groupNameById = new Map(groups.map((g) => [g.id, g.name]));
+    const rosterOut = students
+      .map((s) => ({
+        id: s.id,
+        fullName: s.fullName,
+        username: s.username,
+        groupId: s.groupId,
+        groupName: s.groupId ? (groupNameById.get(s.groupId) ?? null) : null,
+        completedLevels: doneById.get(s.id) ?? 0,
+        stars: starsById.get(s.id) ?? 0,
+        avgAccuracy: accById.get(s.id) ?? 0,
+        lastActivity: lastById.has(s.id) ? new Date(lastById.get(s.id)!).toISOString() : null,
+      }))
+      .sort((a, b) => a.fullName.localeCompare(b.fullName, "es"));
+
     return reply.send({
       counts: { groups: groups.length, teachers: teachers.length, students: studentIds.length },
+      roster: rosterOut,
       activeToday,
       avgProgress,
       totalStars,

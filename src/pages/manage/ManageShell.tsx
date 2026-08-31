@@ -39,6 +39,8 @@ import { api, ApiError } from "../../utils/api";
 import { useAuth } from "../../hooks/useAuth";
 import { assets } from "../../utils/assets";
 import { CredentialsPanel } from "./Credentials";
+import { canCreate, creatableRoles } from "./permissions";
+import { roleLabel } from "../../utils/storage";
 import { Button, Card, ErrorBanner, Field, Input, Spinner } from "./ui";
 
 interface ManageContextValue {
@@ -67,8 +69,11 @@ export function useSede(): ManageContextValue {
 }
 
 const NAV_ALL = [
+  { to: "/gestion/tablero", label: "Tablero", superadminOnly: false },
   { to: "/gestion/grupos", label: "Grupos", superadminOnly: false },
   { to: "/gestion/usuarios", label: "Personas", superadminOnly: false },
+  /* Crear y editar escuelas es de plataforma: ni el admin ni el docente
+     tienen `sede:write`, así que para ellos la sección no existe. */
   { to: "/gestion/sedes", label: "Escuelas", superadminOnly: true },
 ];
 
@@ -81,7 +86,8 @@ const RAIL_MUTED = "#a6a7d8";
 
 export function ManageShell() {
   const { user, logout } = useAuth();
-  const isSuperadmin = user?.role === "superadmin";
+  const actorRole = (user?.role ?? "alumno") as Role;
+  const isSuperadmin = actorRole === "superadmin";
   const nav = NAV_ALL.filter((i) => !i.superadminOnly || isSuperadmin);
 
   const [sedes, setSedes] = useState<Sede[]>([]);
@@ -125,17 +131,21 @@ export function ManageShell() {
     if (!sedeId) return;
     setGroupsError("");
     try {
+      /* El conteo de docentes es solo para el panel de gestión de la
+         escuela. Un docente pidiéndolo recibe una lista vacía —la API le
+         devuelve solo sus alumnos— así que ni se pide. */
+      const wantsTeachers = actorRole !== "docente";
       const [gs, teachers] = await Promise.all([
         api.groups(sedeId),
-        api.users({ role: "docente", sedeId }),
+        wantsTeachers ? api.users({ role: "docente", sedeId }) : Promise.resolve([]),
       ]);
       setGroups(gs);
-      setTeacherCount(teachers.length);
+      setTeacherCount(wantsTeachers ? teachers.length : null);
     } catch (err) {
       setGroups(null);
       setGroupsError(err instanceof ApiError ? err.message : "No pudimos cargar los grupos.");
     }
-  }, [sedeId]);
+  }, [sedeId, actorRole]);
 
   /* Al cambiar de escuela se vacía antes de pedir: si no, se ven un
      instante los grupos de la anterior bajo el nombre de la nueva. */
@@ -248,8 +258,9 @@ export function ManageShell() {
             </ul>
           </nav>
 
-          {/* Alta de cuentas */}
-          {current && (
+          {/* Alta de cuentas. El docente no crea cuentas —no tiene
+              `user:create`— así que para él la columna no la muestra. */}
+          {current && canCreate(actorRole) && (
             <NewAccountForm
               sedeId={current.id}
               sedes={sedes}
@@ -267,14 +278,16 @@ export function ManageShell() {
           <div className="flex shrink-0 gap-1.5">
             <RailStat label="grupos" value={groups ? groups.length : null} />
             <RailStat label="alumnos" value={studentTotal} />
-            <RailStat label="docentes" value={teacherCount} />
+            {/* Un docente no tiene docentes a cargo: el número sería
+                siempre 0 y solo ocuparía lugar. */}
+            {actorRole !== "docente" && <RailStat label="docentes" value={teacherCount} />}
           </div>
 
           <div className="shrink-0 border-t border-white/10 pt-2.5">
             <div className="mb-2 leading-tight">
               <div className="truncate text-[12.5px] font-semibold text-white">{user?.name}</div>
               <div className="text-[10.5px]" style={{ color: RAIL_MUTED }}>
-                {isSuperadmin ? "Superadmin" : "Administrador"}
+                {roleLabel(actorRole)}
               </div>
             </div>
             <button
@@ -427,9 +440,12 @@ function NewAccountForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const roles: Array<"alumno" | "docente" | "admin"> = isSuperadmin
-    ? ["alumno", "docente", "admin"]
-    : ["alumno", "docente"];
+  /* Los roles salen de la matriz y no de un `if (isSuperadmin)`: esta lista
+     y la de la pantalla Personas tienen que decir lo mismo, y con dos
+     copias sueltas se separan la primera vez que cambie una regla. */
+  const roles = creatableRoles(isSuperadmin ? "superadmin" : "admin") as Array<
+    "alumno" | "docente" | "admin"
+  >;
 
   useEffect(() => {
     setAdminSedeId((prev) => (sedes.some((s) => s.id === prev) ? prev : sedeId));

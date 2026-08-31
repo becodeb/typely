@@ -111,6 +111,20 @@ export interface Overview {
   activeToday: number;
   avgProgress: number;
   totalStars: number;
+  /** El plantel con lo que lleva hecho cada alumno, ordenado por nombre.
+   *  Viene con el resumen y no por alumno: en un curso de veinticinco, un
+   *  pedido por cabeza es la diferencia entre una pantalla y una espera. */
+  roster: {
+    id: string;
+    fullName: string;
+    username: string;
+    groupId: string | null;
+    groupName: string | null;
+    completedLevels: number;
+    stars: number;
+    avgAccuracy: number;
+    lastActivity: string | null;
+  }[];
   weekly: { date: string; label: string; count: number }[];
   alerts: {
     inactiveStudents: number;

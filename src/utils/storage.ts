@@ -29,20 +29,18 @@ export function isDemoMode(): boolean {
   return localStorage.getItem(DEMO_MODE_KEY) === "true";
 }
 
-/** A dónde va cada rol después de entrar.
- *
- *  El docente todavía no tiene pantalla propia: entra igual, pero cae en
- *  una que lo dice explícitamente en vez de mandarlo a una ruta rota o al
- *  mapa de islas, que es del alumno. */
+/** A dónde va cada rol después de entrar. */
 export function routeForRole(role: Role): string {
   switch (role) {
     case "alumno":
       return "/mundos";
     case "superadmin":
     case "admin":
-      return "/gestion/grupos";
     case "docente":
-      return "/sin-pantalla";
+      /* Los tres roles de gestión caen en la misma pantalla: el tablero
+         contesta "cómo viene mi gente", que es la primera pregunta de los
+         tres. Lo que cambia es el alcance, y de eso se encarga la API. */
+      return "/gestion/tablero";
   }
 }
 

@@ -34,13 +34,26 @@ const CREATES: Record<Role, readonly Role[]> = {
 
 /** Permisos que no dependen del objetivo sino solo del rol del actor.
  *  Espejo de `PERMISSIONS` en la API, recortado a lo que usa esta pantalla. */
-const CAN: Record<Role, { edit: boolean; remove: boolean; create: boolean; resetPassword: boolean }> = {
-  superadmin: { edit: true, remove: true, create: true, resetPassword: true },
-  admin: { edit: true, remove: true, create: true, resetPassword: true },
+interface Abilities {
+  edit: boolean;
+  remove: boolean;
+  create: boolean;
+  resetPassword: boolean;
+  /** Crear, renombrar y borrar grupos, y asignarles docentes. */
+  writeGroups: boolean;
+  /** Alta masiva por planilla. */
+  importCsv: boolean;
+}
+
+const CAN: Record<Role, Abilities> = {
+  superadmin: { edit: true, remove: true, create: true, resetPassword: true, writeGroups: true, importCsv: true },
+  admin: { edit: true, remove: true, create: true, resetPassword: true, writeGroups: true, importCsv: true },
   /* El docente resuelve el "me olvidé la contraseña" de su curso sin
-     depender del admin, pero no crea, no edita y no borra cuentas. */
-  docente: { edit: false, remove: false, create: false, resetPassword: true },
-  alumno: { edit: false, remove: false, create: false, resetPassword: false },
+     depender del admin, y elige qué islas juega su grupo. Todo lo demás
+     —crear cuentas, editarlas, borrarlas, armar grupos— es del admin: un
+     docente que puede sacar alumnos de un curso puede romper el de otro. */
+  docente: { edit: false, remove: false, create: false, resetPassword: true, writeGroups: false, importCsv: false },
+  alumno: { edit: false, remove: false, create: false, resetPassword: false, writeGroups: false, importCsv: false },
 };
 
 export function reachableRoles(actor: Role): readonly Role[] {
@@ -80,6 +93,16 @@ export function canDelete(actor: Role, target: Role, isSelf: boolean): boolean {
 
 export function canCreate(actor: Role): boolean {
   return CAN[actor].create && CREATES[actor].length > 0;
+}
+
+/** Crear grupos, renombrarlos, y poner o sacar docentes de un curso. */
+export function canWriteGroups(actor: Role): boolean {
+  return CAN[actor].writeGroups;
+}
+
+/** Alta masiva por planilla CSV. */
+export function canImport(actor: Role): boolean {
+  return CAN[actor].importCsv;
 }
 
 /** ¿Puede mover gente entre escuelas? Solo quien no pertenece a ninguna. */
