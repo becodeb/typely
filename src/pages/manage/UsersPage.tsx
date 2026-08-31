@@ -651,7 +651,9 @@ function NewUserForm({
         fullName: clean,
         role,
         sedeId: showSede ? targetSede : sedeId,
-        groupId: role === "alumno" && groupId ? groupId : null,
+        /* La API sabe dónde guardarlo: columna `group_id` si es alumno,
+           fila en `group_teachers` si es docente. */
+        groupId: (role === "alumno" || role === "docente") && groupId ? groupId : null,
         email: email.trim() ? email.trim().toLowerCase() : null,
       });
       /* La contraseña viene solo cuando la generó el servidor, y se ve una
@@ -674,7 +676,7 @@ function NewUserForm({
                 <button
                   key={r}
                   type="button"
-                  onClick={() => { setRole(r); setError(""); }}
+                  onClick={() => { setRole(r); setGroupId(""); setError(""); }}
                   aria-pressed={role === r}
                   className={`rounded-lg px-3.5 py-1.5 text-[13px] font-semibold capitalize transition-colors ${
                     role === r ? "bg-white text-[#17355f] shadow-sm" : "text-[#7f92b0] hover:text-[#17355f]"
@@ -707,11 +709,17 @@ function NewUserForm({
             </label>
           )}
 
-          {role === "alumno" && (
-            <label className="flex w-[11rem] flex-col gap-1">
-              <span className="text-[12px] font-semibold text-[#3d5580]">Grupo</span>
+          {/* El grupo se ofrece a los dos, pero significa cosas
+              distintas: el alumno CURSA ahí, el docente queda A CARGO. Por
+              eso cambia la etiqueta y no solo el valor. Para el docente es
+              opcional y se puede sumar después desde el grupo. */}
+          {(role === "alumno" || role === "docente") && (
+            <label className="flex w-[12rem] flex-col gap-1">
+              <span className="text-[12px] font-semibold text-[#3d5580]">
+                {role === "alumno" ? "Grupo" : "Curso a cargo"}
+              </span>
               <Select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-                <option value="">Sin grupo</option>
+                <option value="">{role === "alumno" ? "Sin grupo" : "Asignar después"}</option>
                 {(groups ?? []).map((g) => (
                   <option key={g.id} value={g.id}>{g.name}</option>
                 ))}

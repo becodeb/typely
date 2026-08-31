@@ -168,41 +168,63 @@ export async function userRoutes(app: FastifyInstance) {
       throw new ForbiddenError("No podés crear usuarios en otra sede.");
     }
 
-    /* Solo un alumno puede pertenecer a un grupo, y el grupo tiene que ser
-       de la misma sede (la base lo exige con un CHECK; acá damos el error
-       claro en vez de un 500). */
+    /* Un grupo se pide igual para alumno y para docente, pero se guarda en
+       lugares distintos, y esa diferencia es del modelo, no un capricho:
+       un alumno pertenece a UN curso (columna `group_id`, con un CHECK que
+       impide usarla para otro rol), mientras que un docente puede estar a
+       cargo de VARIOS y cada grupo tener varios docentes — eso es la tabla
+       `group_teachers`. Acá se acepta uno solo, que es el caso del alta;
+       el resto se agregan después desde el grupo. */
     let groupId: string | null = null;
+    let teachesGroupId: string | null = null;
     if (data.groupId) {
-      if (data.role !== "alumno") {
-        return reply.code(400).send({ error: "Solo un alumno puede pertenecer a un grupo." });
+      if (data.role !== "alumno" && data.role !== "docente") {
+        return reply.code(400).send({ error: "Solo un alumno o un docente pueden asociarse a un grupo." });
       }
       const [group] = await db.select().from(schema.groups).where(eq(schema.groups.id, data.groupId)).limit(1);
       if (!group) return reply.code(400).send({ error: "El grupo no existe." });
       if (group.sedeId !== targetSede) {
         return reply.code(400).send({ error: "Ese grupo es de otra sede." });
       }
-      groupId = group.id;
+      if (data.role === "alumno") groupId = group.id;
+      else teachesGroupId = group.id;
     }
 
     const chosePassword = Boolean(data.password);
     const password = data.password ?? makeTempPassword();
     const username = data.username ?? (await assignUsername(data.fullName));
+    /* El hash es lento a propósito; se calcula ANTES de abrir la
+       transacción para no tener una abierta mientras tanto. */
+    const passwordHash = await hashPassword(password);
 
     let row;
     try {
-      [row] = await db
-        .insert(schema.users)
-        .values({
-          role: data.role,
-          sedeId: targetSede,
-          groupId,
-          username,
-          email: data.email ?? null,
-          fullName: data.fullName,
-          passwordHash: await hashPassword(password),
-          mustChangePassword: !chosePassword,
-        })
-        .returning(publicColumns);
+      /* Crear la cuenta y ponerla a cargo del curso van juntas o no van:
+         si el vínculo fallara aparte, quedaría un docente creado que el
+         admin cree asignado y no lo está. */
+      row = await db.transaction(async (tx) => {
+        const [created] = await tx
+          .insert(schema.users)
+          .values({
+            role: data.role,
+            sedeId: targetSede,
+            groupId,
+            username,
+            email: data.email ?? null,
+            fullName: data.fullName,
+            passwordHash,
+            mustChangePassword: !chosePassword,
+          })
+          .returning(publicColumns);
+
+        if (teachesGroupId && created) {
+          await tx
+            .insert(schema.groupTeachers)
+            .values({ groupId: teachesGroupId, userId: created.id })
+            .onConflictDoNothing();
+        }
+        return created;
+      });
     } catch (err) {
       if (String((err as { code?: string }).code) === "23505") {
         return reply.code(409).send({ error: "Ya existe una cuenta con ese usuario o email." });
@@ -215,7 +237,7 @@ export async function userRoutes(app: FastifyInstance) {
       action: "create_user",
       entityType: "user",
       entityId: row!.id,
-      meta: { role: data.role, username, sedeId: targetSede, groupId },
+      meta: { role: data.role, username, sedeId: targetSede, groupId, teachesGroupId },
     });
 
     return reply.code(201).send({
