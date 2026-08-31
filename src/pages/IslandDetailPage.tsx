@@ -1260,42 +1260,53 @@ export function IslandDetailPage() {
 
       {/* Compact floating island header — sits in the top-safe area and never
           covers the level nodes. Replaces the old large title/progress panel. */}
+      {/* Encabezado de la isla — UNA sola línea.
+          Antes eran dos renglones dentro de un bloque blanco de 489x77 que se
+          apoyaba justo sobre el eje por donde sube el camino de niveles, y
+          entre este panel y la barra de personaje de abajo se comían casi un
+          cuarto del alto de la pantalla. Lo que sacó altura fue juntar todo en
+          una línea y acortar el texto de progreso: "Faltan 15★ para el próximo
+          mundo" decía en ocho palabras lo que "15★ para el próximo" dice en
+          cuatro, y el dato completo sigue en el title y en el aria-label. */}
       <header
-        className="fixed top-0 left-1/2 -translate-x-1/2 z-20 glass-strong rounded-b-2xl px-5 py-3 flex items-center gap-4 shadow-card animate-hud-in max-w-[92vw]"
-        /* Mismo fondo blanco OPACO que la barra de personaje de abajo, para que
-           ambos paneles tengan EXACTAMENTE el mismo color sin importar el arte
-           que tengan detrás (antes el de arriba dejaba pasar el cielo azul y el
-           de abajo las nubes blancas, y se veían de distinto color). */
-        style={{ background: "rgba(255,255,255,0.88)" }}
+        className="fixed top-0 left-1/2 -translate-x-1/2 z-20 glass-strong rounded-b-2xl px-4 py-1.5 flex items-center gap-2.5 shadow-card animate-hud-in max-w-[92vw]"
+        /* Mismo fondo blanco que la barra de personaje de abajo, para que los
+           dos paneles se vean del mismo color sin importar el arte que tengan
+           detrás (antes el de arriba dejaba pasar el cielo azul y el de abajo
+           las nubes blancas, y no coincidían). */
+        style={{ background: "rgba(255,255,255,0.82)" }}
       >
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/20 text-violet-700 font-bold text-[clamp(0.95rem,1.7vmin,1.3rem)] whitespace-nowrap">
-          <Star size={15} fill="currentColor" />
-          Mundo {worldNumber}
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-700 font-bold text-[11px] whitespace-nowrap">
+          <Star size={11} fill="currentColor" />
+          M{worldNumber}
         </span>
-        <div className="flex flex-col min-w-0">
-          <h1 className="font-display font-black text-text text-[clamp(1.2rem,2.3vmin,1.8rem)] truncate">{world.title}</h1>
-          <div className="flex items-center gap-3 text-[clamp(0.95rem,1.7vmin,1.3rem)]">
-            <span className="inline-flex items-center gap-1 text-yellow-500 font-bold">
-              <Star size={14} fill="currentColor" />
-              {starProgress.earnedStars}/{starProgress.totalStars}
-            </span>
-            <span className="text-muted">
-              {!isLastWorld && !starProgress.isUnlockedNext
-                ? `Faltan ${Math.max(0, starProgress.requiredStars - starProgress.earnedStars)}★ para el próximo mundo`
-                : "Tocá un nivel para jugar"}
-            </span>
-          </div>
-        </div>
+        <h1 className="font-display font-black text-text text-[clamp(0.95rem,1.7vmin,1.15rem)] truncate leading-tight">{world.title}</h1>
+        <span className="inline-flex items-center gap-1 text-yellow-500 font-bold text-[13px] whitespace-nowrap">
+          <Star size={12} fill="currentColor" />
+          {starProgress.earnedStars}/{starProgress.totalStars}
+        </span>
+        <span
+          className="hidden sm:inline text-[11px] font-semibold text-muted whitespace-nowrap"
+          title={
+            !isLastWorld && !starProgress.isUnlockedNext
+              ? `Te faltan ${Math.max(0, starProgress.requiredStars - starProgress.earnedStars)} estrellas para desbloquear el próximo mundo`
+              : undefined
+          }
+        >
+          {!isLastWorld && !starProgress.isUnlockedNext
+            ? `${Math.max(0, starProgress.requiredStars - starProgress.earnedStars)}★ para el próximo`
+            : "Tocá un nivel"}
+        </span>
         {canGoToNextWorld && nextWorld && (
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-white font-bold shadow-btn animate-next-pulse hover:brightness-105 transition cursor-pointer whitespace-nowrap"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-accent text-white font-bold text-[12px] shadow-btn animate-next-pulse hover:brightness-105 transition cursor-pointer whitespace-nowrap"
             onClick={() => navigate(nextWorld.route)}
             aria-label={`Ir al siguiente mundo: ${nextWorld.title}`}
             title={`Ir a ${nextWorld.title}`}
           >
             <span>Siguiente</span>
-            <ArrowRight size={18} strokeWidth={2.7} />
+            <ArrowRight size={14} strokeWidth={2.7} />
           </button>
         )}
       </header>
