@@ -33,6 +33,7 @@ import { getWorldStarRequirements, getWorldStatesForUser, getWorldsForUser, worl
 import { Toast } from "../components/common/Toast";
 import { StarCounter } from "../components/common/StarCounter";
 import { CharacterSkin } from "../components/common/CharacterSkin";
+import { useEsCelular } from "../hooks/useEsCelular";
 import { SkinProgressBar } from "../components/common/SkinProgressBar";
 import { SkinUnlockCelebration } from "../components/common/SkinUnlockCelebration";
 import { assets } from "../utils/assets";
@@ -209,6 +210,16 @@ export function WorldsPage() {
      render. Cheaper than relying on the referential stability of
      `visibleWorlds` (the function reads localStorage). */
   const trackWidthVw = useMemo(() => trackWidth(visibleWorlds), [visibleWorlds]);
+  /* En el celular la pista se ESTIRA en vez de comprimirse. El mapa está todo
+     en unidades vw, así que al angostar la pantalla se achicaba todo junto y
+     entraban las quince islas diminutas. Multiplicando el eje horizontal por
+     3 entra UNA isla, dos como máximo, que es como se recorre un mapa en un
+     teléfono. Horizontal es gratis: la pantalla ya se desplaza al costado, así
+     que lo que queda fuera del borde no cuesta nada. En VERTICAL no se toca
+     nada — sigue mostrando lo mismo que en la computadora (CLAUDE.md §6.2). */
+  const celular = useEsCelular();
+  const escalaMapa = celular ? 3 : 1;
+  const anchoPista = trackWidthVw * escalaMapa;
   /* Approximate centres (used until the real ones are measured on first paint). */
   const fallbackCenters = useMemo(() => visibleWorlds.map(islandCenter), [visibleWorlds]);
   /* Measure each island's real centre (in SVG units: x in vw, y in % of track
@@ -267,12 +278,12 @@ export function WorldsPage() {
       visibleWorlds.find((w) => worldStates[w.slug] === "current") ?? visibleWorlds[0];
     if (!currentWorld) return;
     const vwPx = window.innerWidth / 100;
-    const targetPx = (currentWorld.map.x + 8) * vwPx;
+    const targetPx = (currentWorld.map.x * escalaMapa + 8) * vwPx;
     const left = Math.max(0, targetPx - scene.clientWidth / 2);
     scene.scrollTo({ left, behavior: "smooth" });
     // Run once on mount; unlock-state changes after page-load are rare.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [escalaMapa]);
 
   /* Glide the real stars slowly along the trail. We sample the SVG path with
      getPointAtLength (undistorted user units: x in vw, y in %) and position
@@ -502,15 +513,15 @@ export function WorldsPage() {
         <div
           ref={trackRef}
           className="relative h-full"
-          style={{ width: `${trackWidthVw}vw` }}
+          style={{ width: `${anchoPista}vw` }}
         >
           {/* Magical trail SVG */}
           <svg
             className="absolute top-0 left-0 pointer-events-none h-full"
-            viewBox={`0 0 ${trackWidthVw} 100`}
+            viewBox={`0 0 ${anchoPista} 100`}
             aria-hidden="true"
             preserveAspectRatio="none"
-            style={{ width: `${trackWidthVw}vw` }}
+            style={{ width: `${anchoPista}vw` }}
           >
             <defs>
               {/* El gradiente de la ruta CICLA los colores de marca (igual que
@@ -636,7 +647,7 @@ export function WorldsPage() {
               <div
                 key={world.id}
                 className="absolute"
-                style={{ left: `${world.map.x}vw`, top: `${world.map.y}%` }}
+                style={{ left: `${world.map.x * escalaMapa}vw`, top: `${world.map.y}%` }}
               >
                 <button
                   type="button"
@@ -650,7 +661,11 @@ export function WorldsPage() {
                        HEIGHT below the 36%-of-viewport gap between the two island
                        rows — so they never overlap vertically on wide-but-short
                        screens (where a flat `20vw` would collide). */
-                    "relative w-[min(24vw,38vh)] max-w-[22rem] aspect-square rounded-full border-0 p-0",
+                    /* En el celular la isla ocupa mucho más ancho: con 24vw
+                       sobre 375 px quedaba en 90 px, ilegible. */
+                    celular
+                      ? "relative w-[min(62vw,32vh)] aspect-square rounded-full border-0 p-0"
+                      : "relative w-[min(24vw,38vh)] max-w-[22rem] aspect-square rounded-full border-0 p-0",
                     "cursor-pointer transition-all duration-300 ease-out",
                     "hover:scale-105 hover:-translate-y-1",
                     "active:scale-95",
@@ -817,7 +832,7 @@ export function WorldsPage() {
       <span className="absolute bottom-0 left-0 animate-mascot-float pointer-events-none select-none z-10">
         <CharacterSkin
           kind="female"
-          className="w-auto max-h-[33vh] drop-shadow-lg"
+          className={`w-auto drop-shadow-lg ${celular ? "max-h-[17vh]" : "max-h-[33vh]"}`}
           alt=""
           loading="lazy"
         />
@@ -831,7 +846,7 @@ export function WorldsPage() {
         <span className="animate-mascot-float">
           <CharacterSkin
             kind="male"
-            className="w-auto max-h-[33vh] drop-shadow-lg"
+            className={`w-auto drop-shadow-lg ${celular ? "max-h-[17vh]" : "max-h-[33vh]"}`}
             alt=""
             loading="lazy"
           />

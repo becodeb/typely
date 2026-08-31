@@ -8,6 +8,8 @@ import { StarCounter } from "../components/common/StarCounter";
 import { CharacterSkin } from "../components/common/CharacterSkin";
 import { SkinUnlockCelebration } from "../components/common/SkinUnlockCelebration";
 import { SkinProgressBar } from "../components/common/SkinProgressBar";
+import { AvisoSoloEnComputadora } from "../components/common/SoloEnComputadora";
+import { useEsCelular } from "../hooks/useEsCelular";
 import { LevelStars } from "../components/common/LevelStars";
 import { getWorldBySlug, getWorlds, worldStarProgress, WORLD_PEDAGOGY_ORDER, type Level, type LevelPosition } from "../data/worlds";
 import { LevelPositionEditor, type PerspField, type PerspMode } from "../components/dev/LevelPositionEditor";
@@ -110,6 +112,10 @@ export function IslandDetailPage() {
   const panRef = useRef<{ sx: number; sy: number; bx: number; by: number } | null>(null);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const ZOOM_MIN = 1, ZOOM_MAX = 8;
+  /* Con qué acercamiento queda la isla en el celular después de la animación
+     de apertura. A 2.2 los nodos vuelven a su proporción correcta (5.34 % del
+     escenario) en vez del 11.7 % al que los infla el piso táctil de 44 px. */
+  const ZOOM_CELULAR = 2.2;
 
   /** Aplica un zoom nuevo dejando quieto el punto (sx, sy) de la pantalla.
    *  Sin esto el zoom siempre tira al centro y perdés de vista el nodo que
@@ -137,6 +143,72 @@ export function IslandDetailPage() {
 
   const resetView = useCallback(() => setView({ z: 1, x: 0, y: 0 }), []);
 
+  /* ── Celular: el escenario se recorre con el dedo ────────────────────────
+     La isla entera no entra en un teléfono — a 375×812 el `contain` la deja
+     en una fajita de 211 px de alto y los nodos, que tienen un piso táctil de
+     44 px, se encavallan. La salida es la misma lente que usa el editor, con
+     zoom y arrastre. Las coordenadas NO cambian: se mueve la ventana, no el
+     sistema de referencia (CLAUDE.md §6.2). */
+  const celular = useEsCelular();
+  const stageRef = useRef<HTMLDivElement>(null);
+  /* Mientras dura la animación de apertura la lente lleva transición; después
+     se apaga para que arrastrar responda al toque sin retardo. */
+  const [animandoEntrada, setAnimandoEntrada] = useState(false);
+  /* Sin zoom no hay nada que arrastrar, y capturar el puntero de gratis
+     rompería el toque sobre los nodos. */
+  const celularPaneo = celular && view.z > 1;
+  const entradaHecha = useRef(false);
+
+  /** Lleva un punto del escenario, en % del arte, al centro de la pantalla. */
+  const centrarEn = useCallback((xPct: number, yPct: number, z: number) => {
+    const wrap = stageWrapRef.current, stage = stageRef.current;
+    if (!wrap || !stage) return;
+    const rw = wrap.getBoundingClientRect(), rs = stage.getBoundingClientRect();
+    /* rs ya viene con el zoom actual aplicado; se divide para volver a la
+       medida sin escalar y no arrastrar el zoom anterior en la cuenta. */
+    const sw = rs.width / view.z, sh = rs.height / view.z;
+    const dx = (xPct / 100 - 0.5) * sw, dy = (yPct / 100 - 0.5) * sh;
+    const mx = ((z - 1) * rw.width) / 2, my = ((z - 1) * rw.height) / 2;
+    setView({
+      z,
+      x: Math.min(mx, Math.max(-mx, -z * dx)),
+      y: Math.min(my, Math.max(-my, -z * dy)),
+    });
+  }, [view.z]);
+
+  /* Pellizco para acercar y alejar. El arrastre de un dedo lo resuelve el
+     mismo efecto de paneo del editor, habilitado abajo para el celular. */
+  useEffect(() => {
+    if (!celular) return;
+    const el = stageWrapRef.current;
+    if (!el) return;
+    let base: { dist: number; z: number } | null = null;
+    const separacion = (t: TouchList) =>
+      Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+
+    const alTocar = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return;
+      base = { dist: separacion(e.touches), z: view.z };
+    };
+    const alMover = (e: TouchEvent) => {
+      if (!base || e.touches.length !== 2) return;
+      e.preventDefault();
+      const centroX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const centroY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      zoomAt(base.z * (separacion(e.touches) / base.dist), centroX, centroY);
+    };
+    const alSoltar = (e: TouchEvent) => { if (e.touches.length < 2) base = null; };
+
+    el.addEventListener("touchstart", alTocar, { passive: true });
+    el.addEventListener("touchmove", alMover, { passive: false });
+    el.addEventListener("touchend", alSoltar, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", alTocar);
+      el.removeEventListener("touchmove", alMover);
+      el.removeEventListener("touchend", alSoltar);
+    };
+  }, [celular, view.z, zoomAt]);
+
   /** ¿El evento salió del panel del editor? Chequea que sea un Element antes
    *  de preguntar por closest: el target de un evento no siempre lo es. */
   const enHud = (t: EventTarget | null) => t instanceof Element && !!t.closest("[data-hud]");
@@ -161,10 +233,18 @@ export function IslandDetailPage() {
   /* Desplazamiento: botón del medio, o barra espaciadora + arrastre. Los dos
      porque no todos los trackpads de Chromebook tienen botón del medio. */
   useEffect(() => {
-    if (!editorOn) return;
+    /* Dos usos del mismo arrastre: el editor con barra espaciadora o botón del
+       medio, y el CELULAR con un dedo, donde no hay ni teclado ni botón. */
+    if (!editorOn && !celularPaneo) return;
     function onDown(e: PointerEvent) {
       if (enHud(e.target)) return;
-      if (e.button !== 1 && !spaceHeld) return;
+      /* En el celular no se arrastra desde un nodo: ahí el toque tiene que
+         abrir la ficha del nivel, no mover el mapa. */
+      if (celularPaneo) {
+        if (e.target instanceof Element && e.target.closest("[data-level-node]")) return;
+      } else if (e.button !== 1 && !spaceHeld) {
+        return;
+      }
       e.preventDefault();
       panRef.current = { sx: e.clientX, sy: e.clientY, bx: view.x, by: view.y };
     }
@@ -190,7 +270,7 @@ export function IslandDetailPage() {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
     };
-  }, [editorOn, spaceHeld, view.x, view.y, view.z]);
+  }, [editorOn, spaceHeld, celularPaneo, view.x, view.y, view.z]);
 
   /* La barra espaciadora arma el modo arrastre mientras se la tiene apretada.
      Con preventDefault porque los nodos son <button>: sin eso, la barra
@@ -333,6 +413,25 @@ export function IslandDetailPage() {
       ? editorPositions
       : world.levelPositions;
   const currentPosition = activePositions[currentIndex] ?? activePositions[0];
+
+  /* LA ANIMACIÓN DE APERTURA ES EL TUTORIAL. La isla abre entera y sin zoom, y
+     recién CUANDO EL ARTE TERMINÓ DE CARGAR se acerca despacio hasta la nave,
+     que está parada en el nivel actual. De ese solo movimiento salen dos
+     cosas: el chico llega mirando lo que le toca jugar, y acaba de VER el mapa
+     acercarse, así que sabe que es algo que puede hacer él. Dispararla antes
+     de que cargue el arte la desperdicia — no habría nada que mirar acercarse. */
+  const arteListo = bgReady && (!islandImgPath || !!islandImgSize);
+  useEffect(() => {
+    if (!celular || !arteListo || entradaHecha.current || editorOn) return;
+    entradaHecha.current = true;
+    const arranque = window.setTimeout(() => {
+      setAnimandoEntrada(true);
+      centrarEn(currentPosition.x, currentPosition.y, ZOOM_CELULAR);
+    }, 450);
+    const fin = window.setTimeout(() => setAnimandoEntrada(false), 450 + 1900);
+    return () => { window.clearTimeout(arranque); window.clearTimeout(fin); };
+  }, [celular, arteListo, editorOn, centrarEn, currentPosition.x, currentPosition.y]);
+
   /* The ship is the game's main character (always front-facing, never a
      directional indicator). Its art "evolves" with the cumulative star total,
      same as the mascots — rendered via <CharacterSkin kind="ship" /> below. */
@@ -830,11 +929,21 @@ export function IslandDetailPage() {
           className="absolute inset-0"
           style={
             view.z !== 1 || view.x !== 0 || view.y !== 0
-              ? { transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`, transformOrigin: "center", cursor: spaceHeld ? "grab" : undefined }
+              ? {
+                  transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`,
+                  transformOrigin: "center",
+                  cursor: spaceHeld ? "grab" : undefined,
+                  /* Sólo durante la apertura: después se apaga para que el
+                     arrastre con el dedo responda sin retardo. */
+                  transition: animandoEntrada
+                    ? "transform 1900ms cubic-bezier(0.22, 0.61, 0.36, 1)"
+                    : undefined,
+                }
               : undefined
           }
         >
         <div
+          ref={stageRef}
           className={`island-stage ${stageCover ? "island-stage--cover" : ""} transition-opacity duration-300 ${bgReady && (!islandImgPath || islandImgSize) ? "animate-island-zoom" : "opacity-0"}`}
         >
           {/* El arte nítido, llenando el escenario. No lleva object-fit: la
@@ -1202,15 +1311,24 @@ export function IslandDetailPage() {
                   <span className="block mb-3">
                     <LevelStars earned={selectedLevel.stars} size={19} gap={2} />
                   </span>
-                  <Button className="w-full" onClick={openLevel}>
-                    {selectedLevel.state === "Bloqueado" ? (
-                      <><Lock size={17} /> <span>Bloqueado</span></>
-                    ) : selectedLevel.state === "Completado" ? (
-                      <><RotateCcw size={17} /> <span>Reintentar</span></>
-                    ) : (
-                      <><span>Entrar al nivel</span> <ArrowRight size={18} strokeWidth={2.8} /></>
-                    )}
-                  </Button>
+                  {/* En el celular la ficha se abre igual —nombre, estado y
+                      estrellas ganadas— pero SIN botón de jugar: se explora el
+                      juego, no se progresa (CLAUDE.md §6.2). Se muestra el
+                      aviso en vez de un botón muerto para que el chico entienda
+                      por qué y siga recorriendo. */}
+                  {celular ? (
+                    <AvisoSoloEnComputadora />
+                  ) : (
+                    <Button className="w-full" onClick={openLevel}>
+                      {selectedLevel.state === "Bloqueado" ? (
+                        <><Lock size={17} /> <span>Bloqueado</span></>
+                      ) : selectedLevel.state === "Completado" ? (
+                        <><RotateCcw size={17} /> <span>Reintentar</span></>
+                      ) : (
+                        <><span>Entrar al nivel</span> <ArrowRight size={18} strokeWidth={2.8} /></>
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
@@ -1224,9 +1342,12 @@ export function IslandDetailPage() {
         type="button"
         className="fixed top-4 left-4 z-30 glass-surface rounded-xl px-3 py-2 flex items-center gap-2 text-text font-bold shadow-card hover:brightness-105 transition cursor-pointer animate-hud-in"
         onClick={() => navigate("/mundos")}
+        aria-label="Volver a mundos"
       >
         <ArrowLeft size={20} />
-        <span className="text-[clamp(1rem,1.8vmin,1.35rem)]">Volver a mundos</span>
+        {/* En el celular queda sólo la flecha: con el texto, este botón y el
+            encabezado de la isla se pisaban — no entran los dos en 375 px. */}
+        <span className={`text-[clamp(1rem,1.8vmin,1.35rem)] ${celular ? "hidden" : ""}`}>Volver a mundos</span>
       </button>
 
       {/* Contador de estrellas de la cuenta (siempre visible, arriba a la derecha). */}

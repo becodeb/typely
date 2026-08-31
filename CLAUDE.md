@@ -179,8 +179,8 @@ clickable-vs-inert rule) lives in **§6.5**.
 
 > **Primary target device: touch Chromebooks** (Acer and similar) — small but
 > rectangular screens. Many of them are **3:2**, not 16:9 (1366×912, 2256×1504),
-> which matters because all the island art is 16:9. Phones are NOT a target yet;
-> they are a planned future step (see §6.2). Optimise for the Chromebook first.
+> which matters because all the island art is 16:9. Phones are **explore-only**
+> — browsable, no level playable (§6.2). Optimise for the Chromebook first.
 
 `src/styles/global.css` holds the visual system + all page CSS. Responsiveness
 targets three device classes:
@@ -191,12 +191,14 @@ targets three device classes:
   blocks (720/620/560). Width layout = desktop.
 - **Phones (≤768px):** **explore-only** — the whole game is browsable, no level
   is playable. The full decision, and what it means screen by screen, is §6.2.
-  This file used to claim a consolidated "RESPONSIVE PASS" section existed at
-  the end of `global.css`. **It does not** — the only `max-width` in that file
-  is inside a comment, so there is no phone CSS at all today. When it gets
-  written it goes at the END of `global.css`, width-only, so it wins the
-  cascade without disturbing the scattered `max-height` overrides that the
-  Chromebooks depend on.
+  **This class is handled in React, not in CSS.** `global.css` still has no
+  phone block, and that is on purpose: what a phone changes is *behaviour*
+  (which route is reachable, where the zoom lens sits, how many islands the
+  track fits) and none of that is expressible as a width override. The single
+  source of truth is the `useEsCelular` hook — see §6.2. If a future change is
+  purely cosmetic and CSS *can* express it, it goes at the END of `global.css`,
+  width-only, so it wins the cascade without disturbing the scattered
+  `max-height` overrides that the Chromebooks depend on.
 
 ### 6.1 Island stage — the level-map coordinate system
 
@@ -321,7 +323,7 @@ It draws each node over the real art at its true relative size (the same
 and after editing `levelPositions.ts`; the `--zoom` view carries a fine
 percentage grid so you can read a platform's centre straight off the image.
 
-### 6.2 Phones — explore-only (DECIDED, not implemented)
+### 6.2 Phones — explore-only (implemented)
 
 **The decision.** On a phone the whole game is browsable and **no level is
 playable**. A kid can log in, walk the world map, open any island, tap a level
@@ -420,6 +422,40 @@ home row.
 island, achievements/rewards, missions and the account. All of them browsable
 on a phone. Only `GameplayPage`, `ShortcutLevelView` and `SkillLevelView` are
 closed.
+
+Login, `/logros`, `/misiones` and `/mi-cuenta` needed **no work**: they are
+column-of-cards layouts that already reflow, and none of them overflows
+horizontally at 375px. Only the two game screens — the world map and the island
+— had to change, because only those two paint on a fixed stage.
+
+#### Where the code lives
+
+| Piece | File |
+|---|---|
+| What counts as a phone | `src/hooks/useEsCelular.ts` — `CONSULTA_CELULAR`, `esCelular()`, `useEsCelular()` |
+| Route guard on the level | `src/components/common/SoloEnComputadora.tsx`, wired in `App.tsx` |
+| "Played on a computer" line | `AvisoSoloEnComputadora`, same file, rendered by the island popover |
+| Zoom + pan, opening animation | `src/pages/IslandDetailPage.tsx` |
+| One island per screen | `src/pages/WorldsPage.tsx` |
+
+Three things are worth keeping straight, because each was a real trap:
+
+- **The breakpoint is read in ONE place.** `useEsCelular` is the only thing that
+  decides. Do not re-test the width inline anywhere — that is how the guard and
+  the popover drift apart and a phone gets a play button that leads nowhere.
+- **The zoom lens is its own transform layer**, exactly as §6.1 warns. Putting
+  it on `.island-stage` makes it fight that element's entrance animation, which
+  also animates `transform`.
+- **The world map scales the TRACK, not the islands' coordinates.**
+  `escalaMapa` (1 on a computer, 3 on a phone) multiplies the track width, the
+  SVG viewBox and each island's `left`, so the same layout simply spreads out.
+  Island positions are untouched, and the desktop path is byte-for-byte the old
+  one because it multiplies by 1.
+
+The opening animation waits for the island art to load, then eases to the
+current level over 1900ms at `ZOOM_CELULAR = 2.2`. Both numbers are tuned to be
+watchable — the point is that the kid *sees* the zoom happen and learns the
+gesture, so making it faster defeats it.
 
 ### 6.3 Island art — one folder per island
 
