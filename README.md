@@ -94,30 +94,69 @@ las islas, los niveles, el arte y el motor de tipeo, que es casi todo.
 
 El login real y el panel de gestión **no van a funcionar** sin la API.
 
-### Con la API
+### Con todo el stack local
 
-La API necesita un Postgres. Levantá uno como quieras (Docker es lo más
-simple) y pasale la URL:
+Para tocar login, roles o el panel de gestión necesitás la API y una base.
+**No hace falta ningún acceso a producción**, y no hay que copiar nada de
+Coolify: la base es un contenedor descartable en tu máquina.
+
+Necesitás Docker andando y dos archivos que git ignora — `api/.env` (base,
+`JWT_SECRET`, superadmin inicial) y `.env.local` (a dónde apunta el proxy).
+`.env.example` muestra qué lleva cada uno.
+
+Con eso, un comando arma la base, aplica las migraciones y crea el
+superadmin:
 
 ```bash
-cd api
-npm ci
-DATABASE_URL=postgres://usuario:clave@localhost:5432/typely \
-JWT_SECRET=$(openssl rand -base64 48) \
+npm run db:local
+```
+
+Además siembra **ocho cuentas de prueba, una por rol**, todas con la misma
+contraseña, para que probar el RBAC no exija crearlas a mano cada vez:
+
+| Usuario | Rol | Dónde queda |
+| --- | --- | --- |
+| `superadmin` | superadmin | Toda la plataforma |
+| `admin1`, `admin2` | admin | Escuela de Prueba |
+| `docente1` | docente | A cargo de 4.º A |
+| `docente2` | docente | A cargo de 5.º B |
+| `alumno1`, `alumno2` | alumno | 4.º A |
+| `alumno3` | alumno | 5.º B |
+
+Los alumnos van en **dos** grupos y cada docente tiene **uno** a propósito:
+con un solo grupo, "el docente ve solo a sus alumnos" da verdadero por
+accidente y la prueba no prueba nada.
+
+El seed es idempotente y corre en cada `db:local`, así que si cambiaste una
+contraseña probando, la próxima corrida la repone. La contraseña la imprime
+el propio comando (y vive en `api/.env`).
+
+**Nunca corre contra producción**: aborta si `DATABASE_URL` no apunta a tu
+máquina, y no hay bandera para saltearlo. Ocho cuentas con una contraseña
+conocida y pública serían, en una base real, una puerta abierta.
+
+Después, cada servidor en su terminal:
+
+```bash
+cd api && npm run dev:local
+```
+
+```bash
 npm run dev
 ```
 
-Al arrancar aplica las migraciones sola. Después creá el primer superadmin
-—la base arranca vacía y no existe ninguna cuenta por defecto—:
+Para empezar de cero —borra la base y todo lo que hayas cargado—:
 
 ```bash
-SUPERADMIN_USERNAME=tu.usuario \
-SUPERADMIN_NAME="Tu Nombre" \
-npm run bootstrap:dev
+npm run db:local -- --reset
 ```
 
-Te imprime una contraseña temporal **una sola vez** y te la pide cambiar al
-entrar.
+**El proxy de `vite dev` decide contra qué backend trabajás.** Sin
+`.env.local` va a producción, que es lo que sirve para trabajar en el juego
+sin montar nada; con `TYPELY_API=http://127.0.0.1:3010` va a tu API. Es una
+variable de entorno y no una edición de `vite.config.ts` a propósito:
+editar el archivo versionado termina commiteado por accidente y le cambia
+el backend a todo el equipo.
 
 ### Antes de dar algo por terminado
 

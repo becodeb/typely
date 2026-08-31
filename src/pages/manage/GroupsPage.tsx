@@ -18,6 +18,9 @@ import { Link } from "react-router-dom";
 import type { Group } from "../../types";
 import { api, ApiError } from "../../utils/api";
 import { assets, islandMapThumb } from "../../utils/assets";
+import type { Role } from "../../types";
+import { useAuth } from "../../hooks/useAuth";
+import { canImport, canWriteGroups } from "./permissions";
 import { useSede } from "./ManageShell";
 import {
   Button,
@@ -36,7 +39,15 @@ import {
 
 export function GroupsPage() {
   const { sedeId, groups, groupsError, reloadGroups } = useSede();
+  const { user } = useAuth();
   const [creating, setCreating] = useState(false);
+
+  /* Un docente ve sus grupos pero no los arma: armar cursos y dar de alta
+     gente es del admin. Mostrarle botones que la API va a rechazar con un
+     403 es peor que no mostrarlos — promete algo que no va a pasar. */
+  const actorRole = (user?.role ?? "alumno") as Role;
+  const mayWrite = canWriteGroups(actorRole);
+  const mayImport = canImport(actorRole);
 
   return (
     <>
@@ -65,6 +76,7 @@ export function GroupsPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            {mayImport && (
             <Link
               to="/gestion/importar"
               className="inline-flex h-[38px] items-center gap-2 rounded-xl border border-white/90 bg-white/80 px-4 text-[13px] font-semibold text-[#17355f] backdrop-blur transition-colors hover:bg-white"
@@ -76,7 +88,8 @@ export function GroupsPage() {
               </svg>
               Importar
             </Link>
-            {!creating && (
+            )}
+            {mayWrite && !creating && (
               <Button variant="primary" onClick={() => setCreating(true)}>
                 Nuevo grupo
               </Button>
@@ -107,10 +120,14 @@ export function GroupsPage() {
         ) : groups.length === 0 ? (
           <Card>
             <EmptyState
-              title="Todavía no hay grupos"
-              hint="Un grupo es un curso: 4.º B, 5.º A. Los alumnos y los docentes se cargan dentro de cada uno."
+              title={mayWrite ? "Todavía no hay grupos" : "Todavía no tenés grupos a cargo"}
+              hint={
+                mayWrite
+                  ? "Un grupo es un curso: 4.º B, 5.º A. Los alumnos y los docentes se cargan dentro de cada uno."
+                  : "Cuando el administrador de la escuela te asigne un curso, va a aparecer acá."
+              }
               action={
-                !creating && (
+                mayWrite && !creating && (
                   <Button variant="primary" onClick={() => setCreating(true)}>
                     Crear el primero
                   </Button>

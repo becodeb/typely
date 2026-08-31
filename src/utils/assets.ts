@@ -10,6 +10,10 @@
  * editing this file again.
  */
 export const assets = {
+  /* La marca. Original en `Images/brand/logos/`; esta copia la genera
+     `scripts/import-brand-logo.mjs` recortada y en WebP. */
+  logoWordmark: "/assets/brand/logo-typely.webp",
+
   loginBg: "/assets/edutic-art/login-sky-islands-bg.webp",
   homeBg: "/assets/edutic-art/sky-soft-bg.webp",
   gameplayBg: "/assets/edutic-art/gameplay-bg.webp",

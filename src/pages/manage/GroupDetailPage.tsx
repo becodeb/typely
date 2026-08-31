@@ -15,6 +15,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { ApiUser, Group, GroupMember, IssuedCredentials } from "../../types";
 import { api, ApiError } from "../../utils/api";
+import type { Role } from "../../types";
+import { useAuth } from "../../hooks/useAuth";
+import { canCreate, canEdit, canImport, canResetPassword, canWriteGroups } from "./permissions";
 import { useSede } from "./ManageShell";
 import {
   Button,
@@ -118,6 +121,10 @@ function TeachersSection({
   teachers: GroupMember[];
   onChanged: () => void;
 }) {
+  const { user } = useAuth();
+  /* Poner y sacar docentes de un curso es del admin. Un docente ve quiénes
+     son sus colegas en el grupo, pero no reordena el trabajo de otro. */
+  const mayWrite = canWriteGroups((user?.role ?? "alumno") as Role);
   const [available, setAvailable] = useState<ApiUser[] | null>(null);
   const [picking, setPicking] = useState(false);
   const [selected, setSelected] = useState("");
@@ -171,7 +178,7 @@ function TeachersSection({
     <Card className="overflow-hidden">
       <div className="flex items-center justify-between gap-3 border-b border-[#e3e6ec] px-5 py-3.5">
         <h2 className="text-sm font-bold text-[#101828]">Docentes a cargo</h2>
-        {!picking && (
+        {mayWrite && !picking && (
           <Button variant="secondary" onClick={() => void openPicker()}>
             Asignar docente
           </Button>
@@ -234,9 +241,11 @@ function TeachersSection({
                   {t.email ? ` · ${t.email}` : ""}
                 </p>
               </div>
-              <Button variant="ghost" onClick={() => void remove(t.id)} disabled={busy}>
-                Quitar
-              </Button>
+              {mayWrite && (
+                <Button variant="ghost" onClick={() => void remove(t.id)} disabled={busy}>
+                  Quitar
+                </Button>
+              )}
             </li>
           ))}
         </ul>
@@ -262,6 +271,12 @@ function StudentsSection({
   onChanged: () => void;
   onIssued: (v: { title: string; list: IssuedCredentials[] }) => void;
 }) {
+  const { user } = useAuth();
+  const actorRole = (user?.role ?? "alumno") as Role;
+  const mayCreate = canCreate(actorRole);
+  const mayImport = canImport(actorRole);
+  const mayEditStudents = canEdit(actorRole, "alumno", false);
+  const mayResetPassword = canResetPassword(actorRole, "alumno", false);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -345,13 +360,15 @@ function StudentsSection({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e3e6ec] px-5 py-3.5">
         <h2 className="text-sm font-bold text-[#101828]">Alumnos</h2>
         <div className="flex gap-2">
-          <Link
-            to={`/gestion/grupos/${groupId}/importar`}
-            className="inline-flex items-center rounded-lg border border-[#d5d9e2] bg-white px-3.5 py-2 text-sm font-semibold text-[#1a2233] hover:bg-[#f4f6fa]"
-          >
-            Importar lista
-          </Link>
-          {!adding && (
+          {mayImport && (
+            <Link
+              to={`/gestion/grupos/${groupId}/importar`}
+              className="inline-flex items-center rounded-lg border border-[#d5d9e2] bg-white px-3.5 py-2 text-sm font-semibold text-[#1a2233] hover:bg-[#f4f6fa]"
+            >
+              Importar lista
+            </Link>
+          )}
+          {mayCreate && !adding && (
             <Button variant="primary" onClick={() => setAdding(true)}>
               Agregar alumno
             </Button>
@@ -429,12 +446,19 @@ function StudentsSection({
                     )}
                   </td>
                   <td className="px-5 py-3.5 text-right whitespace-nowrap">
-                    <Button variant="ghost" onClick={() => void resetPassword(s)} disabled={busyId === s.id}>
-                      Nueva contraseña
-                    </Button>
-                    <Button variant="ghost" onClick={() => void removeFromGroup(s)} disabled={busyId === s.id}>
-                      Quitar
-                    </Button>
+                    {/* La contraseña sí la puede el docente: es el caso
+                        real de "me la olvidé" en el aula. Sacar a alguien
+                        del curso, no — eso reordena el trabajo de otro. */}
+                    {mayResetPassword && (
+                      <Button variant="ghost" onClick={() => void resetPassword(s)} disabled={busyId === s.id}>
+                        Nueva contraseña
+                      </Button>
+                    )}
+                    {mayEditStudents && (
+                      <Button variant="ghost" onClick={() => void removeFromGroup(s)} disabled={busyId === s.id}>
+                        Quitar
+                      </Button>
+                    )}
                   </td>
                 </tr>
               ))}

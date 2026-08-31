@@ -14,6 +14,9 @@ import { AccountPage } from "./pages/AccountPage";
 import { MissionsPage } from "./pages/MissionsPage";
 import { ManageShell } from "./pages/manage/ManageShell";
 import { GroupsPage } from "./pages/manage/GroupsPage";
+import { DashboardPage } from "./pages/manage/DashboardPage";
+import { StudentDetailPage } from "./pages/manage/StudentDetailPage";
+import { UsersPage } from "./pages/manage/UsersPage";
 import { GroupDetailPage } from "./pages/manage/GroupDetailPage";
 import { SedesPage } from "./pages/manage/SedesPage";
 import { ImportPage } from "./pages/manage/ImportPage";
@@ -156,11 +159,16 @@ export function App() {
         {/* Gestión — superadmin y admin. Las dos comparten pantallas: el
             superadmin tiene los mismos permisos más el alcance, y elige
             sede con un selector en la barra. */}
-        <Route element={<ProtectedRoute roles={["superadmin", "admin"]} />}>
+        <Route element={<ProtectedRoute roles={["superadmin", "admin", "docente"]} />}>
           <Route path="/gestion" element={<ManageShell />}>
-            <Route index element={<Navigate to="/gestion/grupos" replace />} />
+            {/* Los tres entran por el tablero. Lo que cada uno VE lo decide
+                la API por su alcance, no una ruta distinta por rol. */}
+            <Route index element={<Navigate to="/gestion/tablero" replace />} />
+            <Route path="tablero" element={<DashboardPage />} />
+            <Route path="alumnos/:studentId" element={<StudentDetailPage />} />
             <Route path="sedes" element={<SedesPage />} />
             <Route path="grupos" element={<GroupsPage />} />
+            <Route path="usuarios" element={<UsersPage />} />
             <Route path="grupos/:groupId" element={<GroupDetailPage />} />
             <Route path="grupos/:groupId/importar" element={<ImportPage />} />
             <Route path="importar" element={<ImportPage />} />

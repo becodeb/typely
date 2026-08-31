@@ -233,6 +233,14 @@ export async function userRoutes(app: FastifyInstance) {
     const target = await loadTarget(actor, id, reply);
     if (!target) return;
 
+    /* Mismo límite que en DELETE: un admin no puede tocar a otro admin.
+       PATCH no lo verificaba —`loadTarget` solo frena al superadmin y a
+       otras sedes— así que un admin podía renombrar, mover de sede o
+       DESACTIVAR a un par suyo, y desactivar le corta la sesión al toque.
+       Editarse a uno mismo sigue siendo válido: nadie se escala a sí mismo
+       porque el rol no es un campo editable acá. */
+    if (target.id !== actor.id) assertCanGrant(actor.role, target.role);
+
     const parsed = updateUserSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "Datos inválidos." });
     const data = parsed.data;
@@ -337,6 +345,18 @@ export async function userRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const target = await loadTarget(actor, id, reply);
     if (!target) return;
+
+    /* Nadie se resetea a sí mismo por acá. `change-password` exige la
+       contraseña ACTUAL justamente para que un access token robado no
+       alcance para quedarse con la cuenta; si el dueño del token pudiera
+       resetearse a sí mismo por esta ruta, esa defensa no serviría de
+       nada. Un superadmin pasaba: `assertCanGrant(superadmin, superadmin)`
+       es verdadero. */
+    if (target.id === actor.id) {
+      return reply.code(400).send({
+        error: "Para cambiar tu propia contraseña usá «Cambiar contraseña»: te pide la actual.",
+      });
+    }
 
     if (actor.role === "docente") {
       /* El docente resuelve el "me olvidé la contraseña" de su propio

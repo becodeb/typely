@@ -125,15 +125,25 @@ export async function groupRoutes(app: FastifyInstance) {
         grade: schema.groups.grade,
         sedeId: schema.groups.sedeId,
         active: schema.groups.active,
+        /* ⚠ La referencia al grupo de afuera va CALIFICADA —`"groups"."id"`—
+           y escrita a mano, no como `${schema.groups.id}`.
+
+           Drizzle interpola esa columna como `"id"` pelado. Adentro del
+           subquery ese nombre resuelve contra la tabla interna, así que la
+           condición terminaba siendo `u.group_id = u.id`: siempre falsa,
+           sin error, y todos los grupos mostraban 0 alumnos con la base
+           llena. El de docentes zafaba de casualidad, porque
+           `group_teachers` no tiene columna `id` y el nombre caía al de
+           afuera — que es peor todavía: uno andaba y el otro no. */
         studentCount: sql<number>`(
           SELECT count(*)::int FROM users u
-          WHERE u.group_id = ${schema.groups.id}
+          WHERE u.group_id = "groups"."id"
             AND u.role = 'alumno'
             AND u.deleted_at IS NULL
         )`,
         teacherCount: sql<number>`(
           SELECT count(*)::int FROM group_teachers gt
-          WHERE gt.group_id = ${schema.groups.id}
+          WHERE gt.group_id = "groups"."id"
         )`,
         /* Precisión media de los alumnos del grupo, sobre su mejor
            resultado en cada nivel. Es el mismo número que usa el detalle
@@ -144,7 +154,7 @@ export async function groupRoutes(app: FastifyInstance) {
           SELECT coalesce(round(avg(lp.best_accuracy)), 0)::int
           FROM level_progress lp
           INNER JOIN users su ON su.id = lp.user_id
-          WHERE su.group_id = ${schema.groups.id}
+          WHERE su.group_id = "groups"."id"
             AND su.deleted_at IS NULL
         )`,
       })

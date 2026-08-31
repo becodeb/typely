@@ -1,7 +1,13 @@
-/* Marco de las pantallas de gestión — dos columnas, alto fijo.
+/* Marco de las pantallas de gestión — tres columnas, alto fijo.
  *
  * La izquierda es CONTEXTO y no cambia al navegar: en qué escuela estás,
- * el alta de cuentas y los totales. La derecha es trabajo.
+ * el alta de cuentas y los totales. El medio es trabajo. La derecha son
+ * HERRAMIENTAS que se usan mientras mirás otra cosa —hoy, restablecer
+ * contraseñas— y por eso no viven detrás de un menú.
+ *
+ * La de la derecha aparece recién en pantallas anchas (`xl`). Por debajo
+ * de eso le comería a la lista de grupos el espacio donde muestra sus
+ * métricas, y esa lista es la pantalla; la herramienta, no.
  *
  * **La pantalla no scrollea.** Ocupa exactamente el alto de la ventana y
  * lo que crece —la lista de grupos— scrollea adentro de su propia zona.
@@ -28,16 +34,20 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import type { Group, IssuedCredentials, Sede } from "../../types";
+import type { Group, IssuedCredentials, Role, Sede } from "../../types";
 import { api, ApiError } from "../../utils/api";
 import { useAuth } from "../../hooks/useAuth";
 import { assets } from "../../utils/assets";
 import { CredentialsPanel } from "./Credentials";
+import { canCreate, creatableRoles } from "./permissions";
+import { roleLabel } from "../../utils/storage";
 import { Button, Card, ErrorBanner, Field, Input, Spinner } from "./ui";
 
 interface ManageContextValue {
   sedeId: string;
   sedeName: string;
+  /** Todas las escuelas alcanzables. Para el admin es una sola. */
+  sedes: Sede[];
   /** Solo el superadmin puede cambiar de escuela. */
   canSwitch: boolean;
   /** Relee las escuelas: la usa la pantalla de Escuelas tras crear o editar. */
@@ -59,7 +69,11 @@ export function useSede(): ManageContextValue {
 }
 
 const NAV_ALL = [
+  { to: "/gestion/tablero", label: "Tablero", superadminOnly: false },
   { to: "/gestion/grupos", label: "Grupos", superadminOnly: false },
+  { to: "/gestion/usuarios", label: "Personas", superadminOnly: false },
+  /* Crear y editar escuelas es de plataforma: ni el admin ni el docente
+     tienen `sede:write`, así que para ellos la sección no existe. */
   { to: "/gestion/sedes", label: "Escuelas", superadminOnly: true },
 ];
 
@@ -70,9 +84,21 @@ const NAV_ALL = [
 const RAIL_BG = "linear-gradient(168deg, #33306f 0%, #262456 52%, #1a1840 100%)";
 const RAIL_MUTED = "#a6a7d8";
 
+/* Colores del rol sobre el crepúsculo. Son los mismos tres acentos del
+   proyecto —violeta, cian y menta— pero levantados en luminosidad: los del
+   panel claro (`permissions.ts`) están hechos para fondo blanco y sobre
+   este violeta no llegarían al contraste que necesita un texto de 9.5px. */
+const RAIL_ROLE: Record<Role, { bg: string; fg: string }> = {
+  superadmin: { bg: "rgba(155,124,255,0.22)", fg: "#c9b6ff" },
+  admin: { bg: "rgba(51,199,240,0.18)", fg: "#7ddcf5" },
+  docente: { bg: "rgba(91,232,186,0.16)", fg: "#5be8ba" },
+  alumno: { bg: "rgba(255,255,255,0.12)", fg: "#c9cbef" },
+};
+
 export function ManageShell() {
   const { user, logout } = useAuth();
-  const isSuperadmin = user?.role === "superadmin";
+  const actorRole = (user?.role ?? "alumno") as Role;
+  const isSuperadmin = actorRole === "superadmin";
   const nav = NAV_ALL.filter((i) => !i.superadminOnly || isSuperadmin);
 
   const [sedes, setSedes] = useState<Sede[]>([]);
@@ -116,17 +142,21 @@ export function ManageShell() {
     if (!sedeId) return;
     setGroupsError("");
     try {
+      /* El conteo de docentes es solo para el panel de gestión de la
+         escuela. Un docente pidiéndolo recibe una lista vacía —la API le
+         devuelve solo sus alumnos— así que ni se pide. */
+      const wantsTeachers = actorRole !== "docente";
       const [gs, teachers] = await Promise.all([
         api.groups(sedeId),
-        api.users({ role: "docente", sedeId }),
+        wantsTeachers ? api.users({ role: "docente", sedeId }) : Promise.resolve([]),
       ]);
       setGroups(gs);
-      setTeacherCount(teachers.length);
+      setTeacherCount(wantsTeachers ? teachers.length : null);
     } catch (err) {
       setGroups(null);
       setGroupsError(err instanceof ApiError ? err.message : "No pudimos cargar los grupos.");
     }
-  }, [sedeId]);
+  }, [sedeId, actorRole]);
 
   /* Al cambiar de escuela se vacía antes de pedir: si no, se ven un
      instante los grupos de la anterior bajo el nombre de la nueva. */
@@ -144,6 +174,7 @@ export function ManageShell() {
         ? {
             sedeId: current.id,
             sedeName: current.name,
+            sedes,
             canSwitch: isSuperadmin,
             reloadSedes: () => void loadSedes(),
             groups,
@@ -152,7 +183,7 @@ export function ManageShell() {
             showCredentials: (title, list) => setCredentials({ title, list }),
           }
         : null,
-    [current, isSuperadmin, loadSedes, groups, groupsError, loadGroups],
+    [current, sedes, isSuperadmin, loadSedes, groups, groupsError, loadGroups],
   );
 
   return (
@@ -180,12 +211,22 @@ export function ManageShell() {
             scrollea acá adentro en vez de recortarse. */}
         <div className="relative flex h-full min-h-0 flex-col gap-3.5 overflow-y-auto px-4 pb-0 pt-4">
 
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="font-display text-[20px] font-extrabold">TYPELY</span>
-            <span className="rounded-full bg-[#5be8ba]/[0.16] px-2 py-[2px] text-[9.5px] font-bold uppercase tracking-[0.07em] text-[#5be8ba]">
-              Gestión
-            </span>
-          </div>
+          {/* El logo real en vez de la palabra en tipografía. Va la variante
+              simple —la cargada lleva los robots y dos islas alrededor, que
+              a 168 px de ancho es ruido ilegible— y va SOLO acá: repetirlo
+              en cada pantalla lo convertiría en decoración.
+
+              Centrado y solo. La insignia que lo acompañaba decía "Gestión",
+              que es lo único que no hacía falta aclarar estando adentro del
+              panel; ahora dice el rol y bajó a la ficha de la persona. */}
+          <img
+            src={assets.logoWordmark}
+            alt="TYPELY"
+            className="mx-auto w-[168px] max-w-full shrink-0"
+            /* El logo se dibujó para fondo claro; sobre el crepúsculo
+               necesita separarse del violeta sin llevar una caja. */
+            style={{ filter: "drop-shadow(0 2px 6px rgba(10,8,40,0.45))" }}
+          />
 
           {/* Escuela */}
           <div className="shrink-0 rounded-[14px] border border-white/[0.13] bg-white/[0.08] px-3 py-2.5">
@@ -238,8 +279,9 @@ export function ManageShell() {
             </ul>
           </nav>
 
-          {/* Alta de cuentas */}
-          {current && (
+          {/* Alta de cuentas. El docente no crea cuentas —no tiene
+              `user:create`— así que para él la columna no la muestra. */}
+          {current && canCreate(actorRole) && (
             <NewAccountForm
               sedeId={current.id}
               sedes={sedes}
@@ -257,15 +299,34 @@ export function ManageShell() {
           <div className="flex shrink-0 gap-1.5">
             <RailStat label="grupos" value={groups ? groups.length : null} />
             <RailStat label="alumnos" value={studentTotal} />
-            <RailStat label="docentes" value={teacherCount} />
+            {/* Un docente no tiene docentes a cargo: el número sería
+                siempre 0 y solo ocuparía lugar. */}
+            {actorRole !== "docente" && <RailStat label="docentes" value={teacherCount} />}
           </div>
 
           <div className="shrink-0 border-t border-white/10 pt-2.5">
-            <div className="mb-2 leading-tight">
-              <div className="truncate text-[12.5px] font-semibold text-white">{user?.name}</div>
-              <div className="text-[10.5px]" style={{ color: RAIL_MUTED }}>
-                {isSuperadmin ? "Superadmin" : "Administrador"}
-              </div>
+            {/* El rol como insignia y no como texto gris: es el dato que
+                explica por qué ves lo que ves, y acá cae junto a la persona
+                a la que le corresponde. Cada rol tiene su color, así se
+                reconoce de un vistazo al cambiar de cuenta. */}
+            {/* Nombre e insignia en el mismo renglón, centrados: leídos
+                juntos dicen una sola cosa —quién sos y con qué alcance— y
+                en renglones separados parecían dos datos sueltos.
+                `min-w-0` en el nombre para que recorte él y no empuje a la
+                insignia fuera de la columna. */}
+            <div className="mb-2 flex items-center justify-center gap-1.5">
+              <span className="min-w-0 truncate text-[12.5px] font-semibold text-white">
+                {user?.name}
+              </span>
+              <span
+                /* Ajustada al mínimo: con el padding y el tracking
+                   anteriores, "Superadmin de Prueba" se recortaba por 2 px.
+                   Estos seis de más lo dejan entrar entero. */
+                className="shrink-0 rounded-full px-1.5 py-[2px] text-[9.5px] font-bold uppercase tracking-[0.04em]"
+                style={{ background: RAIL_ROLE[actorRole].bg, color: RAIL_ROLE[actorRole].fg }}
+              >
+                {roleLabel(actorRole)}
+              </span>
             </div>
             <button
               type="button"
@@ -278,13 +339,18 @@ export function ManageShell() {
 
           {/* La mascota toma lo que sobra y se achica sola: en una pantalla
               baja desaparece antes que empujar algo útil fuera de vista.
-              Espejada para que mire hacia el contenido. */}
-          <div className="flex min-h-0 flex-1 items-end justify-center overflow-hidden">
+              Espejada para que mire hacia el contenido.
+
+              El aire de abajo va como `pb-4` del contenedor, no como margen
+              de la imagen: `max-h-full` se mide contra la caja de contenido,
+              así que el padding entra en la cuenta y la mascota se despega
+              del borde sin que se le recorte la cabeza. */}
+          <div className="flex min-h-0 flex-1 items-end justify-center overflow-hidden pb-10">
             <img
               src={assets.mascotMaleLaptop}
               alt=""
               aria-hidden="true"
-              className="mb-[-10px] max-h-full w-auto max-w-[150px] object-contain"
+              className="max-h-full w-auto max-w-[150px] object-contain"
               style={{ transform: "scaleX(-1)" }}
             />
           </div>
@@ -298,7 +364,7 @@ export function ManageShell() {
 
         {/* Barra compacta donde la columna no entra. */}
         <div className="flex shrink-0 items-center gap-2 border-b border-[#dbe6f4] bg-white px-4 py-2 md:hidden">
-          <span className="font-display text-lg font-extrabold">TYPELY</span>
+          <img src={assets.logoWordmark} alt="TYPELY" className="h-6 w-auto shrink-0" />
           {nav.map((item) => (
             <NavLink
               key={item.to}
@@ -353,9 +419,11 @@ export function ManageShell() {
           </ManageContext.Provider>
         )}
       </main>
+
     </div>
   );
 }
+
 
 /* ------------------------------------------------------------------ */
 
@@ -410,9 +478,12 @@ function NewAccountForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const roles: Array<"alumno" | "docente" | "admin"> = isSuperadmin
-    ? ["alumno", "docente", "admin"]
-    : ["alumno", "docente"];
+  /* Los roles salen de la matriz y no de un `if (isSuperadmin)`: esta lista
+     y la de la pantalla Personas tienen que decir lo mismo, y con dos
+     copias sueltas se separan la primera vez que cambie una regla. */
+  const roles = creatableRoles(isSuperadmin ? "superadmin" : "admin") as Array<
+    "alumno" | "docente" | "admin"
+  >;
 
   useEffect(() => {
     setAdminSedeId((prev) => (sedes.some((s) => s.id === prev) ? prev : sedeId));
