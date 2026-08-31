@@ -1,7 +1,13 @@
-/* Marco de las pantallas de gestión — dos columnas, alto fijo.
+/* Marco de las pantallas de gestión — tres columnas, alto fijo.
  *
  * La izquierda es CONTEXTO y no cambia al navegar: en qué escuela estás,
- * el alta de cuentas y los totales. La derecha es trabajo.
+ * el alta de cuentas y los totales. El medio es trabajo. La derecha son
+ * HERRAMIENTAS que se usan mientras mirás otra cosa —hoy, restablecer
+ * contraseñas— y por eso no viven detrás de un menú.
+ *
+ * La de la derecha aparece recién en pantallas anchas (`xl`). Por debajo
+ * de eso le comería a la lista de grupos el espacio donde muestra sus
+ * métricas, y esa lista es la pantalla; la herramienta, no.
  *
  * **La pantalla no scrollea.** Ocupa exactamente el alto de la ventana y
  * lo que crece —la lista de grupos— scrollea adentro de su propia zona.
@@ -28,11 +34,12 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import type { Group, IssuedCredentials, Sede } from "../../types";
+import type { Group, IssuedCredentials, Role, Sede } from "../../types";
 import { api, ApiError } from "../../utils/api";
 import { useAuth } from "../../hooks/useAuth";
 import { assets } from "../../utils/assets";
 import { CredentialsPanel } from "./Credentials";
+import { PasswordTool } from "./PasswordTool";
 import { Button, Card, ErrorBanner, Field, Input, Spinner } from "./ui";
 
 interface ManageContextValue {
@@ -358,8 +365,27 @@ export function ManageShell() {
           </ManageContext.Provider>
         )}
       </main>
+
+      {/* ================= Herramientas ================= */}
+      {/* Restablecer contraseñas es lo que más se pide en un aula y siempre
+          en el medio de otra cosa, así que va como columna fija y no detrás
+          de un menú. Aparece recién en pantallas anchas: por debajo de
+          1280px le comería a la lista de grupos el espacio de sus métricas,
+          y esa lista es la pantalla, no esto. */}
+      {ctx && user && canResetPasswords(user.role) && (
+        <aside className="hidden h-full w-[286px] shrink-0 border-l border-[#dde7f4] bg-white xl:block">
+          <PasswordTool sedeId={ctx.sedeId} actorRole={user.role} actorId={user.id} />
+        </aside>
+      )}
     </div>
   );
+}
+
+/** Quién ve la columna de contraseñas. El alumno no alcanza a nadie, y el
+ *  docente todavía no tiene panel propio — cuando lo tenga, hereda esto sin
+ *  cambios porque `PasswordTool` ya filtra por rol. */
+function canResetPasswords(role: Role): boolean {
+  return role === "superadmin" || role === "admin" || role === "docente";
 }
 
 /* ------------------------------------------------------------------ */

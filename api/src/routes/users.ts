@@ -338,6 +338,18 @@ export async function userRoutes(app: FastifyInstance) {
     const target = await loadTarget(actor, id, reply);
     if (!target) return;
 
+    /* Nadie se resetea a sí mismo por acá. `change-password` exige la
+       contraseña ACTUAL justamente para que un access token robado no
+       alcance para quedarse con la cuenta; si el dueño del token pudiera
+       resetearse a sí mismo por esta ruta, esa defensa no serviría de
+       nada. Un superadmin pasaba: `assertCanGrant(superadmin, superadmin)`
+       es verdadero. */
+    if (target.id === actor.id) {
+      return reply.code(400).send({
+        error: "Para cambiar tu propia contraseña usá «Cambiar contraseña»: te pide la actual.",
+      });
+    }
+
     if (actor.role === "docente") {
       /* El docente resuelve el "me olvidé la contraseña" de su propio
          curso, sin depender del admin — pero solo el de sus alumnos. */
