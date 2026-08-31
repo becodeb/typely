@@ -77,14 +77,21 @@ const NAV_ALL = [
   { to: "/gestion/sedes", label: "Escuelas", superadminOnly: true },
 ];
 
-/* Crepúsculo: el cielo del juego al anochecer. El violeta sale del arte
-   real (`#7488fc` es su tono saturado), llevado a una profundidad donde el
-   texto de 10.5px se lee — el tono tal cual da 3.15 de contraste contra
-   blanco y las etiquetas no se leerían. */
-const RAIL_BG = "linear-gradient(168deg, #33306f 0%, #262456 52%, #1a1840 100%)";
-const RAIL_MUTED = "#a6a7d8";
+/* Violeta de tinta: poco cromático a propósito, para que lo único
+   saturado en pantalla sea el arte de las islas del área de trabajo.
+   El tono sale del cielo del juego (`#7488fc`) desaturado y bajado.
 
-/* Colores del rol sobre el crepúsculo. Son los mismos tres acentos del
+   **El degradado es corto a propósito.** Antes iba de `#33306f` a un
+   `#1a1840` casi negro, y esa caída hundía la mitad de abajo de la
+   columna — justo donde están los totales, el nombre y la mascota. Con
+   los tres pasos cerca entre sí la barra se lee como UN color y no como
+   un desvanecido. Si alguna vez se estira, vuelve el pie hundido. */
+const RAIL_BG = "linear-gradient(168deg, #332b50 0%, #2c2445 52%, #251e3b 100%)";
+/* 5.4:1 contra el tono medio: las etiquetas de 10px lo necesitan. Sube o
+   baja con el fondo — un gris neutro sobre violeta se ve sucio. */
+const RAIL_MUTED = "#b0a7cb";
+
+/* Colores del rol sobre la barra. Son los mismos tres acentos del
    proyecto —violeta, cian y menta— pero levantados en luminosidad: los del
    panel claro (`permissions.ts`) están hechos para fondo blanco y sobre
    este violeta no llegarían al contraste que necesita un texto de 9.5px. */
@@ -199,12 +206,12 @@ export function ManageShell() {
         <div
           aria-hidden="true"
           className="pointer-events-none absolute -left-20 -top-32 h-[380px] w-[380px] rounded-full"
-          style={{ background: "radial-gradient(circle, rgba(116,136,252,0.30), transparent 68%)" }}
+          style={{ background: "radial-gradient(circle, rgba(155,124,255,0.16), transparent 68%)" }}
         />
         <div
           aria-hidden="true"
           className="pointer-events-none absolute -right-28 bottom-20 h-[300px] w-[300px] rounded-full"
-          style={{ background: "radial-gradient(circle, rgba(155,124,255,0.20), transparent 70%)" }}
+          style={{ background: "radial-gradient(circle, rgba(116,136,252,0.10), transparent 70%)" }}
         />
 
         {/* Red de seguridad: en una ventana muy baja el contenido fijo
@@ -225,11 +232,11 @@ export function ManageShell() {
             className="mx-auto w-[168px] max-w-full shrink-0"
             /* El logo se dibujó para fondo claro; sobre el crepúsculo
                necesita separarse del violeta sin llevar una caja. */
-            style={{ filter: "drop-shadow(0 2px 6px rgba(10,8,40,0.45))" }}
+            style={{ filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.5))" }}
           />
 
           {/* Escuela */}
-          <div className="shrink-0 rounded-[14px] border border-white/[0.13] bg-white/[0.08] px-3 py-2.5">
+          <div className="shrink-0 rounded-[14px] border border-white/[0.10] bg-white/[0.06] px-3 py-2.5">
             <div className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: RAIL_MUTED }}>
               Escuela
             </div>
@@ -244,7 +251,7 @@ export function ManageShell() {
                 value={selected ?? ""}
                 onChange={(e) => setSelected(e.target.value)}
                 aria-label="Escuela"
-                className="mt-1 w-full cursor-pointer rounded-lg border border-white/15 bg-white/10 px-2 py-1 text-[13px] font-semibold text-white outline-none focus:border-[#7488fc]"
+                className="mt-1 w-full cursor-pointer rounded-lg border border-white/[0.14] bg-white/[0.09] px-2 py-1 text-[13px] font-semibold text-white outline-none focus:border-[#9b7cff]"
               >
                 {sedes.map((s) => (
                   <option key={s.id} value={s.id} className="text-[#17355f]">
@@ -268,7 +275,7 @@ export function ManageShell() {
                     to={item.to}
                     className={({ isActive }) =>
                       `block rounded-[10px] px-3 py-[7px] text-[13px] font-semibold transition-colors ${
-                        isActive ? "bg-white/[0.14] text-white" : "text-[#a6a7d8] hover:bg-white/[0.07]"
+                        isActive ? "bg-white/[0.12] text-white" : "text-[#b0a7cb] hover:bg-white/[0.06]"
                       }`
                     }
                   >
@@ -304,7 +311,7 @@ export function ManageShell() {
             {actorRole !== "docente" && <RailStat label="docentes" value={teacherCount} />}
           </div>
 
-          <div className="shrink-0 border-t border-white/10 pt-2.5">
+          <div className="shrink-0 border-t border-white/[0.11] pt-2.5">
             {/* El rol como insignia y no como texto gris: es el dato que
                 explica por qué ves lo que ves, y acá cae junto a la persona
                 a la que le corresponde. Cada rol tiene su color, así se
@@ -331,7 +338,7 @@ export function ManageShell() {
             <button
               type="button"
               onClick={() => void logout()}
-              className="w-full rounded-[10px] border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[12.5px] font-semibold text-[#c9cbef] transition-colors hover:bg-white/10 hover:text-white"
+              className="w-full rounded-[10px] border border-white/[0.14] bg-white/[0.05] px-3 py-1.5 text-[12.5px] font-semibold text-[#d3cde2] transition-colors hover:bg-white/10 hover:text-white"
             >
               Cerrar sesión
             </button>
@@ -429,7 +436,7 @@ export function ManageShell() {
 
 function RailStat({ label, value }: { label: string; value: number | null }) {
   return (
-    <div className="flex-1 rounded-xl bg-white/[0.07] px-2.5 py-2">
+    <div className="flex-1 rounded-xl bg-white/[0.06] px-2.5 py-2">
       <div className="font-display text-[17px] font-bold leading-none text-white">
         {value === null ? "—" : value}
       </div>
@@ -558,7 +565,7 @@ function NewAccountForm({
   }
 
   const fieldClass =
-    "w-full rounded-[10px] border border-white/[0.13] bg-white/[0.07] px-2.5 py-1.5 text-[12.5px] text-white outline-none transition-colors placeholder:text-[#a6a7d8] focus:border-[#7488fc] focus:bg-white/[0.11]";
+    "w-full rounded-[10px] border border-white/[0.10] bg-white/[0.05] px-2.5 py-1.5 text-[12.5px] text-white outline-none transition-colors placeholder:text-[#b0a7cb] focus:border-[#9b7cff] focus:bg-white/[0.09]";
 
   const CTA: Record<string, string> = {
     alumno: "Crear alumno",
@@ -572,7 +579,7 @@ function NewAccountForm({
         Crear cuenta
       </div>
 
-      <div className="flex rounded-[11px] bg-white/[0.09] p-[3px]" role="group" aria-label="Rol de la cuenta">
+      <div className="flex rounded-[11px] bg-white/[0.08] p-[3px]" role="group" aria-label="Rol de la cuenta">
         {roles.map((r) => (
           <button
             key={r}
@@ -580,7 +587,7 @@ function NewAccountForm({
             onClick={() => { setRole(r); setGroupId(""); setError(""); }}
             aria-pressed={role === r}
             className={`flex-1 rounded-[9px] py-[6px] text-[12px] font-semibold capitalize transition-colors ${
-              role === r ? "bg-white text-[#262456]" : "text-[#a6a7d8] hover:text-white"
+              role === r ? "bg-white text-[#2c2445]" : "text-[#b0a7cb] hover:text-white"
             }`}
           >
             {r}
@@ -650,7 +657,7 @@ function NewAccountForm({
               type="button"
               onClick={() => setNewSedeName(null)}
               aria-label="Elegir una escuela existente"
-              className="shrink-0 rounded-[10px] border border-white/[0.13] bg-white/[0.07] px-2 text-[12.5px] font-semibold text-[#a6a7d8] hover:text-white"
+              className="shrink-0 rounded-[10px] border border-white/[0.10] bg-white/[0.05] px-2 text-[12.5px] font-semibold text-[#b0a7cb] hover:text-white"
             >
               ✕
             </button>

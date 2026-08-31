@@ -53,3 +53,4 @@ screenshots/
 # Borradores de diseno del canvas (scripts/prompt-fondo.mjs y /design)
 .design-isla1/
 .design-gestion/
+.design-barra/
