@@ -94,30 +94,46 @@ las islas, los niveles, el arte y el motor de tipeo, que es casi todo.
 
 El login real y el panel de gestión **no van a funcionar** sin la API.
 
-### Con la API
+### Con todo el stack local
 
-La API necesita un Postgres. Levantá uno como quieras (Docker es lo más
-simple) y pasale la URL:
+Para tocar login, roles o el panel de gestión necesitás la API y una base.
+**No hace falta ningún acceso a producción**, y no hay que copiar nada de
+Coolify: la base es un contenedor descartable en tu máquina.
+
+Necesitás Docker andando y dos archivos que git ignora — `api/.env` (base,
+`JWT_SECRET`, superadmin inicial) y `.env.local` (a dónde apunta el proxy).
+`.env.example` muestra qué lleva cada uno.
+
+Con eso, un comando arma la base, aplica las migraciones y crea el
+superadmin:
 
 ```bash
-cd api
-npm ci
-DATABASE_URL=postgres://usuario:clave@localhost:5432/typely \
-JWT_SECRET=$(openssl rand -base64 48) \
+npm run db:local
+```
+
+Te imprime el usuario y la contraseña con los que entrás. Después, cada
+servidor en su terminal:
+
+```bash
+cd api && npm run dev:local
+```
+
+```bash
 npm run dev
 ```
 
-Al arrancar aplica las migraciones sola. Después creá el primer superadmin
-—la base arranca vacía y no existe ninguna cuenta por defecto—:
+Para empezar de cero —borra la base y todo lo que hayas cargado—:
 
 ```bash
-SUPERADMIN_USERNAME=tu.usuario \
-SUPERADMIN_NAME="Tu Nombre" \
-npm run bootstrap:dev
+npm run db:local -- --reset
 ```
 
-Te imprime una contraseña temporal **una sola vez** y te la pide cambiar al
-entrar.
+**El proxy de `vite dev` decide contra qué backend trabajás.** Sin
+`.env.local` va a producción, que es lo que sirve para trabajar en el juego
+sin montar nada; con `TYPELY_API=http://127.0.0.1:3000` va a tu API. Es una
+variable de entorno y no una edición de `vite.config.ts` a propósito:
+editar el archivo versionado termina commiteado por accidente y le cambia
+el backend a todo el equipo.
 
 ### Antes de dar algo por terminado
 

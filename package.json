@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "db:local": "node scripts/local-db.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.0",
