@@ -39,12 +39,13 @@ import { api, ApiError } from "../../utils/api";
 import { useAuth } from "../../hooks/useAuth";
 import { assets } from "../../utils/assets";
 import { CredentialsPanel } from "./Credentials";
-import { PasswordTool } from "./PasswordTool";
 import { Button, Card, ErrorBanner, Field, Input, Spinner } from "./ui";
 
 interface ManageContextValue {
   sedeId: string;
   sedeName: string;
+  /** Todas las escuelas alcanzables. Para el admin es una sola. */
+  sedes: Sede[];
   /** Solo el superadmin puede cambiar de escuela. */
   canSwitch: boolean;
   /** Relee las escuelas: la usa la pantalla de Escuelas tras crear o editar. */
@@ -67,6 +68,7 @@ export function useSede(): ManageContextValue {
 
 const NAV_ALL = [
   { to: "/gestion/grupos", label: "Grupos", superadminOnly: false },
+  { to: "/gestion/usuarios", label: "Personas", superadminOnly: false },
   { to: "/gestion/sedes", label: "Escuelas", superadminOnly: true },
 ];
 
@@ -151,6 +153,7 @@ export function ManageShell() {
         ? {
             sedeId: current.id,
             sedeName: current.name,
+            sedes,
             canSwitch: isSuperadmin,
             reloadSedes: () => void loadSedes(),
             groups,
@@ -159,7 +162,7 @@ export function ManageShell() {
             showCredentials: (title, list) => setCredentials({ title, list }),
           }
         : null,
-    [current, isSuperadmin, loadSedes, groups, groupsError, loadGroups],
+    [current, sedes, isSuperadmin, loadSedes, groups, groupsError, loadGroups],
   );
 
   return (
@@ -366,27 +369,10 @@ export function ManageShell() {
         )}
       </main>
 
-      {/* ================= Herramientas ================= */}
-      {/* Restablecer contraseñas es lo que más se pide en un aula y siempre
-          en el medio de otra cosa, así que va como columna fija y no detrás
-          de un menú. Aparece recién en pantallas anchas: por debajo de
-          1280px le comería a la lista de grupos el espacio de sus métricas,
-          y esa lista es la pantalla, no esto. */}
-      {ctx && user && canResetPasswords(user.role) && (
-        <aside className="hidden h-full w-[286px] shrink-0 border-l border-[#dde7f4] bg-white xl:block">
-          <PasswordTool sedeId={ctx.sedeId} actorRole={user.role} actorId={user.id} />
-        </aside>
-      )}
     </div>
   );
 }
 
-/** Quién ve la columna de contraseñas. El alumno no alcanza a nadie, y el
- *  docente todavía no tiene panel propio — cuando lo tenga, hereda esto sin
- *  cambios porque `PasswordTool` ya filtra por rol. */
-function canResetPasswords(role: Role): boolean {
-  return role === "superadmin" || role === "admin" || role === "docente";
-}
 
 /* ------------------------------------------------------------------ */
 

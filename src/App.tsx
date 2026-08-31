@@ -14,6 +14,7 @@ import { AccountPage } from "./pages/AccountPage";
 import { MissionsPage } from "./pages/MissionsPage";
 import { ManageShell } from "./pages/manage/ManageShell";
 import { GroupsPage } from "./pages/manage/GroupsPage";
+import { UsersPage } from "./pages/manage/UsersPage";
 import { GroupDetailPage } from "./pages/manage/GroupDetailPage";
 import { SedesPage } from "./pages/manage/SedesPage";
 import { ImportPage } from "./pages/manage/ImportPage";
@@ -161,6 +162,7 @@ export function App() {
             <Route index element={<Navigate to="/gestion/grupos" replace />} />
             <Route path="sedes" element={<SedesPage />} />
             <Route path="grupos" element={<GroupsPage />} />
+            <Route path="usuarios" element={<UsersPage />} />
             <Route path="grupos/:groupId" element={<GroupDetailPage />} />
             <Route path="grupos/:groupId/importar" element={<ImportPage />} />
             <Route path="importar" element={<ImportPage />} />
