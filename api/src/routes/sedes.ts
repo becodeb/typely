@@ -28,12 +28,15 @@ export async function sedeRoutes(app: FastifyInstance) {
         photo: schema.sedes.photo,
         active: schema.sedes.active,
         /* Conteos en la misma consulta, para no hacer una vuelta por sede. */
+        /* Calificada a mano, igual que en groups.ts: ${schema.sedes.id}
+           emite `"id"` pelado y adentro del subquery resuelve contra la
+           tabla interna, dando siempre 0. */
         groupCount: sql<number>`(
-          SELECT count(*)::int FROM groups g WHERE g.sede_id = ${schema.sedes.id}
+          SELECT count(*)::int FROM groups g WHERE g.sede_id = "sedes"."id"
         )`,
         studentCount: sql<number>`(
           SELECT count(*)::int FROM users u
-          WHERE u.sede_id = ${schema.sedes.id} AND u.role = 'alumno' AND u.deleted_at IS NULL
+          WHERE u.sede_id = "sedes"."id" AND u.role = 'alumno' AND u.deleted_at IS NULL
         )`,
       })
       .from(schema.sedes)

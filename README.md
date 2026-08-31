@@ -111,8 +111,31 @@ superadmin:
 npm run db:local
 ```
 
-Te imprime el usuario y la contraseña con los que entrás. Después, cada
-servidor en su terminal:
+Además siembra **ocho cuentas de prueba, una por rol**, todas con la misma
+contraseña, para que probar el RBAC no exija crearlas a mano cada vez:
+
+| Usuario | Rol | Dónde queda |
+| --- | --- | --- |
+| `superadmin` | superadmin | Toda la plataforma |
+| `admin1`, `admin2` | admin | Escuela de Prueba |
+| `docente1` | docente | A cargo de 4.º A |
+| `docente2` | docente | A cargo de 5.º B |
+| `alumno1`, `alumno2` | alumno | 4.º A |
+| `alumno3` | alumno | 5.º B |
+
+Los alumnos van en **dos** grupos y cada docente tiene **uno** a propósito:
+con un solo grupo, "el docente ve solo a sus alumnos" da verdadero por
+accidente y la prueba no prueba nada.
+
+El seed es idempotente y corre en cada `db:local`, así que si cambiaste una
+contraseña probando, la próxima corrida la repone. La contraseña la imprime
+el propio comando (y vive en `api/.env`).
+
+**Nunca corre contra producción**: aborta si `DATABASE_URL` no apunta a tu
+máquina, y no hay bandera para saltearlo. Ocho cuentas con una contraseña
+conocida y pública serían, en una base real, una puerta abierta.
+
+Después, cada servidor en su terminal:
 
 ```bash
 cd api && npm run dev:local

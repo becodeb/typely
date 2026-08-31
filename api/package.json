@@ -11,7 +11,8 @@
     "bootstrap": "node dist/scripts/bootstrap.js",
     "bootstrap:dev": "tsx src/scripts/bootstrap.ts",
     "dev:local": "node --env-file=.env --watch --import tsx ./src/server.ts",
-    "bootstrap:local": "node --env-file=.env --import tsx ./src/scripts/bootstrap.ts"
+    "bootstrap:local": "node --env-file=.env --import tsx ./src/scripts/bootstrap.ts",
+    "seed:local": "node --env-file=.env --import tsx ./src/scripts/seed-local.ts"
   },
   "dependencies": {
     "fastify": "^4.28.1",

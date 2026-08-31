@@ -428,7 +428,7 @@ export async function adminRoutes(app: FastifyInstance) {
         grade: schema.groups.grade,
         studentCount: sql<number>`(
           SELECT count(*)::int FROM users u
-          WHERE u.group_id = ${schema.groups.id} AND u.role = 'alumno' AND u.deleted_at IS NULL
+          WHERE u.group_id = "groups"."id" AND u.role = 'alumno' AND u.deleted_at IS NULL
         )`,
       })
       .from(schema.groupTeachers)

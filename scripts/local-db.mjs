@@ -18,7 +18,7 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -105,47 +105,54 @@ async function waitReady() {
   process.exit(1);
 }
 
-/** Las migraciones las aplica el propio bootstrap al arrancar, así que este
- *  paso deja la base con esquema Y con el superadmin, de una. */
-function bootstrap() {
-  console.log("\nAplicando migraciones y creando el superadmin…");
-  /* `npm.cmd` en vez de `shell: true`: con shell, Node concatena los
-     argumentos sin escaparlos y avisa (DEP0190). Nombrar el ejecutable
-     real de Windows evita el shell y la advertencia. */
-  const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-  const r = spawnSync(npm, ["run", "bootstrap:local"], {
-    cwd: `${ROOT}api`,
-    stdio: "inherit",
-  });
+/** Corre un script de la API invocando `node` directo, sin pasar por npm.
+ *
+ *  Las dos formas obvias fallan en Windows. Con `shell: true`, Node
+ *  concatena los argumentos sin escaparlos y avisa (DEP0190). Sin shell y
+ *  nombrando `npm.cmd`, Node directamente se niega a ejecutar un `.cmd`
+ *  —endurecimiento por CVE-2024-27980—, el hijo nunca arranca y el fallo
+ *  es mudo: `status` viene en null y no se imprime una sola línea.
+ *
+ *  `process.execPath` es el mismo Node que corre este script, así que no
+ *  hay resolución de PATH que pueda fallar. Es el mismo comando que
+ *  envuelven los scripts de `api/package.json`, que siguen siendo la
+ *  entrada para usarlos a mano. */
+function apiScript(file) {
+  const r = spawnSync(
+    process.execPath,
+    ["--env-file=.env", "--import", "tsx", `./src/scripts/${file}`],
+    { cwd: `${ROOT}api`, stdio: "inherit" },
+  );
+  if (r.error) {
+    console.error(`\n✖ No se pudo correr ${file}: ${r.error.message}`);
+    process.exit(1);
+  }
   if (r.status !== 0) process.exit(r.status ?? 1);
 }
 
-function credentials() {
-  /* Se leen del .env en vez de repetirlas acá: una copia se desincroniza
-     el día que alguien cambia una y no la otra. */
-  const env = Object.fromEntries(
-    readFileSync(`${ROOT}api/.env`, "utf8")
-      .split("\n")
-      .filter((l) => l.includes("=") && !l.trim().startsWith("#"))
-      .map((l) => {
-        const i = l.indexOf("=");
-        return [l.slice(0, i).trim(), l.slice(i + 1).trim().replace(/^"|"$/g, "")];
-      }),
-  );
-  console.log("\n────────────────────────────────────────────");
-  console.log(" Entrás en http://localhost:5173 con:");
-  console.log(`   usuario:     ${env.SUPERADMIN_USERNAME}`);
-  console.log(`   contraseña:  ${env.SUPERADMIN_PASSWORD}`);
-  console.log("────────────────────────────────────────────");
-  console.log("\nFalta levantar los dos servidores, cada uno en su terminal:");
+/** Las migraciones las aplica cada script al arrancar, así que estos dos
+ *  pasos dejan la base con esquema, con el superadmin y con las cuentas de
+ *  prueba. El seed corre SIEMPRE, no solo al crear la base: es idempotente
+ *  y así las ocho cuentas siguen ahí aunque hayas cambiado alguna probando. */
+function bootstrap() {
+  console.log("\nAplicando migraciones y creando el superadmin…");
+  apiScript("bootstrap.ts");
+  console.log("\nSembrando las cuentas de prueba…");
+  apiScript("seed-local.ts");
+}
+
+/* Las cuentas las imprime el seed, que es quien las decide. Repetirlas acá
+   sería una segunda copia que se desincroniza el día que cambie una. */
+function nextSteps() {
+  console.log("Falta levantar los dos servidores, cada uno en su terminal:");
   console.log("   cd api && npm run dev:local");
   console.log("   npm run dev");
-  console.log("");
+  console.log("\nDespués entrás en http://localhost:5173\n");
 }
 
 requireDocker();
 startContainer();
 await waitReady();
 bootstrap();
-credentials();
+nextSteps();
 
