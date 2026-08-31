@@ -130,7 +130,7 @@ npm run db:local -- --reset
 
 **El proxy de `vite dev` decide contra qué backend trabajás.** Sin
 `.env.local` va a producción, que es lo que sirve para trabajar en el juego
-sin montar nada; con `TYPELY_API=http://127.0.0.1:3000` va a tu API. Es una
+sin montar nada; con `TYPELY_API=http://127.0.0.1:3010` va a tu API. Es una
 variable de entorno y no una edición de `vite.config.ts` a propósito:
 editar el archivo versionado termina commiteado por accidente y le cambia
 el backend a todo el equipo.

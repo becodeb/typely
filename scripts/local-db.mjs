@@ -109,10 +109,13 @@ async function waitReady() {
  *  paso deja la base con esquema Y con el superadmin, de una. */
 function bootstrap() {
   console.log("\nAplicando migraciones y creando el superadmin…");
-  const r = spawnSync("npm", ["run", "bootstrap:local"], {
+  /* `npm.cmd` en vez de `shell: true`: con shell, Node concatena los
+     argumentos sin escaparlos y avisa (DEP0190). Nombrar el ejecutable
+     real de Windows evita el shell y la advertencia. */
+  const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+  const r = spawnSync(npm, ["run", "bootstrap:local"], {
     cwd: `${ROOT}api`,
     stdio: "inherit",
-    shell: process.platform === "win32",
   });
   if (r.status !== 0) process.exit(r.status ?? 1);
 }
