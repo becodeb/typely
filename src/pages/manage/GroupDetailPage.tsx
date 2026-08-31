@@ -17,7 +17,8 @@ import type { ApiUser, Group, GroupMember, IssuedCredentials } from "../../types
 import { api, ApiError } from "../../utils/api";
 import type { Role } from "../../types";
 import { useAuth } from "../../hooks/useAuth";
-import { canCreate, canEdit, canImport, canResetPassword, canWriteGroups } from "./permissions";
+import { canChooseWorlds, canCreate, canEdit, canImport, canResetPassword, canWriteGroups } from "./permissions";
+import { GroupWorldsSection } from "./GroupWorldsSection";
 import { useSede } from "./ManageShell";
 import {
   Button,
@@ -45,6 +46,8 @@ export function GroupDetailPage() {
   /* `reloadGroups` mantiene al día los contadores de la columna: sin eso,
      agregar un alumno acá dejaba el total de la izquierda desfasado. */
   const { sedeId, reloadGroups, showCredentials } = useSede();
+  const { user } = useAuth();
+  const actorRole = (user?.role ?? "alumno") as Role;
 
   const [data, setData] = useState<Members | null>(null);
   const [error, setError] = useState("");
@@ -87,6 +90,11 @@ export function GroupDetailPage() {
         </Card>
       ) : (
         <div className="flex flex-col gap-6">
+          {/* Primero lo que el docente sí decide. Para él, el resto de la
+              pantalla es de solo lectura; si esto quedara al final, la
+              única cosa accionable estaría abajo de todo. */}
+          {canChooseWorlds(actorRole) && <GroupWorldsSection groupId={groupId} />}
+
           <TeachersSection
             groupId={groupId}
             sedeId={sedeId}

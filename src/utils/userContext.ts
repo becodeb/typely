@@ -15,7 +15,7 @@
 import type { ActiveUser, GradeId, Group, Role } from "../types";
 import { api, getAccessToken } from "./api";
 import { isDemoMode } from "./storage";
-import type { Activity } from "../data/activities";
+import { WORLD_PEDAGOGY_ORDER, type Activity } from "../data/activities";
 
 /* ------------------------------------------------------------------ */
 /* Grupo del alumno — cargado una vez, leído muchas                    */
@@ -112,45 +112,44 @@ export function getUserContext(user: ActiveUser | null): UserContext {
 /* Grado → islas                                                       */
 /* ------------------------------------------------------------------ */
 
-/** Qué islas corresponden a cada grado, en orden de dificultad. */
-export const GRADE_WORLDS: Record<GradeId, Activity["worldId"][]> = {
-  inicial: ["island1", "island6"],
-  "1ep": ["island1", "island6", "island2"],
-  "2ep": ["island1", "island6", "island2", "island7", "island13"],
-  "3ep": ["island1", "island6", "island2", "island7", "island13", "island3", "island8"],
-  "4ep": [
-    "island1", "island6", "island2", "island7", "island13",
-    "island3", "island8", "island9", "island4", "island10",
-  ],
-  "5ep": [
-    "island1", "island6", "island2", "island7", "island13",
-    "island3", "island8", "island9", "island4", "island10",
-    "island5", "island11",
-  ],
-  "6ep": [
-    "island1", "island6", "island2", "island7", "island13",
-    "island3", "island8", "island9", "island4", "island10",
-    "island5", "island11", "island12", "island14", "island15",
-  ],
-  sec: [
-    "island1", "island6", "island2", "island7", "island13",
-    "island3", "island8", "island9", "island4", "island10",
-    "island5", "island11", "island12", "island14", "island15",
-  ],
-  libre: [
-    "island1", "island6", "island2", "island7", "island13",
-    "island3", "island8", "island9", "island4", "island10",
-    "island5", "island11", "island12", "island14", "island15",
-  ],
+/** La isla que REPRESENTA a cada grado en el panel de gestión.
+ *
+ *  Es solo un emblema para reconocer un curso de un vistazo en la lista de
+ *  grupos: ya NO decide a qué juega nadie. Antes esta tabla era la lista de
+ *  islas habilitadas por grado, y de ahí salía el recorte que dejaba a un
+ *  primer grado con tres islas; ahora todos los alumnos tienen las quince
+ *  y lo único que recorta es la selección del docente.
+ *
+ *  Los valores son los que ya se venían mostrando —la última isla de cada
+ *  grado en la tabla vieja— así que el panel se ve igual. */
+export const GRADE_EMBLEM: Record<GradeId, Activity["worldId"]> = {
+  inicial: "island6",
+  "1ep": "island2",
+  "2ep": "island13",
+  "3ep": "island8",
+  "4ep": "island10",
+  "5ep": "island11",
+  "6ep": "island15",
+  sec: "island15",
+  libre: "island15",
 };
-
-/** Las islas visibles para este usuario, en orden. */
+/** Las islas visibles para este usuario, en orden pedagógico.
+ *
+ *  **Por defecto están todas, sin importar el grado.** El juego se abre
+ *  solo: cada isla se desbloquea al terminar la anterior, y esa progresión
+ *  ya es la que regula la dificultad. Recortar además por grado hacía que
+ *  un chico de primero viera tres islas y, al terminarlas, se quedara sin
+ *  juego — con doce islas ahí, invisibles, hasta que alguien le cambiara
+ *  el grado al grupo.
+ *
+ *  Lo único que recorta es la selección del DOCENTE (`group_worlds`), que
+ *  es una decisión de aula y no una regla del producto: un docente puede
+ *  querer que su curso se quede en las primeras mientras trabaja un tema.
+ *  Sin selección guardada (`null`), están todas. */
 export function getVisibleWorldIds(context: UserContext): Activity["worldId"][] {
-  const base = GRADE_WORLDS[context.grade] ?? GRADE_WORLDS.libre;
+  const base = [...WORLD_PEDAGOGY_ORDER];
   if (!context.isCoursePath) return base;
 
-  /* Alumno con curso: se respeta lo que habilitó su docente. Sin filas
-     guardadas (`null`) significa "todas las de su grado". */
   const enabled = cached?.worldIds;
   if (!enabled) return base;
   return base.filter((id) => enabled.includes(id));

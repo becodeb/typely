@@ -1,4 +1,4 @@
-import { activitiesByWorld, type Activity } from "./activities";
+import { activitiesByWorld, WORLD_PEDAGOGY_ORDER, type Activity } from "./activities";
 import { islandLevelLayouts, type LevelPosition } from "./levelPositions";
 import { islandArt, islandGameplayBg, islandMapThumb } from "../utils/assets";
 import {
@@ -240,23 +240,9 @@ export const getGameplayBackgroundForWorld = getGameplayBackground;
    map in `userContext.ts`) MUST derive from this array — never
    hand-maintain a parallel list.
 ===================================================================== */
-export const WORLD_PEDAGOGY_ORDER: ReadonlyArray<Activity["worldId"]> = [
-  "island1",   // 1  basic letters
-  "island6",   // 2  syllables + short words
-  "island2",   // 3  words
-  "island7",   // 4  long words + phrases
-  "island13",  // 5  friendly messages
-  "island5",   // 6  digital / mouse skills
-  "island3",   // 7  uppercase, ñ, accents
-  "island8",   // 8  punctuation & signs
-  "island9",   // 9  email writing
-  "island4",   // 10 symbols & code
-  "island10",  // 11 browser searches
-  "island11",  // 12 basic keyboard commands
-  "island12",  // 13 windows & tabs
-  "island14",  // 14 advanced shortcuts
-  "island15",  // 15 grand final challenge
-];
+/* La lista canónica vive en `activities.ts` porque `userContext.ts`
+   también la necesita y no puede importar de acá sin cerrar un ciclo. */
+export { WORLD_PEDAGOGY_ORDER } from "./activities";
 
 /* O(1) lookup: worldId → 1-based pedagogical position. Used everywhere we
    need to show "Mundo N" to a student, teacher or admin. */
