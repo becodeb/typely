@@ -11,7 +11,7 @@
  */
 
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
-import { GRADE_WORLDS } from "../../utils/userContext";
+import { GRADE_EMBLEM } from "../../utils/userContext";
 import type { GradeId } from "../../types";
 
 /* ------------------------------------------------------------------ */
@@ -238,19 +238,18 @@ export function gradeLabel(id: string): string {
   return GRADES.find((g) => g.id === id)?.label ?? id;
 }
 
-/** La isla que representa a un grado: la ÚLTIMA de su recorrido, o sea
- *  la más lejos que llega ese curso.
+/** La isla que representa a un grado en la lista de grupos.
  *
- *  Sale de `GRADE_WORLDS`, la misma tabla que decide qué mundos ve el
- *  alumno. No es una lista aparte a propósito: si mañana cambia el
- *  recorrido de 4.º, la miniatura del panel cambia con él en vez de
- *  quedar mintiendo.
+ *  Es un EMBLEMA, no un permiso: sirve para reconocer un curso de un
+ *  vistazo, y no dice nada sobre a qué puede jugar ese grupo. Todos los
+ *  alumnos tienen las quince islas y las abren jugando; lo único que
+ *  recorta es la selección del docente.
  *
- *  Los primeros mundos no sirven para esto — todos los grados arrancan en
- *  island1, así que elegir el primero pintaría todos los grupos igual. */
+ *  Antes salía de la tabla que SÍ decidía el acceso, tomando la última
+ *  isla del grado. Los valores se conservaron uno a uno al separarlas, así
+ *  que el panel se ve igual que siempre. */
 export function islandForGrade(grade: string): string {
-  const worlds = GRADE_WORLDS[grade as GradeId] ?? GRADE_WORLDS.libre;
-  return worlds[worlds.length - 1] ?? "island1";
+  return GRADE_EMBLEM[grade as GradeId] ?? GRADE_EMBLEM.libre;
 }
 
 /** Color de acento del grado, del rango de la marca. Acompaña a la isla:

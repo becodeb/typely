@@ -73,17 +73,31 @@ async function loadGroupForRead(actor: Actor, id: string, reply: FastifyReply) {
     reply.code(404).send({ error: "Grupo no encontrado." });
     return null;
   }
-  if (canActOnSede(actor, group.sedeId)) return group;
+  /* El docente va PRIMERO, y el orden es el arreglo de un agujero real.
+     `canActOnSede` es verdadero para él —pertenece a la sede— así que
+     evaluarlo antes lo dejaba pasar a CUALQUIER grupo de la escuela y el
+     chequeo de asignación de acá abajo no se ejecutaba nunca: era código
+     muerto. Como esta función también autoriza el PUT de las islas, un
+     docente podía recortarle el juego al curso de otro.
+
+     Su alcance son SUS grupos: la sede es condición necesaria, no
+     suficiente. */
   if (actor.role === "docente") {
-    const [assigned] = await db
-      .select({ groupId: schema.groupTeachers.groupId })
-      .from(schema.groupTeachers)
-      .where(
-        and(eq(schema.groupTeachers.groupId, id), eq(schema.groupTeachers.userId, actor.id)),
-      )
-      .limit(1);
-    if (assigned) return group;
+    if (canActOnSede(actor, group.sedeId)) {
+      const [assigned] = await db
+        .select({ groupId: schema.groupTeachers.groupId })
+        .from(schema.groupTeachers)
+        .where(
+          and(eq(schema.groupTeachers.groupId, id), eq(schema.groupTeachers.userId, actor.id)),
+        )
+        .limit(1);
+      if (assigned) return group;
+    }
+    reply.code(403).send({ error: "Ese grupo no está a tu cargo." });
+    return null;
   }
+
+  if (canActOnSede(actor, group.sedeId)) return group;
   /* Un alumno puede leer SU propio grupo — lo necesita para saber qué
      islas tiene habilitadas. */
   if (actor.role === "alumno") {

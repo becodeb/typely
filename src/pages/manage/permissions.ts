@@ -109,6 +109,15 @@ export function canImport(actor: Role): boolean {
   return CAN[actor].importCsv;
 }
 
+/** Elegir a qué islas juega un grupo.
+ *
+ *  Lo puede el docente, y es la única cosa del curso que decide él: es una
+ *  decisión de aula —"esta semana nos quedamos en las primeras"— y no de
+ *  administración. Espejo de `group:worlds:write`. */
+export function canChooseWorlds(actor: Role): boolean {
+  return actor === "superadmin" || actor === "admin" || actor === "docente";
+}
+
 /** ¿Puede mover gente entre escuelas? Solo quien no pertenece a ninguna. */
 export function canMoveBetweenSedes(actor: Role): boolean {
   return actor === "superadmin";

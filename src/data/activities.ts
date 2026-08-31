@@ -2190,3 +2190,31 @@ export function getActivityById(id?: string): Activity {
 export function getActivitiesForWorld(worldId: Activity["worldId"]): Activity[] {
   return activitiesByWorld[worldId];
 }
+
+/* ------------------------------------------------------------------ */
+/* Orden pedagógico                                                    */
+/* ------------------------------------------------------------------ */
+
+/** Las quince islas en el orden en que se aprenden — que NO es el orden
+ *  de sus ids: `island6` va segunda y `island2` tercera.
+ *
+ *  Vive acá, en la hoja del árbol de dependencias, porque la necesitan
+ *  tanto `data/worlds.ts` como `utils/userContext.ts`, y ese último no
+ *  puede importar de `worlds.ts` sin cerrar un ciclo. */
+export const WORLD_PEDAGOGY_ORDER: ReadonlyArray<Activity["worldId"]> = [
+  "island1",   // 1  primeras letras
+  "island6",   // 2  sílabas y palabras cortas
+  "island2",   // 3  palabras
+  "island7",   // 4  palabras largas y frases
+  "island13",  // 5  mensajes
+  "island5",   // 6  mouse y habilidades digitales
+  "island3",   // 7  mayúsculas, ñ, tildes
+  "island8",   // 8  puntuación y signos
+  "island9",   // 9  correo electrónico
+  "island4",   // 10 símbolos y código
+  "island10",  // 11 búsquedas en el navegador
+  "island11",  // 12 comandos básicos
+  "island12",  // 13 ventanas y pestañas
+  "island14",  // 14 atajos avanzados
+  "island15",  // 15 reto final
+];
