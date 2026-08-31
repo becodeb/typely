@@ -24,10 +24,14 @@ const REACHES: Record<Role, readonly Role[]> = {
 };
 
 /** Qué roles puede CREAR cada uno. Igual que arriba salvo el propio rol:
- *  nadie crea a un par suyo, y el superadmin sí porque es la plataforma. */
+ *  nadie crea a un par suyo.
+ *
+ *  **El orden importa**: es el de los botones y el primero queda elegido
+ *  por defecto. Va de menos a más privilegio porque dar de alta alumnos es
+ *  lo que se hace cien veces al arrancar un año, y crear un admin, una. */
 const CREATES: Record<Role, readonly Role[]> = {
-  superadmin: ["admin", "docente", "alumno"],
-  admin: ["docente", "alumno"],
+  superadmin: ["alumno", "docente", "admin"],
+  admin: ["alumno", "docente"],
   docente: [],
   alumno: [],
 };

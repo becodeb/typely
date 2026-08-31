@@ -200,8 +200,19 @@ export function ManageShell() {
             scrollea acá adentro en vez de recortarse. */}
         <div className="relative flex h-full min-h-0 flex-col gap-3.5 overflow-y-auto px-4 pb-0 pt-4">
 
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="font-display text-[20px] font-extrabold">TYPELY</span>
+          {/* El logo real en vez de la palabra en tipografía. Va la variante
+              simple —la cargada lleva los robots y dos islas alrededor, que
+              a 150 px de ancho es ruido ilegible— y va SOLO acá: repetirlo
+              en cada pantalla lo convertiría en decoración. */}
+          <div className="flex shrink-0 flex-col items-start gap-1.5">
+            <img
+              src={assets.logoWordmark}
+              alt="TYPELY"
+              className="w-[168px] max-w-full"
+              /* El logo se dibujó para fondo claro; sobre el crepúsculo
+                 necesita separarse del violeta sin llevar una caja. */
+              style={{ filter: "drop-shadow(0 2px 6px rgba(10,8,40,0.45))" }}
+            />
             <span className="rounded-full bg-[#5be8ba]/[0.16] px-2 py-[2px] text-[9.5px] font-bold uppercase tracking-[0.07em] text-[#5be8ba]">
               Gestión
             </span>
@@ -326,7 +337,7 @@ export function ManageShell() {
 
         {/* Barra compacta donde la columna no entra. */}
         <div className="flex shrink-0 items-center gap-2 border-b border-[#dbe6f4] bg-white px-4 py-2 md:hidden">
-          <span className="font-display text-lg font-extrabold">TYPELY</span>
+          <img src={assets.logoWordmark} alt="TYPELY" className="h-6 w-auto shrink-0" />
           {nav.map((item) => (
             <NavLink
               key={item.to}
