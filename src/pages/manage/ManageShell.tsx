@@ -84,6 +84,17 @@ const NAV_ALL = [
 const RAIL_BG = "linear-gradient(168deg, #33306f 0%, #262456 52%, #1a1840 100%)";
 const RAIL_MUTED = "#a6a7d8";
 
+/* Colores del rol sobre el crepúsculo. Son los mismos tres acentos del
+   proyecto —violeta, cian y menta— pero levantados en luminosidad: los del
+   panel claro (`permissions.ts`) están hechos para fondo blanco y sobre
+   este violeta no llegarían al contraste que necesita un texto de 9.5px. */
+const RAIL_ROLE: Record<Role, { bg: string; fg: string }> = {
+  superadmin: { bg: "rgba(155,124,255,0.22)", fg: "#c9b6ff" },
+  admin: { bg: "rgba(51,199,240,0.18)", fg: "#7ddcf5" },
+  docente: { bg: "rgba(91,232,186,0.16)", fg: "#5be8ba" },
+  alumno: { bg: "rgba(255,255,255,0.12)", fg: "#c9cbef" },
+};
+
 export function ManageShell() {
   const { user, logout } = useAuth();
   const actorRole = (user?.role ?? "alumno") as Role;
@@ -202,21 +213,20 @@ export function ManageShell() {
 
           {/* El logo real en vez de la palabra en tipografía. Va la variante
               simple —la cargada lleva los robots y dos islas alrededor, que
-              a 150 px de ancho es ruido ilegible— y va SOLO acá: repetirlo
-              en cada pantalla lo convertiría en decoración. */}
-          <div className="flex shrink-0 flex-col items-start gap-1.5">
-            <img
-              src={assets.logoWordmark}
-              alt="TYPELY"
-              className="w-[168px] max-w-full"
-              /* El logo se dibujó para fondo claro; sobre el crepúsculo
-                 necesita separarse del violeta sin llevar una caja. */
-              style={{ filter: "drop-shadow(0 2px 6px rgba(10,8,40,0.45))" }}
-            />
-            <span className="rounded-full bg-[#5be8ba]/[0.16] px-2 py-[2px] text-[9.5px] font-bold uppercase tracking-[0.07em] text-[#5be8ba]">
-              Gestión
-            </span>
-          </div>
+              a 168 px de ancho es ruido ilegible— y va SOLO acá: repetirlo
+              en cada pantalla lo convertiría en decoración.
+
+              Centrado y solo. La insignia que lo acompañaba decía "Gestión",
+              que es lo único que no hacía falta aclarar estando adentro del
+              panel; ahora dice el rol y bajó a la ficha de la persona. */}
+          <img
+            src={assets.logoWordmark}
+            alt="TYPELY"
+            className="mx-auto w-[168px] max-w-full shrink-0"
+            /* El logo se dibujó para fondo claro; sobre el crepúsculo
+               necesita separarse del violeta sin llevar una caja. */
+            style={{ filter: "drop-shadow(0 2px 6px rgba(10,8,40,0.45))" }}
+          />
 
           {/* Escuela */}
           <div className="shrink-0 rounded-[14px] border border-white/[0.13] bg-white/[0.08] px-3 py-2.5">
@@ -295,11 +305,18 @@ export function ManageShell() {
           </div>
 
           <div className="shrink-0 border-t border-white/10 pt-2.5">
+            {/* El rol como insignia y no como texto gris: es el dato que
+                explica por qué ves lo que ves, y acá cae junto a la persona
+                a la que le corresponde. Cada rol tiene su color, así se
+                reconoce de un vistazo al cambiar de cuenta. */}
             <div className="mb-2 leading-tight">
               <div className="truncate text-[12.5px] font-semibold text-white">{user?.name}</div>
-              <div className="text-[10.5px]" style={{ color: RAIL_MUTED }}>
+              <span
+                className="mt-1 inline-block rounded-full px-2 py-[2px] text-[9.5px] font-bold uppercase tracking-[0.07em]"
+                style={{ background: RAIL_ROLE[actorRole].bg, color: RAIL_ROLE[actorRole].fg }}
+              >
                 {roleLabel(actorRole)}
-              </div>
+              </span>
             </div>
             <button
               type="button"
