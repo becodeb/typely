@@ -418,7 +418,32 @@ export async function groupRoutes(app: FastifyInstance) {
 
     return reply.send({
       worldIds: rows.length ? rows.filter((r) => r.isEnabled).map((r) => r.worldId) : null,
+      /* El interruptor del modo Órbita viaja junto con las islas: es la
+         misma pantalla del docente la que administra las dos cosas. */
+      arcadeEnabled: group.arcadeEnabled,
     });
+  });
+
+  /* ----- PUT /api/groups/:id/arcade  { enabled: boolean } -----
+     El docente puede apagar el modo Órbita para su grupo — la única
+     herramienta que tiene para reconducir un aula que se fue entera al
+     arcade. Misma autorización que la selección de islas. */
+  app.put("/api/groups/:id/arcade", async (req, reply) => {
+    const actor = requirePermission(req, "group:worlds:write");
+    const { id } = req.params as { id: string };
+    const group = await loadGroupForRead(actor, id, reply);
+    if (!group) return;
+    if (actor.role === "alumno") throw new ForbiddenError("No autorizado.");
+
+    const parsed = z.object({ enabled: z.boolean() }).safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Datos inválidos." });
+
+    await db
+      .update(schema.groups)
+      .set({ arcadeEnabled: parsed.data.enabled })
+      .where(eq(schema.groups.id, id));
+    await audit({ actor, action: "set_group_arcade", entityType: "group", entityId: id, meta: { enabled: parsed.data.enabled } });
+    return reply.send({ ok: true });
   });
 
   /* ----- PUT /api/groups/:id/worlds  { worldIds: string[] | null } ----- */
@@ -475,6 +500,10 @@ export async function groupRoutes(app: FastifyInstance) {
     return reply.send({
       group: group ?? null,
       worldIds: rows.length ? rows.filter((r) => r.isEnabled).map((r) => r.worldId) : null,
+      /* El alumno necesita saber si su docente apagó el modo Órbita: el
+         orbe se muestra dormido en vez de desaparecer (nunca un botón
+         muerto, tampoco un hueco inexplicable). */
+      arcadeEnabled: group?.arcadeEnabled ?? true,
     });
   });
 }

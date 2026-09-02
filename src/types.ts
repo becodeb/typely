@@ -53,6 +53,8 @@ export interface Group {
   sedeId: string;
   grade: GradeId;
   active: boolean;
+  /** El docente puede apagar el modo Órbita (arcade) para su grupo. */
+  arcadeEnabled?: boolean;
   studentCount?: number;
   teacherCount?: number;
   /** Precisión media de los alumnos del grupo, 0-100. */

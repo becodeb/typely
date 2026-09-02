@@ -62,6 +62,9 @@ export const groups = pgTable(
     name: text("name").notNull(),
     grade: gradeEnum("grade").notNull().default("libre"),
     active: boolean("active").notNull().default(true),
+    /* El docente puede apagar el modo Órbita (arcade) para su grupo, igual
+       que ya recorta las islas. `true` = habilitado, el estado natural. */
+    arcadeEnabled: boolean("arcade_enabled").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -204,6 +207,61 @@ export const studentAchievements = pgTable(
     unlockedAt: timestamp("unlocked_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({ pk: primaryKey({ columns: [t.userId, t.achievementId] }) }),
+);
+
+/* ===== Modo Órbita (arcade) — espeja 0003_arcade.sql ===== */
+
+/* Una fila por alumno: alias de piloto, saldo de cristales, récords y
+   cosméticos. El alias existe porque el ranking global cruza escuelas y son
+   menores: nunca un nombre real en la superficie pública. */
+export const arcadeProfile = pgTable("arcade_profile", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  alias: text("alias"),
+  aliasChangedAt: timestamp("alias_changed_at", { withTimezone: true }),
+  crystalsBalance: integer("crystals_balance").notNull().default(0),
+  bestScore: integer("best_score").notNull().default(0),
+  bestThreat: smallint("best_threat").notNull().default(0),
+  bestRank: text("best_rank"),
+  /* JSON serializado: string[] de ids del catálogo. Mismo criterio que
+     audit_log.meta — barato y sin migrar a jsonb. */
+  ownedCosmetics: text("owned_cosmetics").notNull().default("[]"),
+  equippedTrail: text("equipped_trail"),
+  equippedBeam: text("equipped_beam"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/* Una partida, append-only. `ranked=false` = la telemetría no cerró: se
+   guarda como dato pero no compite ni acuña cristales. */
+export const arcadeRuns = pgTable(
+  "arcade_runs",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    gameId: text("game_id").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    endedAt: timestamp("ended_at", { withTimezone: true }).notNull(),
+    durationMs: integer("duration_ms").notNull(),
+    score: integer("score").notNull(),
+    peakThreat: smallint("peak_threat").notNull(),
+    rankId: text("rank_id").notNull(),
+    wpmAvg: smallint("wpm_avg").notNull(),
+    wpmPeak: smallint("wpm_peak").notNull(),
+    accuracy: smallint("accuracy").notNull(),
+    wordsDestroyed: integer("words_destroyed").notNull(),
+    charsTyped: integer("chars_typed").notNull(),
+    errors: integer("errors").notNull(),
+    crystalsEarned: integer("crystals_earned").notNull().default(0),
+    weekKey: text("week_key").notNull(),
+    ranked: boolean("ranked").notNull().default(true),
+  },
+  (t) => ({
+    userTimeIdx: index("idx_arcade_runs_user_time").on(t.userId, t.endedAt),
+  }),
 );
 
 export const refreshTokens = pgTable(

@@ -16,6 +16,7 @@ import {
   MousePointerClick,
   Medal,
   Menu,
+  Orbit,
   PenLine,
   Search,
   Star,
@@ -459,6 +460,14 @@ export function WorldsPage() {
             className="glass-surface grid gap-1 p-3 rounded-2xl animate-menu-reveal min-w-[12rem]"
             aria-label="Menú de estudiante"
           >
+            <button
+              type="button"
+              className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-text font-semibold text-sm cursor-pointer bg-transparent border-0 hover:bg-white/40 transition-colors text-left w-full"
+              onClick={() => navigate("/modos")}
+            >
+              <Orbit size={19} />
+              <span>Modos de juego</span>
+            </button>
             <button
               type="button"
               className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-text font-semibold text-sm cursor-pointer bg-transparent border-0 hover:bg-white/40 transition-colors text-left w-full"

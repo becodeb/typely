@@ -827,6 +827,98 @@ touchpad, windows, tabs, shortcuts, text editing, UI literacy). `SkillLevelView`
 - El orden de mundos es `WORLD_PEDAGOGY_ORDER`; cada uno muestra su
   `displayNumber` pedagógico (ej. "M3").
 
+### 8.1 Modo Órbita (arcade)
+
+El segundo eje del producto: minijuegos infinitos y rejugables, medidos por
+supervivencia y velocidad — no por completación. El primero es **Tormenta de
+palabras** (`/orbita/tormenta`). La especificación de diseño completa vive en
+el artefacto "Tormenta de palabras"; acá va lo que hace falta para tocar el
+código sin romper sus reglas.
+
+**El alumno entra por `/modos`** (la puerta post-login de `routeForRole`): un
+selector de ORBES DE CRISTAL — Aventura (las islas), Órbita, y un orbe dormido
+para modos futuros. Las rutas: `/orbita` (hub), `/orbita/tormenta` (el juego,
+con `SoloEnComputadora` igual que los niveles), `/orbita/ranking`,
+`/orbita/hangar`. Todo lazy.
+
+**El motor es puro y la promesa se verifica por simulación.**
+`src/utils/orbita/motor.ts` no toca DOM: un controlador de lazo cerrado mide
+PPM×precisión^1.7 en ventana de 10 s, estima el techo del jugador (R̂, solo
+sube) y exige `R̂ × (1 + margen(t))` con un margen que va de **−15 % al
+arrancar a +35 % a los 120 s** — la partida dura ~2:00 ± 0:30 PARA CUALQUIERA
+por construcción. Los primeros 4-10 s son un **vuelo de prueba**: llueven
+palabras cada vez más rápido (tres en pantalla, sin asomo de banda, intervalo
+≤ 2,5 s) y nada lastima. El vuelo corta cuando el tope de tres queda lleno
+1,5 s seguidos, cuando una palabra casi impacta, cuando el chico lleva 2,5 s
+ocupados sin mejorar, o a los 10 s. El techo NO sale de la demanda final (la
+sonda sobrepasa siempre) sino de lo que las manos hicieron: teclas correctas
+sobre tiempo OCUPADO (esperar palabras no es lentitud), con el ritmo dentro
+de la palabra y la sobrecarga por palabra medidos aparte y extrapolados al
+largo de la banda en la que va a jugar — el vuelo mide en palabras cortas,
+donde manda la reacción, y un tipeador de 60 PPM medía 25. Las sobrevivientes
+del vuelo reciben 40 % más de viaje. En la partida, si el chico vacía la
+pantalla y espera más del 15 % del intervalo entre palabras, R̂ **empuja**
+(25 %/s; 30 %/s en el vuelo): la adaptación es por lo que hacés, no por
+reloj. Tres frenos a ese empuje, y los tres fueron trinquetes reales: no
+cuenta mientras un *lento*, un *pulso* o un *rayo* vacían la pantalla; nunca
+lleva R̂ más allá de 1,35 × la demanda; y la cadencia se mide contra el largo
+REAL de la última palabra, no contra el largo medio de la banda (un "@" de la
+banda de símbolos dejaba la pantalla vacía todo su intervalo y R̂ pasaba de
+50 a 102 en cinco segundos). Dos exámenes, y hay que correr los dos después
+de tocar cualquier valor de `AJUSTES`: `node scripts/simular-tormenta.mjs`
+(seis tipeadores sintéticos de 8 a 85 PPM; los seis tienen que caer en
+90–150 s de mediana) y `node scripts/jugar-tormenta.mjs` (diez jugadores
+guionados — el que arranca mal y termina brillante, el que se distrae, el
+que no toca nada — con métricas de sensación: huecos, ahogo, en qué segundo
+se pierde cada corazón, amenaza en el tiempo, poderes verificados,
+invariantes). Los dos aceptan `--ajuste clave=valor` para probar una perilla
+sin editar el motor. No dar por buena una calibración que no pase los dos.
+
+**Reglas que no se negocian:**
+
+- **Órbita no reparte estrellas.** Las estrellas abren mundos y evolucionan la
+  nave; el arcade acuña CRISTALES (cosméticos del hangar, nunca ventaja). Si
+  el arcade diera estrellas, un chico abriría la isla 8 sin jugar la 7.
+- **No hay teclado en pantalla, ni tenue.** Mirar hacia abajo es perder; sacar
+  la vista del teclado físico es lo que este modo entrena.
+- **Alias, nunca nombre real, hacia afuera.** El ranking global cruza escuelas
+  y son menores. El nombre real solo lo ve quien ya tiene alcance sobre ese
+  alumno (docente/admin de su sede). El servidor valida el alias (sin nombre
+  real ni usuario adentro) y limita el cambio a uno por semana.
+- **El servidor es escéptico.** Cada partida llega con telemetría completa y
+  se valida coherencia (`validarCoherencia` en `api/src/routes/arcade.ts`);
+  la que no cierra se guarda con `ranked=false` — no compite ni acuña. Los
+  cristales los recomputa el servidor, nunca se acredita lo que diga el
+  cliente sin tope.
+- **El corpus sale del currículum** (`src/data/orbitaCorpus.ts`: once bandas
+  desde los `targets[]` reales, en orden pedagógico) y el techo del alumno es
+  su banda desbloqueada +1 de asomo — nunca símbolos que jamás vio.
+- **El demo juega y no manda nada**: sin cuenta no hay ranking ni cristales.
+- **El docente puede pausar el modo por grupo** (`groups.arcade_enabled`,
+  toggle en la pantalla de islas del grupo). El orbe se ve dormido, nunca
+  desaparece ni queda como botón muerto.
+- La partida **se pausa sola con la pestaña oculta** (rAF + recorte de dt en
+  el motor): una interrupción de aula no regala impactos. Cuatro ganchos
+  existen SOLO en dev y no aparecen en producción: `?bot=N` corre el bucle
+  por intervalo a N× (para verificar desde una pestaña oculta, donde no hay
+  rAF, antes de que el cliente de Vite recargue), `window.__tormentaTecla`
+  tipea por el mismo camino que el teclado, `window.__tormentaVivas` da la
+  lista viva del MOTOR (el DOM entre dos pintadas de React miente), y
+  `?banda=8` fuerza la banda máxima de corpus (0-10) para probar símbolos o
+  correos sin pasarse cinco islas. Ojo con `?bot=4`: una partida sin teclas
+  termina en 22 s de juego, o sea 5 s de pared — el bot hay que inyectarlo
+  antes de que termine la cuenta regresiva.
+
+**Persistencia:** mismo contrato que el progreso — localStorage al instante
+(`typely_orbita_*`), cola con reintento a `POST /api/arcade/run`, cache de
+perfil. Ranking semanal por `week_key` ISO calculada con huso argentino.
+Tablas `arcade_profile` / `arcade_runs` (migración `0003_arcade.sql`); el
+catálogo del hangar está duplicado a propósito cliente/servidor y manda el
+del servidor.
+
+**CSS:** prefijo `.orb-*` en `global.css`, antes del compact-height pass. El
+borde de gradiente sigue siendo exclusivo de la consigna; Órbita no lo usa.
+
 ## 9. Project Structure
 
 - `src/App.tsx` — routes + protected-route composition (lazy-loads heavy pages).

@@ -28,6 +28,13 @@ import { useAuth } from "./hooks/useAuth";
 const GameplayPage = lazy(() =>
   import("./pages/GameplayPage").then((m) => ({ default: m.GameplayPage })),
 );
+/* El modo Órbita entero también va bajo demanda: pesa (motor + corpus +
+   arte) y no lo abre todo el mundo en cada sesión. */
+const ModosPage = lazy(() => import("./pages/orbita/ModosPage"));
+const OrbitaHubPage = lazy(() => import("./pages/orbita/OrbitaHubPage"));
+const TormentaPage = lazy(() => import("./pages/orbita/TormentaPage"));
+const RankingPage = lazy(() => import("./pages/orbita/RankingPage"));
+const HangarPage = lazy(() => import("./pages/orbita/HangarPage"));
 
 function PageFallback() {
   return (
@@ -163,6 +170,54 @@ export function App() {
           <Route path="/logros" element={<RewardsPage />} />
           <Route path="/mi-cuenta" element={<AccountPage />} />
           <Route path="/misiones" element={<MissionsPage />} />
+
+          {/* Modo Órbita (arcade). El selector de modos es la puerta del
+              alumno después del login (routeForRole). El juego en sí lleva
+              la MISMA guarda de celular que los niveles: se tipea en un
+              teclado físico, y un link compartido no puede meter a nadie
+              en una pantalla injugable. */}
+          <Route
+            path="/modos"
+            element={
+              <Suspense fallback={<PageFallback />}>
+                <ModosPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/orbita"
+            element={
+              <Suspense fallback={<PageFallback />}>
+                <OrbitaHubPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/orbita/tormenta"
+            element={
+              <SoloEnComputadora>
+                <Suspense fallback={<PageFallback />}>
+                  <TormentaPage />
+                </Suspense>
+              </SoloEnComputadora>
+            }
+          />
+          <Route
+            path="/orbita/ranking"
+            element={
+              <Suspense fallback={<PageFallback />}>
+                <RankingPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/orbita/hangar"
+            element={
+              <Suspense fallback={<PageFallback />}>
+                <HangarPage />
+              </Suspense>
+            }
+          />
         </Route>
 
         {/* Gestión — superadmin y admin. Las dos comparten pantallas: el

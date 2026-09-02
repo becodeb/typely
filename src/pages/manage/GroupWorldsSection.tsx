@@ -36,6 +36,11 @@ export function GroupWorldsSection({ groupId }: { groupId: string }) {
   const [error, setError] = useState("");
   const [justSaved, setJustSaved] = useState(false);
 
+  /* El interruptor del modo Órbita viaja con las islas: misma pantalla,
+     misma autorización, misma decisión de aula. */
+  const [arcadeOn, setArcadeOn] = useState(true);
+  const [arcadeSaving, setArcadeSaving] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -44,12 +49,27 @@ export function GroupWorldsSection({ groupId }: { groupId: string }) {
       const next = res.worldIds ? new Set(res.worldIds as WorldId[]) : null;
       setSelection(next);
       setSaved(JSON.stringify(res.worldIds));
+      setArcadeOn(res.arcadeEnabled ?? true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No pudimos cargar las islas del grupo.");
     } finally {
       setLoading(false);
     }
   }, [groupId]);
+
+  async function toggleArcade() {
+    const próximo = !arcadeOn;
+    setArcadeSaving(true);
+    setError("");
+    try {
+      await api.setGroupArcade(groupId, próximo);
+      setArcadeOn(próximo);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No pudimos cambiar el modo Órbita.");
+    } finally {
+      setArcadeSaving(false);
+    }
+  }
 
   useEffect(() => {
     void load();
@@ -170,6 +190,32 @@ export function GroupWorldsSection({ groupId }: { groupId: string }) {
             );
           })}
         </ul>
+      )}
+
+      {/* ---- Modo Órbita (arcade) ----
+          Apagarlo NO borra nada: el orbe se ve dormido para el grupo y los
+          récords quedan esperando. Es la herramienta para reconducir un
+          aula que se fue entera al arcade. */}
+      {!loading && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eef3f9] px-5 py-3.5">
+          <div>
+            <h3 className="font-display text-[14px] font-bold text-[#17355f]">
+              Modo Órbita (arcade)
+            </h3>
+            <p className="mt-0.5 text-[12px] text-[#8a99b5]">
+              {arcadeOn
+                ? "Habilitado: el grupo puede jugar los minijuegos y competir en el ranking."
+                : "Pausado: el orbe se ve dormido. Los récords y cristales quedan guardados."}
+            </p>
+          </div>
+          <Button
+            variant={arcadeOn ? "secondary" : "primary"}
+            onClick={() => void toggleArcade()}
+            loading={arcadeSaving}
+          >
+            {arcadeOn ? "Pausar" : "Habilitar"}
+          </Button>
+        </div>
       )}
     </Card>
   );
