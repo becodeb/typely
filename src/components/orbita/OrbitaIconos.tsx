@@ -1,22 +1,30 @@
-/* Iconos del modo Órbita — los 18 SVG dibujados a mano, inlineados.
+/* Iconos del modo Órbita — los 20 SVG dibujados a mano, inlineados.
  *
  * Los archivos de `svg/` son COPIAS de `Images/orbita/{iconos,rangos}/`
  * (la fuente de verdad, que no se publica: `.dockerignore` deja `Images`
  * afuera del contenedor). Si un icono se redibuja allá, copiarlo acá.
  * Se inlinean con `?raw` en vez de servirse como archivos por dos motivos:
- * se tiñen por CSS (`currentColor`) y son chicos — 18 requests por 18
+ * se tiñen por CSS (`currentColor`) y son chicos — 20 requests por 20
  * íconos de 1 KB sería puro overhead.
  *
  * Uso: <IconoOrbita nombre="corazon-lleno" className="w-6 h-6 text-red-400" />
  * El color lo pone `currentColor`; el tamaño, el contenedor.
+ *
+ * Lo que se ve GRANDE (la insignia del resultado y del podio, la gema del
+ * poder que llega a la nave, el cristal del saldo) no es SVG: son objetos
+ * 3D generados (`public/assets/orbita/{insignias,gemas}/`, ver ORBITA.md).
+ * `InsigniaRango tamano="grande"` y `Gema` los cargan, y si el WebP todavía
+ * no existe caen al SVG sin ruido: así el rediseño entra por tandas.
  */
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 import corazonLleno from "./svg/corazon-lleno.svg?raw";
 import corazonVacio from "./svg/corazon-vacio.svg?raw";
 import escudoEntero from "./svg/escudo-entero.svg?raw";
 import escudoAgrietado from "./svg/escudo-agrietado.svg?raw";
 import cristal from "./svg/cristal.svg?raw";
+import nubeCalma from "./svg/nube-calma.svg?raw";
+import nubeTormenta from "./svg/nube-tormenta.svg?raw";
 import pwReparacion from "./svg/pw-reparacion.svg?raw";
 import pwEscudo from "./svg/pw-escudo.svg?raw";
 import pwPulso from "./svg/pw-pulso.svg?raw";
@@ -39,6 +47,8 @@ const ICONOS = {
   "escudo-entero": escudoEntero,
   "escudo-agrietado": escudoAgrietado,
   cristal,
+  "nube-calma": nubeCalma,
+  "nube-tormenta": nubeTormenta,
   "pw-reparacion": pwReparacion,
   "pw-escudo": pwEscudo,
   "pw-pulso": pwPulso,
@@ -105,19 +115,87 @@ export function IconoOrbita({
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* Objetos 3D con respaldo SVG                                         */
+/* ------------------------------------------------------------------ */
+
+const ARTE_INSIGNIAS = "/assets/orbita/insignias";
+const ARTE_GEMAS = "/assets/orbita/gemas";
+
+/** Los WebP que ya fallaron una vez en esta sesión: no se vuelven a pedir
+ *  en cada render (un 404 por insignia por pantalla es ruido de consola
+ *  y de red mientras el arte se genera por tandas). */
+const faltantes = new Set<string>();
+
+function useImagenConRespaldo(src: string) {
+  const [disponible, setDisponible] = useState(() => !faltantes.has(src));
+  useEffect(() => setDisponible(!faltantes.has(src)), [src]);
+  const alFallar = () => {
+    faltantes.add(src);
+    setDisponible(false);
+  };
+  return { disponible, alFallar };
+}
+
 /** Insignia de rango — lleva su color propio (no se tiñe): color y forma
- *  suben juntas, y se distinguen contando galones sin depender del color. */
+ *  suben juntas, y se distinguen contando galones sin depender del color.
+ *  `chica` es el SVG (HUD, listas, ≤ 32 px); `grande` carga la medalla 3D
+ *  y cae al SVG si todavía no está generada. */
 export function InsigniaRango({
   rango,
   className,
+  tamano = "chica",
 }: {
   rango: RangoId;
   className?: string;
+  tamano?: "chica" | "grande";
 }) {
+  const src = `${ARTE_INSIGNIAS}/${rango}.webp`;
+  const { disponible, alFallar } = useImagenConRespaldo(src);
+  if (tamano === "grande" && disponible) {
+    return (
+      <span className={`orb-ico orb-insignia-grande ${className ?? ""}`}>
+        <img src={src} alt="" decoding="async" onError={alFallar} />
+      </span>
+    );
+  }
   return (
     <span
       className={`orb-ico ${className ?? ""}`}
       dangerouslySetInnerHTML={{ __html: RANGOS_SVG[rango] }}
+    />
+  );
+}
+
+/** Gema 3D de un poder (o el cristal, la moneda del modo), con el SVG de
+ *  respaldo. Se usa donde se ve grande: la revelación sobre la nave, el
+ *  saldo, el resultado. En el HUD y en la palabra que vuela siguen los SVG. */
+export function Gema({
+  nombre,
+  className,
+  style,
+}: {
+  nombre: PowerupId | "cristal";
+  className?: string;
+  style?: CSSProperties;
+}) {
+  const src = `${ARTE_GEMAS}/${nombre}.webp`;
+  const { disponible, alFallar } = useImagenConRespaldo(src);
+  const respaldo = nombre === "cristal" ? ICONOS.cristal : ICONOS[ICONO_DE_POWERUP[nombre]];
+  const colorRespaldo = nombre === "cristal" ? "#9b7cff" : COLOR_DE_POWERUP[nombre];
+  if (disponible) {
+    return (
+      <span className={`orb-ico orb-gema ${className ?? ""}`} style={style} aria-hidden="true">
+        <img src={src} alt="" decoding="async" onError={alFallar} />
+      </span>
+    );
+  }
+  return (
+    <span
+      className={`orb-ico ${className ?? ""}`}
+      style={{ color: colorRespaldo, ...style }}
+      aria-hidden="true"
+      dangerouslySetInnerHTML={{ __html: respaldo }}
     />
   );
 }

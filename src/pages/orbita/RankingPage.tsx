@@ -7,6 +7,10 @@
  * El reinicio semanal es la decisión pedagógica: con un ranking eterno,
  * el que empieza en agosto ve que nunca alcanza al de marzo y deja de
  * intentar. Todos los lunes hay una chance real.
+ *
+ * Los tres primeros van en un PODIO con su insignia grande: en primaria un
+ * ranking se lee como medallas, no como una tabla. Del cuarto en adelante,
+ * la lista, dentro del vidrio de marca.
  */
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -16,6 +20,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { api, ApiError, type ArcadeBoardRow } from "../../utils/api";
 import { sincronizaArcade } from "../../utils/orbita/arcade";
 import type { RangoId } from "../../utils/orbita/motor";
+import { FondoEspacio } from "./OrbitaHubPage";
 
 type Alcance = "global" | "sede" | "grade";
 type Periodo = "week" | "all";
@@ -25,6 +30,8 @@ const ALCANCES: { id: Alcance; nombre: string }[] = [
   { id: "sede", nombre: "Mi escuela" },
   { id: "grade", nombre: "Mi grado" },
 ];
+
+const ORO = "#c98a00";
 
 export function RankingPage() {
   const navigate = useNavigate();
@@ -63,34 +70,23 @@ export function RankingPage() {
     };
   }, [alcance, periodo, sincroniza]);
 
-  const boton = (activo: boolean) =>
-    `px-4 py-2 rounded-full border-0 cursor-pointer font-bold text-sm transition-colors ${
-      activo ? "text-[#0b2437]" : "orb-dato bg-white/10 hover:bg-white/20"
-    }`;
-  const fondoActivo = { background: "linear-gradient(90deg, #54e8c6, #25c8df)" };
+  const pildora = (activo: boolean) =>
+    `orb-pildora orb-pildora--boton text-sm ${activo ? "orb-pildora--activa" : ""}`;
+
+  /* Podio solo cuando hay tres: con menos, la lista alcanza. */
+  const conPodio = filas.length >= 3;
+  const podio = conPodio ? [filas[1]!, filas[0]!, filas[2]!] : [];
+  const resto = conPodio ? filas.slice(3) : filas;
 
   return (
     <main className="relative min-h-dvh overflow-hidden" aria-label="Ranking de Órbita">
-      <div
-        className="orb-fondo"
-        style={
-          {
-            "--orb-nebulosa": "url(/assets/orbita/fondo/nebulosa.webp)",
-            "--orb-tinte": "rgb(80, 84, 214)",
-            "--orb-tinte-fuerza": 0.5,
-          } as React.CSSProperties
-        }
-        aria-hidden="true"
-      >
-        <img className="orb-estrellas" src="/assets/orbita/fondo/estrellas.webp" alt="" />
-        <div className="orb-tinte" />
-      </div>
+      <FondoEspacio tinte="rgb(112, 96, 230)" fuerza={0.5} />
 
       <div className="relative z-10 min-h-dvh px-4 py-8 grid content-start justify-items-center gap-5">
         <button
           type="button"
           onClick={() => navigate("/orbita")}
-          className="orb-dato fixed top-4 left-4 z-20 flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 border-0 cursor-pointer font-bold text-sm transition-colors"
+          className="orb-pildora orb-pildora--boton fixed top-4 left-4 z-20 text-sm"
         >
           <ArrowLeft size={17} /> Órbita
         </button>
@@ -105,10 +101,14 @@ export function RankingPage() {
         </header>
 
         {!sincroniza ? (
-          <p className="orb-dato text-center max-w-md font-semibold">
-            El ranking es de las cuentas de verdad. Entrá con tu usuario para competir con tu
-            escuela, tu grado y todo TYPELY.
-          </p>
+          <section className="orb-vidrio w-[min(28rem,94vw)] p-6 text-center grid gap-2">
+            <p className="m-0 font-bold" style={{ fontFamily: "var(--font-display)", fontSize: "1.15rem" }}>
+              El ranking es de las cuentas de verdad.
+            </p>
+            <p className="orb-suave m-0 text-sm font-semibold">
+              Entrá con tu usuario para competir con tu escuela, tu grado y todo TYPELY.
+            </p>
+          </section>
         ) : (
           <>
             <div className="flex gap-2 flex-wrap justify-center">
@@ -116,81 +116,103 @@ export function RankingPage() {
                 <button
                   key={a.id}
                   type="button"
-                  className={boton(alcance === a.id)}
-                  style={alcance === a.id ? fondoActivo : undefined}
+                  className={pildora(alcance === a.id)}
                   onClick={() => setAlcance(a.id)}
                 >
                   {a.nombre}
                 </button>
               ))}
               <span className="w-2" />
-              <button
-                type="button"
-                className={boton(periodo === "week")}
-                style={periodo === "week" ? fondoActivo : undefined}
-                onClick={() => setPeriodo("week")}
-              >
+              <button type="button" className={pildora(periodo === "week")} onClick={() => setPeriodo("week")}>
                 Esta semana
               </button>
-              <button
-                type="button"
-                className={boton(periodo === "all")}
-                style={periodo === "all" ? fondoActivo : undefined}
-                onClick={() => setPeriodo("all")}
-              >
+              <button type="button" className={pildora(periodo === "all")} onClick={() => setPeriodo("all")}>
                 Histórico
               </button>
             </div>
 
-            <section
-              className="w-[min(34rem,94vw)] rounded-[24px] overflow-hidden"
-              style={{
-                background: "rgba(16, 26, 56, 0.85)",
-                border: "1px solid rgba(148, 178, 226, 0.25)",
-                color: "#eef4ff",
-              }}
-              aria-live="polite"
-            >
+            {conPodio && !cargando && !error && (
+              <section className="orb-podio w-[min(34rem,94vw)]" aria-label="Los tres primeros">
+                {podio.map((f) => (
+                  <div
+                    key={f.pos}
+                    className={`orb-vidrio orb-podio__lugar orb-podio__lugar--${f.pos}`}
+                    style={f.mine ? { outline: "3px solid rgba(84, 232, 198, 0.8)", outlineOffset: "2px" } : undefined}
+                  >
+                    <span className="orb-podio__puesto">
+                      {f.pos === 1 ? "1.º puesto" : f.pos === 2 ? "2.º" : "3.º"}
+                    </span>
+                    <InsigniaRango
+                      rango={f.rankId as RangoId}
+                      tamano="grande"
+                      className={f.pos === 1 ? "w-24 h-24" : "w-16 h-16"}
+                    />
+                    <b
+                      className="block truncate max-w-full"
+                      style={{ fontFamily: "var(--font-display)", fontSize: f.pos === 1 ? "1.15rem" : "1rem" }}
+                    >
+                      {f.alias}
+                      {f.mine && <span className="orb-suave font-semibold"> (vos)</span>}
+                    </b>
+                    {f.realName && <span className="orb-suave text-xs font-semibold">{f.realName}</span>}
+                    <span
+                      className="font-extrabold tabular-nums"
+                      style={{ color: ORO, fontFamily: "var(--font-display)", fontSize: f.pos === 1 ? "1.4rem" : "1.1rem" }}
+                    >
+                      {f.score.toLocaleString("es-AR")}
+                    </span>
+                    <span className="orb-suave text-xs font-semibold tabular-nums">{f.wpmPeak} PPM</span>
+                  </div>
+                ))}
+              </section>
+            )}
+
+            <section className="orb-vidrio w-[min(34rem,94vw)] overflow-hidden" aria-live="polite">
               {cargando ? (
-                <p className="m-0 p-6 text-center opacity-80">Cargando…</p>
+                <p className="orb-suave m-0 p-6 text-center font-semibold">Cargando…</p>
               ) : error ? (
-                <p className="m-0 p-6 text-center opacity-80">{error}</p>
+                <p className="orb-suave m-0 p-6 text-center font-semibold">{error}</p>
               ) : filas.length === 0 ? (
-                <p className="m-0 p-6 text-center opacity-80">
+                <p className="orb-suave m-0 p-6 text-center font-semibold">
                   Todavía no hay partidas {periodo === "week" ? "esta semana" : "registradas"}.
                   ¡El primer puesto está esperando!
                 </p>
+              ) : resto.length === 0 ? (
+                <p className="orb-suave m-0 p-4 text-center text-sm font-semibold">
+                  Por ahora son solo los tres del podio. ¡Hay lugar!
+                </p>
               ) : (
                 <ol className="m-0 p-0 list-none">
-                  {filas.map((f) => (
+                  {resto.map((f) => (
                     <li
                       key={f.pos}
-                      className="flex items-center gap-3 px-4 py-2.5 border-b border-white/8"
-                      style={
-                        f.mine
-                          ? { background: "rgba(84, 232, 198, 0.14)", borderLeft: "3px solid #54e8c6" }
-                          : undefined
-                      }
+                      className="flex items-center gap-3 px-4 py-2.5"
+                      style={{
+                        borderBottom: "1px solid rgba(23, 53, 95, 0.1)",
+                        ...(f.mine
+                          ? { background: "rgba(84, 232, 198, 0.24)", borderLeft: "3px solid #1fb5a6" }
+                          : {}),
+                      }}
                     >
                       <span
                         className="w-8 text-center font-extrabold tabular-nums"
-                        style={{
-                          fontFamily: "var(--font-display)",
-                          color: f.pos <= 3 ? "#ffd552" : "inherit",
-                        }}
+                        style={{ fontFamily: "var(--font-display)", color: f.pos <= 3 ? ORO : "#52658f" }}
                       >
                         {f.pos}
                       </span>
                       <InsigniaRango rango={f.rankId as RangoId} className="w-7 h-7" />
-                      <span className="flex-1 font-bold truncate">
+                      <span className="flex-1 font-bold truncate" style={{ fontFamily: "var(--font-display)" }}>
                         {f.alias}
-                        {f.mine && <span className="opacity-70 font-semibold"> (vos)</span>}
+                        {f.mine && <span className="orb-suave font-semibold"> (vos)</span>}
                         {f.realName && (
-                          <span className="block text-xs opacity-60 font-normal">{f.realName}</span>
+                          <span className="orb-suave block text-xs font-medium">{f.realName}</span>
                         )}
                       </span>
-                      <span className="text-xs opacity-70 tabular-nums">{f.wpmPeak} PPM</span>
-                      <span className="font-extrabold tabular-nums" style={{ color: "#ffd552" }}>
+                      <span className="orb-suave text-xs font-semibold tabular-nums">{f.wpmPeak} PPM</span>
+                      <span
+                        className="font-extrabold tabular-nums"
+                        style={{ color: ORO, fontFamily: "var(--font-display)" }}
+                      >
                         {f.score.toLocaleString("es-AR")}
                       </span>
                     </li>
@@ -200,7 +222,7 @@ export function RankingPage() {
               {yo && !filas.some((f) => f.mine) && (
                 <p
                   className="m-0 px-4 py-3 text-sm font-bold"
-                  style={{ background: "rgba(84, 232, 198, 0.14)" }}
+                  style={{ background: "rgba(84, 232, 198, 0.24)", fontFamily: "var(--font-display)" }}
                 >
                   Vos: puesto {yo.pos} · {yo.score.toLocaleString("es-AR")} puntos
                 </p>
@@ -208,7 +230,7 @@ export function RankingPage() {
             </section>
 
             {periodo === "week" && (
-              <p className="orb-dato m-0 text-xs opacity-80">
+              <p className="orb-dato m-0 text-xs font-semibold">
                 El ranking semanal se reinicia todos los lunes. El histórico queda para siempre.
               </p>
             )}

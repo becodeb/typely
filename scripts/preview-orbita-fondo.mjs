@@ -34,20 +34,26 @@ const H = 562; // 16:9, la proporción de la Chromebook
 
 /* Los tres momentos de una partida. El color no está en el arte: está acá,
    y en el juego lo interpola el controlador de dificultad (§4 del diseño). */
+/* Pervinca → violeta → coral: la tormenta es color de tormenta, no de
+   sangre (TINTE_PARADAS en TormentaPage.tsx; cambiar los dos juntos). */
 const MOMENTOS = [
-  { nombre: "amenaza 8 · Cadete",   color: [58, 95, 208],  fuerza: 0.55 },
-  { nombre: "amenaza 52 · As",      color: [124, 75, 216], fuerza: 0.85 },
-  { nombre: "amenaza 94 · Leyenda", color: [208, 52, 79],  fuerza: 1.0 },
+  { nombre: "amenaza 8 · Cadete",   color: [84, 112, 224], fuerza: 0.55 },
+  { nombre: "amenaza 52 · As",      color: [146, 92, 236], fuerza: 0.85 },
+  { nombre: "amenaza 94 · Leyenda", color: [236, 84, 124], fuerza: 1.0 },
 ];
 
 /* Palabras de las bandas reales del currículum, a los tamaños en que van
-   a aparecer: chicas al nacer en el punto de fuga, grandes al acercarse. */
+   a aparecer: chicas al nacer en el punto de fuga, grandes al acercarse.
+   Las dos últimas cruzan la franja del horizonte, que es donde una capa
+   nueva puede robarles la lectura. */
 const PALABRAS = [
   { t: "bosque",   x: 0.5,  y: 0.28, s: 15, o: 0.55 },
   { t: "montaña",  x: 0.27, y: 0.42, s: 26, o: 0.9 },
   { t: "¿cuándo?", x: 0.72, y: 0.46, s: 28, o: 0.9 },
   { t: "reloj",    x: 0.44, y: 0.62, s: 38, o: 1 },
   { t: "señal",    x: 0.78, y: 0.66, s: 34, o: 1 },
+  { t: "planeta",  x: 0.32, y: 0.76, s: 42, o: 1 },
+  { t: "¡Vamos!",  x: 0.66, y: 0.8,  s: 44, o: 1 },
 ];
 
 const falta = ["estrellas", "nebulosa", "polvo"].filter(
@@ -94,18 +100,26 @@ function palabras() {
   return Buffer.from(`<svg width="${W}" height="${H}">${t}</svg>`);
 }
 
+/* El horizonte es opcional: si todavía no se importó, la preview sale sin
+   él (y lo dice). Va entre la nube y el polvo, anclado abajo, igual que la
+   capa .orb-horizonte de la página. */
+const horizontePath = path.join(FONDO, "horizonte.webp");
+const conHorizonte = fs.existsSync(horizontePath);
+const horizonte = conHorizonte
+  ? await sharp(horizontePath).resize(W, H, { fit: "cover", position: "bottom" }).png().toBuffer()
+  : null;
+
 const paneles = [];
 for (const m of MOMENTOS) {
   const base = await sharp(path.join(FONDO, "estrellas.webp")).resize(W, H, { fit: "cover" }).toBuffer();
   const nube = await nubeTeñida(m.color, m.fuerza);
   const polvo = await sharp(path.join(FONDO, "polvo.webp")).resize(W, H, { fit: "cover" }).png().toBuffer();
 
-  paneles.push(
-    await sharp(base)
-      .composite([{ input: nube }, { input: polvo }, { input: palabras() }])
-      .png()
-      .toBuffer(),
-  );
+  const capasPanel = [{ input: nube }];
+  if (horizonte) capasPanel.push({ input: horizonte });
+  capasPanel.push({ input: polvo }, { input: palabras() });
+
+  paneles.push(await sharp(base).composite(capasPanel).png().toBuffer());
 }
 
 const PAD = 14;
@@ -134,6 +148,6 @@ await sharp({
   .png()
   .toFile(salida);
 
-console.log(`${MOMENTOS.length} momentos · ${W}x${H} cada uno`);
+console.log(`${MOMENTOS.length} momentos · ${W}x${H} cada uno${conHorizonte ? " · con horizonte" : " · SIN horizonte (falta fondo/horizonte.webp)"}`);
 console.log(`-> ${path.relative(RAIZ, salida)}`);
-console.log("Mirá una sola cosa: si las palabras se leen en los tres, sobre todo en el rojo.");
+console.log("Mirá una sola cosa: si las palabras se leen en los tres, sobre todo en coral y cruzando el horizonte.");

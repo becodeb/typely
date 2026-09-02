@@ -35,6 +35,7 @@ const ICONOS = [
   ["pw-escudo", "#54e8c6"], ["pw-pulso", "#25c8df"],
   ["pw-tiempo", "#7c93ff"], ["pw-rayo", "#ffd552"],
   ["pw-cosecha", "#9b7cff"], ["pw-mira", "#ff9fca"],
+  ["nube-calma", "#a9b0e6"], ["nube-tormenta", "#ffd552"],
 ];
 const RANGOS = ["cadete", "piloto", "explorador", "as", "capitan", "leyenda"];
 
