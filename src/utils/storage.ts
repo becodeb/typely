@@ -33,7 +33,9 @@ export function isDemoMode(): boolean {
 export function routeForRole(role: Role): string {
   switch (role) {
     case "alumno":
-      return "/mundos";
+      /* La puerta del alumno es el selector de modos: ahí elige entre la
+         aventura de las islas y el modo Órbita (arcade). */
+      return "/modos";
     case "superadmin":
     case "admin":
     case "docente":

@@ -915,6 +915,357 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   MODO ÓRBITA (arcade) — .orb-*
+   El prefijo es propio, como .gp-* y .nv-*: nunca tocar glass-surface
+   para arreglar una pantalla de juego. El fondo es OSCURO (espacio), así
+   que el halo de los textos sueltos va al revés que .nv-dato: oscuro
+   detrás de letra clara — la misma solución de paint-order que salvó a
+   los números blancos sobre discos claros, servida como sombra.
+   ════════════════════════════════════════════════════════════════════ */
+
+.orb-ico { display: inline-grid; place-items: center; }
+.orb-ico svg { display: block; width: 100%; height: 100%; }
+
+/* ---- El fondo por capas: estrellas + nebulosa teñida + polvo ---- */
+.orb-fondo { position: fixed; inset: 0; overflow: hidden; background: #070f26; }
+.orb-fondo > * { position: absolute; inset: -4%; width: 108%; height: 108%; }
+.orb-estrellas { object-fit: cover; animation: orbDeriva 90s ease-in-out infinite alternate; }
+/* La nebulosa se generó GRIS a propósito: es una máscara de luminosidad.
+   El color de la tensión lo pone este div (via --orb-tinte, interpolado
+   por la página con la amenaza) y la imagen decide DÓNDE se ve. */
+.orb-tinte {
+  background-color: var(--orb-tinte, #3a5fd0);
+  -webkit-mask-image: var(--orb-nebulosa);
+  mask-image: var(--orb-nebulosa);
+  -webkit-mask-size: cover;
+  mask-size: cover;
+  -webkit-mask-position: center;
+  mask-position: center;
+  opacity: var(--orb-tinte-fuerza, 0.7);
+  transition: background-color 1.2s linear, opacity 1.2s linear;
+  animation: orbDeriva 70s ease-in-out infinite alternate-reverse;
+}
+.orb-polvo { object-fit: cover; opacity: 0.8; animation: orbDeriva 38s ease-in-out infinite alternate; }
+@keyframes orbDeriva {
+  from { transform: translate3d(-1.2%, -0.8%, 0) scale(1.02); }
+  to   { transform: translate3d(1.2%, 0.8%, 0) scale(1.05); }
+}
+
+/* ---- Texto suelto sobre el espacio ---- */
+.orb-dato {
+  color: #eef4ff;
+  text-shadow:
+    0 0 10px rgba(5, 11, 30, 0.95),
+    0 0 20px rgba(5, 11, 30, 0.85),
+    0 1px 2px rgba(5, 11, 30, 0.95);
+}
+
+/* ---- Las palabras que vuelan ---- */
+.orb-palabra {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-display);
+  font-weight: 700;
+  white-space: nowrap;
+  color: #f2f7ff;
+  /* Halo oscuro DETRÁS del glifo — legible sobre estrellas en movimiento. */
+  text-shadow:
+    0 0 6px rgba(5, 11, 30, 0.95),
+    0 0 14px rgba(5, 11, 30, 0.8),
+    0 2px 3px rgba(5, 11, 30, 0.9);
+  will-change: transform;
+  pointer-events: none;
+}
+/* El prefijo ya escrito: cambia PESO además de color — el estado nunca
+   depende solo del color. */
+.orb-palabra b { color: #5be8ba; font-weight: 800; }
+/* Enganchada: marco, no solo tinte. */
+.orb-palabra--enganchada {
+  color: #ffffff;
+  text-shadow:
+    0 0 6px rgba(5, 11, 30, 0.95),
+    0 0 16px rgba(37, 200, 223, 0.9),
+    0 0 30px rgba(37, 200, 223, 0.55);
+}
+.orb-palabra--peligro { color: #ffc7d1; }
+.orb-palabra--mira { text-decoration: underline wavy rgba(255, 159, 202, 0.9) 2px; }
+.orb-palabra--error { animation: orbSacudida 220ms ease-in-out; }
+@keyframes orbSacudida {
+  0%, 100% { margin-left: 0; }
+  25% { margin-left: -7px; }
+  60% { margin-left: 6px; }
+}
+
+/* Las MAYÚSCULAS van doradas: se ve que hace falta Shift antes de tipear.
+   Cambia el color Y lleva su propio halo — el estado nunca depende solo
+   del color, pero acá además el peso ya lo pone el prefijo escrito. */
+.orb-palabra em {
+  font-style: normal;
+  color: #ffd552;
+  text-shadow:
+    0 0 6px rgba(5, 11, 30, 0.95),
+    0 0 14px rgba(255, 213, 82, 0.55),
+    0 2px 3px rgba(5, 11, 30, 0.9);
+}
+
+/* Palabra que trae un PODER escondido: estela de cometa iridiscente — la
+   misma para todos los poderes, a propósito: es una sorpresa, y cuál era
+   se sabe recién cuando llega a la nave. */
+.orb-palabra--poder {
+  animation: orbPoderCicla 2.4s linear infinite;
+}
+.orb-palabra--poder::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 88%;
+  width: 0.42em;
+  height: 2.8em;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: linear-gradient(to top, #5be8ba, #9b7cff 45%, #ff9fca 70%, transparent);
+  filter: blur(3px);
+  opacity: 0.85;
+  animation: orbPoderEstela 2.4s linear infinite;
+  pointer-events: none;
+}
+.orb-palabra--poder::after {
+  content: "✦";
+  position: absolute;
+  right: -0.85em;
+  top: -0.55em;
+  font-size: 0.55em;
+  color: #ffffff;
+  animation: orbTitila 1.1s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes orbPoderCicla {
+  0%   { text-shadow: 0 0 6px rgba(5,11,30,.95), 0 0 14px #5be8ba, 0 0 28px rgba(91,232,186,.6); }
+  33%  { text-shadow: 0 0 6px rgba(5,11,30,.95), 0 0 14px #9b7cff, 0 0 28px rgba(155,124,255,.6); }
+  66%  { text-shadow: 0 0 6px rgba(5,11,30,.95), 0 0 14px #ff9fca, 0 0 28px rgba(255,159,202,.6); }
+  100% { text-shadow: 0 0 6px rgba(5,11,30,.95), 0 0 14px #5be8ba, 0 0 28px rgba(91,232,186,.6); }
+}
+@keyframes orbPoderEstela {
+  from { filter: blur(3px) hue-rotate(0deg); }
+  to   { filter: blur(3px) hue-rotate(360deg); }
+}
+@keyframes orbTitila {
+  0%, 100% { opacity: 0.35; scale: 0.8; }
+  50% { opacity: 1; scale: 1.25; }
+}
+
+/* El poder volando hacia la nave: un orbe de luz que sale de donde murió
+   la palabra y aterriza en la nave, donde recién se revela cuál era. */
+.orb-viaje {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffffff, #9b7cff 45%, transparent 72%);
+  box-shadow: 0 0 14px #9b7cff, 0 0 30px #54e8c6;
+  animation: orbViaja var(--orb-viaje-ms, 600ms) cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+  pointer-events: none;
+}
+@keyframes orbViaja {
+  from { translate: 0 0; scale: 1; opacity: 1; }
+  to   { translate: var(--orb-dx) var(--orb-dy); scale: 0.55; opacity: 0.9; }
+}
+.orb-revelado {
+  position: absolute;
+  left: 50%;
+  top: -0.6em;
+  width: 46px;
+  height: 46px;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 0 10px currentColor);
+  animation: orbRevela 1000ms ease-out forwards;
+  pointer-events: none;
+}
+@keyframes orbRevela {
+  0%   { scale: 0.2; opacity: 0; }
+  25%  { scale: 1.4; opacity: 1; }
+  45%  { scale: 1; }
+  75%  { opacity: 1; translate: 0 0; }
+  100% { opacity: 0; translate: 0 -34px; }
+}
+@keyframes orbCapsulaLate {
+  0%, 100% { box-shadow: 0 0 10px rgba(84, 232, 198, 0.35); }
+  50% { box-shadow: 0 0 22px rgba(84, 232, 198, 0.7); }
+}
+
+/* ---- La nave ---- */
+.orb-nave {
+  position: absolute;
+  left: 50%;
+  bottom: 3%;
+  transform: translateX(-50%);
+  width: clamp(120px, 16vh, 190px);
+  pointer-events: none;
+}
+.orb-nave img { display: block; width: 100%; animation: orbFlota 3.4s ease-in-out infinite; }
+@keyframes orbFlota {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+/* Estela equipada: resplandor bajo la nave del color comprado. */
+.orb-estela {
+  position: absolute;
+  left: 50%;
+  bottom: -12%;
+  width: 70%;
+  height: 34%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, var(--orb-estela-color, transparent), transparent 70%);
+  filter: blur(4px);
+  opacity: 0.9;
+}
+/* Aro de escudo apilado sobre las vidas. Se agrieta al absorber. */
+.orb-escudo-aro {
+  position: absolute;
+  inset: -12% -8%;
+  border-radius: 50%;
+  border: 3px solid rgba(84, 232, 198, 0.85);
+  box-shadow: 0 0 18px rgba(84, 232, 198, 0.5), inset 0 0 18px rgba(84, 232, 198, 0.3);
+  animation: orbCapsulaLate 2.2s ease-in-out infinite;
+}
+.orb-escudo-aro--doble { outline: 3px solid rgba(84, 232, 198, 0.35); outline-offset: 5px; }
+
+/* ---- Rayo y explosión ---- */
+.orb-rayo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 3px;
+  border-radius: 999px;
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, var(--orb-rayo-color, #25c8df), transparent);
+  box-shadow: 0 0 10px var(--orb-rayo-color, #25c8df);
+  animation: orbRayoFade 160ms linear forwards;
+  pointer-events: none;
+}
+@keyframes orbRayoFade { to { opacity: 0; } }
+.orb-explosion {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, #ffffff, var(--orb-boom-color, #5be8ba) 45%, transparent 70%);
+  animation: orbExplota 420ms ease-out forwards;
+  pointer-events: none;
+}
+@keyframes orbExplota {
+  from { opacity: 1; scale: 0.6; }
+  to { opacity: 0; scale: 4.4; }
+}
+
+/* ---- HUD ---- */
+.orb-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-family: var(--font-display);
+}
+.orb-hud > * { position: absolute; }
+.orb-amenaza {
+  right: 10px;
+  top: 14%;
+  height: 58%;
+  width: 9px;
+  border-radius: 999px;
+  background: rgba(148, 178, 226, 0.18);
+  overflow: hidden;
+}
+.orb-amenaza i {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-radius: 999px;
+  background: linear-gradient(0deg, #54e8c6, #ffd552 55%, #ff7d94);
+  transition: height 600ms ease;
+}
+.orb-vineta {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 12vmin rgba(207, 63, 91, 0.55);
+  animation: orbVinetaLate 1.1s ease-in-out infinite;
+}
+@keyframes orbVinetaLate { 50% { box-shadow: inset 0 0 18vmin rgba(207, 63, 91, 0.75); } }
+
+/* Aviso de powerup activado: sube y se desvanece sobre la nave. */
+.orb-aviso {
+  animation: orbAvisoSube 1.4s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes orbAvisoSube {
+  from { opacity: 0; translate: 0 10px; }
+  20% { opacity: 1; }
+  to { opacity: 0; translate: 0 -34px; }
+}
+
+/* Cuenta regresiva 3-2-1 y textos grandes de estado. */
+.orb-cuenta { animation: orbCuentaPop 900ms ease-in-out both; }
+@keyframes orbCuentaPop {
+  0% { opacity: 0; scale: 0.4; }
+  25% { opacity: 1; scale: 1.15; }
+  45% { scale: 1; }
+  85% { opacity: 1; }
+  100% { opacity: 0; scale: 0.92; }
+}
+
+/* ---- El selector de modos: orbes de cristal por capas ---- */
+.orb-orbe {
+  position: relative;
+  border-radius: 50%;
+  aspect-ratio: 1;
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+  background: none;
+  transition: transform 320ms ease, filter 320ms ease;
+}
+.orb-orbe:hover, .orb-orbe:focus-visible { transform: translateY(-8px) scale(1.035); }
+.orb-orbe:focus-visible { outline: 3px solid #5ff3d4; outline-offset: 6px; }
+.orb-orbe > img { position: absolute; inset: 0; width: 100%; height: 100%; }
+.orb-orbe__mundo { border-radius: 50%; object-fit: cover; animation: orbMundoRespira 14s ease-in-out infinite alternate; }
+.orb-orbe__brillo { animation: orbBrilloGira 11s ease-in-out infinite alternate; }
+@keyframes orbMundoRespira { from { transform: scale(1); } to { transform: scale(1.045); } }
+@keyframes orbBrilloGira {
+  from { transform: rotate(-3.5deg) scale(1.005); opacity: 0.9; }
+  to { transform: rotate(3.5deg) scale(1.03); opacity: 1; }
+}
+.orb-orbe--dormido { cursor: default; filter: saturate(0.75) brightness(0.92); }
+.orb-orbe--dormido:hover { transform: none; }
+.orb-orbe--dormido .orb-orbe__mundo, .orb-orbe--dormido .orb-orbe__brillo { animation: none; }
+/* Flotan a destiempo para que la pantalla respire. */
+.orb-flota-a { animation: orbFlota 5.2s ease-in-out infinite; }
+.orb-flota-b { animation: orbFlota 6.4s ease-in-out 0.9s infinite; }
+.orb-flota-c { animation: orbFlota 7.1s ease-in-out 1.7s infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .orb-estrellas, .orb-tinte, .orb-polvo, .orb-nave img,
+  .orb-orbe__mundo, .orb-orbe__brillo, .orb-escudo-aro,
+  .orb-vineta, .orb-flota-a, .orb-flota-b, .orb-flota-c,
+  .orb-palabra--poder, .orb-palabra--poder::before, .orb-palabra--poder::after {
+    animation: none;
+  }
+  /* La estela de poder se queda fija pero VISIBLE: sigue siendo la señal. */
+  .orb-palabra--poder { text-shadow: 0 0 6px rgba(5,11,30,.95), 0 0 14px #9b7cff, 0 0 28px rgba(155,124,255,.6); }
+  .orb-palabra--error { animation: none; }
+  /* El viaje y la revelación se acortan a un destello, no se anulan: son
+     información (qué poder llegó), no decoración. */
+  .orb-viaje { animation-duration: 120ms; }
+  .orb-revelado { animation-duration: 500ms; }
+  .orb-orbe, .orb-amenaza i { transition: none; }
+}
+
+/* ════════════════════════════════════════════════════════════════════
    COMPACT-HEIGHT PASS — ventana SIN pantalla completa (la barra del
    navegador roba ~120px). El gameplay es una columna flex de altura fija:
    acá achicamos lo flexible (teclas, paddings) para que la consigna, el

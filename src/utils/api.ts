@@ -216,6 +216,68 @@ export interface AuditEntry {
   actorName: string | null;
 }
 
+/* ---- Modo Órbita (arcade) ---- */
+
+/** Una partida terminada, lista para enviar. Espeja `runItemSchema` de
+ *  `api/src/routes/arcade.ts`. */
+export interface ArcadeRunPayload {
+  gameId: "tormenta";
+  startedAt: string;
+  endedAt: string;
+  durationMs: number;
+  score: number;
+  peakThreat: number;
+  rankId: string;
+  wpmAvg: number;
+  wpmPeak: number;
+  accuracy: number;
+  wordsDestroyed: number;
+  charsTyped: number;
+  errors: number;
+  crystalsClaimed: number;
+}
+
+export interface ArcadePosicion {
+  pos: number;
+  score: number;
+}
+
+export interface ArcadeRunResponse {
+  ok: true;
+  saved: number;
+  /** false = la telemetría no cerró: la partida quedó guardada pero no
+   *  compite ni acuñó cristales. */
+  ranked: boolean;
+  crystalsEarned: number;
+  balance: number;
+  positions: {
+    global: ArcadePosicion | null;
+    sede: ArcadePosicion | null;
+    grado: ArcadePosicion | null;
+  } | null;
+}
+
+export interface ArcadePerfil {
+  alias: string | null;
+  crystals: number;
+  bestScore: number;
+  bestThreat: number;
+  bestRank: string | null;
+  owned: string[];
+  equipped: { trail: string | null; beam: string | null };
+}
+
+export interface ArcadeBoardRow {
+  pos: number;
+  alias: string;
+  /** Solo viaja para filas dentro del alcance del actor (docente/admin). */
+  realName: string | null;
+  score: number;
+  rankId: string;
+  wpmPeak: number;
+  mine: boolean;
+}
+
 /** Un nivel terminado, listo para enviar. */
 export interface ProgressItem {
   worldId: string;
@@ -339,15 +401,21 @@ export const api = {
     call<{ ok: true }>(`/groups/${groupId}/students`, { method: "POST", json: { userId } }),
   removeStudent: (groupId: string, userId: string) =>
     call<{ ok: true }>(`/groups/${groupId}/students/${userId}`, { method: "DELETE" }),
-  groupWorlds: (id: string) => call<{ worldIds: string[] | null }>(`/groups/${id}/worlds`),
+  groupWorlds: (id: string) =>
+    call<{ worldIds: string[] | null; arcadeEnabled: boolean }>(`/groups/${id}/worlds`),
   setGroupWorlds: (id: string, worldIds: string[] | null) =>
     call<{ ok: true }>(`/groups/${id}/worlds`, { method: "PUT", json: { worldIds } }),
+  setGroupArcade: (id: string, enabled: boolean) =>
+    call<{ ok: true }>(`/groups/${id}/arcade`, { method: "PUT", json: { enabled } }),
   credentialsSheet: (id: string) =>
     call<{ group: { id: string; name: string }; students: { fullName: string; username: string; mustChangePassword: boolean }[] }>(
       `/groups/${id}/credentials-sheet`,
     ),
   /** El grupo del alumno y sus islas habilitadas, sin conocer ningún id. */
-  myGroup: () => call<{ group: Group | null; worldIds: string[] | null }>("/groups/mine"),
+  myGroup: () =>
+    call<{ group: Group | null; worldIds: string[] | null; arcadeEnabled: boolean }>(
+      "/groups/mine",
+    ),
 
   /* ---- Alta masiva por CSV ---- */
   importPreview: (csv: string, q: { sedeId?: string; groupId?: string } = {}) =>
@@ -381,6 +449,30 @@ export const api = {
     const qs = p.toString();
     return call<AuditEntry[]>(`/audit${qs ? `?${qs}` : ""}`);
   },
+
+  /* ---- Modo Órbita (arcade) ---- */
+  /** Acepta lote, como el progreso: el cliente encola y reintenta. */
+  postArcadeRuns: (items: ArcadeRunPayload[]) =>
+    call<ArcadeRunResponse>("/arcade/run", { method: "POST", json: { items } }),
+  arcadeMe: () =>
+    call<{ profile: ArcadePerfil; week: { key: string; best: number | null; pos: number | null } }>(
+      "/arcade/me",
+    ),
+  arcadeLeaderboard: (q: { scope?: "global" | "sede" | "grade"; period?: "week" | "all" } = {}) => {
+    const p = new URLSearchParams();
+    if (q.scope) p.set("scope", q.scope);
+    if (q.period) p.set("period", q.period);
+    const qs = p.toString();
+    return call<{ rows: ArcadeBoardRow[]; me: { pos: number; score: number } | null; week: string | null }>(
+      `/arcade/leaderboard${qs ? `?${qs}` : ""}`,
+    );
+  },
+  setArcadeAlias: (alias: string) =>
+    call<{ ok: true; alias: string }>("/arcade/alias", { method: "POST", json: { alias } }),
+  buyArcadeItem: (id: string) =>
+    call<{ ok: true; balance: number }>("/arcade/buy", { method: "POST", json: { id } }),
+  equipArcadeItem: (slot: "trail" | "beam", id: string | null) =>
+    call<{ ok: true }>("/arcade/equip", { method: "POST", json: { slot, id } }),
 
   health: () => call<{ ok: boolean; service: string; ts: string }>("/health", { retry: false }),
 };

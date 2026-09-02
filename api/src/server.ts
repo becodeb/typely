@@ -20,6 +20,7 @@ import { userRoutes } from "./routes/users.js";
 import { progressRoutes } from "./routes/progress.js";
 import { importRoutes } from "./routes/import.js";
 import { groupRoutes } from "./routes/groups.js";
+import { arcadeRoutes } from "./routes/arcade.js";
 import { adminRoutes } from "./routes/admin.js";
 import { inspectorRoutes, registerRoute, recordError } from "./routes/inspector.js";
 import { registerAuthContext } from "./authContext.js";
@@ -105,6 +106,7 @@ async function main() {
   await app.register(progressRoutes);
   await app.register(importRoutes);
   await app.register(groupRoutes);
+  await app.register(arcadeRoutes);
   await app.register(adminRoutes);
   await app.register(inspectorRoutes);
 

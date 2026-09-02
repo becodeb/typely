@@ -50,6 +50,9 @@ screenshots/
 # Prompts de fondo armados desde FONDOS.md (scripts/prompt-fondo.mjs)
 .prompts-fondos/
 
+# Pliego de contacto de los iconos de Órbita (scripts/preview-orbita-iconos.mjs)
+.preview-orbita/
+
 # Borradores de diseno del canvas (scripts/prompt-fondo.mjs y /design)
 .design-isla1/
 .design-gestion/

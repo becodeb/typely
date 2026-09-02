@@ -28,6 +28,8 @@ interface MyGroup {
   /** Islas que habilitó el docente. `null` = sin restricción. */
   worldIds: string[] | null;
   groupName: string | null;
+  /** El docente puede apagar el modo Órbita para su grupo. */
+  arcadeEnabled: boolean;
 }
 
 let cached: MyGroup | null = readCache();
@@ -65,6 +67,7 @@ export async function loadMyGroup(): Promise<MyGroup | null> {
       grade: (group?.grade as GradeId) ?? "1ep",
       worldIds: res.worldIds,
       groupName: group?.name ?? null,
+      arcadeEnabled: res.arcadeEnabled ?? true,
     };
     writeCache(value);
     return value;
@@ -81,6 +84,13 @@ export function clearMyGroup() {
 
 export function myGroupName(): string | null {
   return cached?.groupName ?? null;
+}
+
+/** ¿Este alumno tiene el modo Órbita habilitado? Sin dato (demo, sin
+ *  grupo, sin red) la respuesta es sí: el estado natural es habilitado y
+ *  el orbe dormido es una decisión del docente, no un fallo de cache. */
+export function arcadeHabilitado(): boolean {
+  return cached?.arcadeEnabled ?? true;
 }
 
 /* ------------------------------------------------------------------ */

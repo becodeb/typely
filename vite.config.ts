@@ -27,6 +27,14 @@ export default defineConfig(({ mode }) => {
        de producción. */
     plugins: [react(), tailwindcss(), levelPositionsWriter()],
     server: {
+      /* Puerto fijo: es el que citan CLAUDE.md y el editor de niveles
+         (localhost:5210). Host explícito en IPv4 porque en Windows el
+         default de Node (y también "localhost") puede quedar SOLO en [::1]:
+         el server andaba pero http://127.0.0.1:5210 daba conexión rechazada
+         y Chrome no abría la página. 127.0.0.1 la sirve a todo el mundo;
+         los navegadores que resuelven localhost→::1 igual reintentan v4. */
+      port: 5210,
+      host: "127.0.0.1",
       /* El proxy mantiene al navegador en un solo origen, así no hay CORS
          ni cookies cross-site — y la cookie de refresh, que es HTTP-only,
          viaja igual que en producción. */
