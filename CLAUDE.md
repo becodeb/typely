@@ -916,6 +916,26 @@ Tablas `arcade_profile` / `arcade_runs` (migración `0003_arcade.sql`); el
 catálogo del hangar está duplicado a propósito cliente/servidor y manda el
 del servidor.
 
+**Estética: el mismo cuento de las islas, de noche, visto desde arriba.**
+Índigo (`#141b4d`) en vez de negro; el tinte de la amenaza va de pervinca a
+violeta a coral (`TINTE_PARADAS`, espejado en `preview-orbita-fondo.mjs`);
+los destellos son de cuatro puntas ✦ como en el cielo de día; y toda tarjeta
+fuera de la escena del juego es el **vidrio de marca** (`.orb-vidrio`,
+`.orb-pildora`, `.orb-boton-primario`, `.orb-boton-vidrio`, `.orb-campo`):
+blanco esmerilado con blur, resplandor turquesa/violeta/rosa y texto azul de
+tinta, el mismo de la tarjeta de login. Dentro de la escena el HUD sigue
+siendo texto suelto con halo, nunca tarjetas. Lo que se ve grande (insignia
+del resultado y del podio, gema del poder que llega a la nave, cristal del
+saldo) son objetos 3D generados en `public/assets/orbita/{insignias,gemas}/`
+que `InsigniaRango tamano="grande"` y `Gema` cargan con respaldo SVG; el
+horizonte de las islas (`fondo/horizonte.webp`) y la estación del hub
+(`hub/estacion.webp`) se ocultan solos hasta que existan. Las fichas y los
+prompts de esas piezas están en `Images/orbita/ORBITA.md` §7; el importador
+las mide (`node scripts/import-orbita-art.mjs`) y `preview-orbita-fondo.mjs`
+apila el horizonte con palabras encima para aprobarlo. Ojo Chrome:
+`background-clip: text` no convive con `filter` en el mismo elemento — por
+eso la cuenta regresiva usa el envoltorio `.orb-cuenta-halo`.
+
 **CSS:** prefijo `.orb-*` en `global.css`, antes del compact-height pass. El
 borde de gradiente sigue siendo exclusivo de la consigna; Órbita no lo usa.
 

@@ -1,16 +1,23 @@
 /* El hub de Órbita — la estación desde la que se despega.
  *
- * Fondo de espacio (las mismas capas del juego, con tinte quieto), la
- * nave del chico, y tres puertas: jugar, ranking y hangar. Acá también
- * vive el ONBOARDING DEL ALIAS: la primera vez que un alumno real entra,
- * elige su nombre de piloto con la nave de fondo — es parte de la
- * ficción, no un formulario. El demo juega sin alias y sin ranking.
+ * Fondo de espacio (las mismas capas del juego, con tinte quieto y el
+ * horizonte de las islas abajo), la ESTACIÓN ORBITAL con la nave del chico
+ * apoyada en su plataforma, y tres puertas: jugar, ranking y hangar. Es
+ * una isla más, la que quedó en órbita: el mismo cuento de las islas, de
+ * noche. Acá también vive el ONBOARDING DEL ALIAS: la primera vez que un
+ * alumno real entra, elige su nombre de piloto con la nave de fondo — es
+ * parte de la ficción, no un formulario. El demo juega sin alias y sin
+ * ranking.
+ *
+ * La estación es una imagen generada aparte (ORBITA.md §7.2). Hasta que
+ * exista, el aro de luz de la plataforma sostiene solo a la nave.
  */
 import { ArrowLeft, Play, Rocket, Trophy } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CharacterSkin } from "../../components/common/CharacterSkin";
-import { IconoOrbita, InsigniaRango } from "../../components/orbita/OrbitaIconos";
+import { Gema, InsigniaRango } from "../../components/orbita/OrbitaIconos";
+import { colorEstela } from "../../data/orbitaCosmeticos";
 import { useAuth } from "../../hooks/useAuth";
 import { api, ApiError, type ArcadePerfil } from "../../utils/api";
 import {
@@ -22,22 +29,65 @@ import {
 } from "../../utils/orbita/arcade";
 import { rangoPorAmenaza, RANGOS } from "../../utils/orbita/motor";
 
-function FondoEspacio() {
+const ocultarSiFalta = (e: React.SyntheticEvent<HTMLImageElement>) => {
+  e.currentTarget.style.display = "none";
+};
+
+/** Las capas del juego con el tinte quieto en pervinca: el hub es la calma
+ *  antes de la tormenta. Lo comparten el ranking y el hangar. */
+export function FondoEspacio({
+  tinte = "rgb(84, 112, 224)",
+  fuerza = 0.55,
+}: {
+  tinte?: string;
+  fuerza?: number;
+}) {
   return (
     <div
       className="orb-fondo"
       style={
         {
           "--orb-nebulosa": "url(/assets/orbita/fondo/nebulosa.webp)",
-          "--orb-tinte": "rgb(80, 84, 214)",
-          "--orb-tinte-fuerza": 0.55,
+          "--orb-tinte": tinte,
+          "--orb-tinte-fuerza": fuerza,
         } as React.CSSProperties
       }
       aria-hidden="true"
     >
       <img className="orb-estrellas" src="/assets/orbita/fondo/estrellas.webp" alt="" />
       <div className="orb-tinte" />
+      <img
+        className="orb-horizonte orb-horizonte--quieto"
+        src="/assets/orbita/fondo/horizonte.webp"
+        alt=""
+        onError={ocultarSiFalta}
+      />
       <img className="orb-polvo" src="/assets/orbita/fondo/polvo.webp" alt="" />
+    </div>
+  );
+}
+
+/** La estación con la nave apoyada. `estela` es el color de la estela
+ *  equipada (o null). Lo comparten el hub y el hangar. */
+export function Puerto({ estela, className }: { estela: string | null; className?: string }) {
+  return (
+    <div className={`orb-puerto ${className ?? ""}`}>
+      <img
+        className="orb-estacion"
+        src="/assets/orbita/hub/estacion.webp"
+        alt=""
+        onError={ocultarSiFalta}
+      />
+      <span className="orb-plataforma" aria-hidden="true" />
+      <div className="orb-puerto__nave">
+        {estela && (
+          <span
+            className="orb-estela"
+            style={{ "--orb-estela-color": estela } as React.CSSProperties}
+          />
+        )}
+        <CharacterSkin kind="ship" className="block w-full orb-flota-a" alt="Tu nave" />
+      </div>
     </div>
   );
 }
@@ -91,21 +141,22 @@ export function OrbitaHubPage() {
     (perfil?.bestRank as (typeof RANGOS)[number]["id"] | null) ??
     (record ? rangoPorAmenaza(record.amenazaMax) : "cadete");
   const rango = RANGOS.find((r) => r.id === rangoId) ?? RANGOS[0]!;
+  const estela = colorEstela(perfil?.equipped.trail);
 
   return (
     <main className="relative min-h-dvh overflow-hidden" aria-label="Modo Órbita">
       <FondoEspacio />
 
-      <div className="relative z-10 min-h-dvh grid content-center justify-items-center gap-7 px-4 py-10">
+      <div className="relative z-10 min-h-dvh grid content-center justify-items-center gap-5 px-4 py-8">
         <button
           type="button"
           onClick={() => navigate("/modos")}
-          className="orb-dato fixed top-4 left-4 z-20 flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 border-0 cursor-pointer font-bold text-sm transition-colors"
+          className="orb-pildora orb-pildora--boton fixed top-4 left-4 z-20 text-sm"
         >
           <ArrowLeft size={17} /> Modos
         </button>
 
-        <header className="text-center grid gap-1 justify-items-center">
+        <header className="text-center grid gap-0.5 justify-items-center">
           <h1
             className="orb-dato m-0 font-extrabold"
             style={{ fontFamily: "var(--font-display)", fontSize: "clamp(2.2rem, 6vw, 3.4rem)" }}
@@ -117,18 +168,16 @@ export function OrbitaHubPage() {
           </p>
         </header>
 
-        {/* La nave, con sus datos alrededor como texto suelto. */}
-        <div className="grid justify-items-center gap-3">
-          <div className="w-[min(26vh,12rem)]">
-            <CharacterSkin kind="ship" className="block w-full orb-flota-a" alt="Tu nave" />
-          </div>
-          <div className="flex items-center gap-5 flex-wrap justify-center">
-            <span className="orb-dato font-bold flex items-center gap-1.5">
-              <IconoOrbita nombre="cristal" className="w-5 h-5" style={{ color: "#9b7cff" }} />
+        {/* La estación, con la nave apoyada y sus datos en píldoras de vidrio. */}
+        <div className="grid justify-items-center gap-2">
+          <Puerto estela={estela} />
+          <div className="flex items-center gap-2.5 flex-wrap justify-center">
+            <span className="orb-pildora">
+              <Gema nombre="cristal" className="w-5 h-5" />
               {perfil?.crystals ?? 0} cristales
             </span>
             {mejor > 0 && (
-              <span className="orb-dato font-bold flex items-center gap-1.5">
+              <span className="orb-pildora">
                 <InsigniaRango rango={rango.id} className="w-6 h-6" />
                 récord {mejor.toLocaleString("es-AR")} · {rango.nombre}
               </span>
@@ -138,35 +187,21 @@ export function OrbitaHubPage() {
 
         {/* Las tres puertas. */}
         <div className="grid gap-3 w-[min(26rem,92vw)]">
-          <Link
-            to="/orbita/tormenta"
-            className="flex items-center justify-center gap-3 py-4 rounded-3xl font-extrabold text-xl no-underline text-[#0b2437]"
-            style={{
-              fontFamily: "var(--font-display)",
-              background: "linear-gradient(90deg, #54e8c6, #25c8df, #536bff)",
-              boxShadow: "0 14px 30px rgba(35, 190, 210, 0.35)",
-            }}
-          >
+          <Link to="/orbita/tormenta" className="orb-boton-primario text-xl py-4">
             <Play size={24} /> Tormenta de palabras
           </Link>
           <div className="grid grid-cols-2 gap-3">
-            <Link
-              to="/orbita/ranking"
-              className="orb-dato flex items-center justify-center gap-2 py-3 rounded-2xl bg-white/10 hover:bg-white/20 font-bold no-underline transition-colors"
-            >
+            <Link to="/orbita/ranking" className="orb-boton-vidrio">
               <Trophy size={19} /> Ranking
             </Link>
-            <Link
-              to="/orbita/hangar"
-              className="orb-dato flex items-center justify-center gap-2 py-3 rounded-2xl bg-white/10 hover:bg-white/20 font-bold no-underline transition-colors"
-            >
+            <Link to="/orbita/hangar" className="orb-boton-vidrio">
               <Rocket size={19} /> Hangar
             </Link>
           </div>
         </div>
 
         {!sincroniza && (
-          <p className="orb-dato m-0 text-sm opacity-80 text-center max-w-md">
+          <p className="orb-dato m-0 text-sm opacity-90 text-center max-w-md font-semibold">
             Estás jugando de prueba: tus partidas quedan en esta compu y no entran al ranking.
           </p>
         )}
@@ -174,20 +209,18 @@ export function OrbitaHubPage() {
 
       {/* Onboarding del alias — con la nave de fondo, parte de la ficción. */}
       {pideAlias && (
-        <div className="fixed inset-0 z-30 grid place-items-center p-4 bg-[rgba(5,10,26,0.75)]">
+        <div
+          className="fixed inset-0 z-30 grid place-items-center p-4"
+          style={{ background: "rgba(20, 27, 77, 0.6)" }}
+        >
           <section
-            className="w-[min(26rem,94vw)] rounded-[28px] p-6 grid gap-4 text-center"
-            style={{
-              background: "rgba(16, 26, 56, 0.95)",
-              border: "1px solid rgba(148, 178, 226, 0.28)",
-              color: "#eef4ff",
-            }}
+            className="orb-vidrio w-[min(26rem,94vw)] p-6 grid gap-4 text-center"
             aria-label="Elegí tu nombre de piloto"
           >
             <h2 className="m-0 font-extrabold text-2xl" style={{ fontFamily: "var(--font-display)" }}>
               ¿Cómo te llamás, piloto?
             </h2>
-            <p className="m-0 text-sm opacity-85">
+            <p className="orb-suave m-0 text-sm font-semibold">
               Este nombre te representa en el ranking de todas las escuelas. No uses tu nombre
               real: inventate uno de piloto.
             </p>
@@ -199,17 +232,11 @@ export function OrbitaHubPage() {
               }}
               maxLength={16}
               placeholder="Cometa Verde"
-              className="h-13 px-4 py-3 rounded-2xl border text-lg font-bold text-center"
-              style={{
-                background: "rgba(255, 255, 255, 0.08)",
-                borderColor: "rgba(148, 178, 226, 0.35)",
-                color: "#eef4ff",
-                fontFamily: "var(--font-display)",
-              }}
+              className="orb-campo text-center"
               autoFocus
             />
             {errorAlias && (
-              <p className="m-0 text-sm font-semibold" style={{ color: "#ff9fb4" }}>
+              <p className="m-0 text-sm font-bold" style={{ color: "#d64a6a" }}>
                 {errorAlias}
               </p>
             )}
@@ -217,12 +244,13 @@ export function OrbitaHubPage() {
               type="button"
               disabled={guardando || alias.trim().length < 3}
               onClick={() => void guardarAlias()}
-              className="py-3 rounded-2xl border-0 cursor-pointer font-bold text-base text-[#0b2437] disabled:opacity-50"
-              style={{ background: "linear-gradient(90deg, #54e8c6, #25c8df, #536bff)" }}
+              className="orb-boton-primario"
             >
               {guardando ? "Guardando…" : "¡Listo para despegar!"}
             </button>
-            <p className="m-0 text-xs opacity-60">Después lo podés cambiar en el hangar, una vez por semana.</p>
+            <p className="orb-suave m-0 text-xs font-semibold">
+              Después lo podés cambiar en el hangar, una vez por semana.
+            </p>
           </section>
         </div>
       )}

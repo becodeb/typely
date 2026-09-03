@@ -30,6 +30,27 @@ Las dos carpetas ya existen. El importador produce los WebP en
 `public/assets/orbita/` sacándole el `-source` al nombre —
 `cristal-source.png` → `orbes/cristal.webp`. Vos **no** tocás `public/`.
 
+### Las diez piezas del rediseño (2026-09-02)
+
+El rediseño estético (§7) suma **diez imágenes nuevas más dos rehechas**, en
+tres tandas. Las fichas y los prompts están en §7; esta tabla es la
+respuesta a *qué nombre y dónde*. El importador ya conoce las carpetas
+nuevas y sus chequeos.
+
+| Guardar como | Medida | Transparencia | Tanda | Qué es |
+|---|---|---|---|---|
+| `Images/orbita/fondo/horizonte-source.png` | 2560×1440 | **Sí** | 1 | El mundo de las islas visto desde la órbita, solo la franja de abajo |
+| `Images/orbita/fondo/estrellas-source.png` (v2) | 2560×1440 | No | 1 | El campo estelar rehecho en índigo, con destellos ✦ |
+| `Images/orbita/fondo/nebulosa-source.png` (v2) | 2560×1440 | **Sí**, en gris | 1 | Las nubes del cielo de día, como máscara |
+| `Images/orbita/hub/estacion-source.png` | 1536×1024 | **Sí** | 2 | La estación orbital donde se apoya la nave |
+| `Images/orbita/insignias/<rango>-source.png` | 1024×1024 | **Sí** | 2 | Seis medallas de caramelo (cadete … leyenda) |
+| `Images/orbita/gemas/<poder>-source.png` | 1024×1024 | **Sí** | 3 | Siete gemas de poder y `cristal`, la moneda |
+
+Salen como `fondo/horizonte.webp`, `hub/estacion.webp`,
+`insignias/<rango>.webp` y `gemas/<poder>.webp`. Insignias y gemas son
+listas ABIERTAS como los mundos: cualquier `<nombre>-source.png` en su
+carpeta entra, recortado y encuadrado en un cuadrado con margen parejo.
+
 ### Por qué son sólo ocho
 
 Un orbe son **tres capas apiladas: mundo + cristal + brillo**. El cristal (1) y
@@ -477,10 +498,14 @@ objetos, sin texto.
 
 ## 5. El mapa de zonas del minijuego
 
-⚠️ **Estos números son objetivos de diseño, no mediciones.** Los de `FONDOS.md`
-se tomaron en la app; la pantalla de Órbita todavía no existe. **Volver acá y
-medirlos de verdad cuando el juego esté armado**, igual que se hizo con el
-pedestal, y corregir este bloque.
+**Medidos en la app (2026-09-02), en `TormentaPage.tsx`**, ya no son
+objetivos: el HUD ocupa y 0–9 %; el punto de fuga está en (50 %, 24 %) y las
+palabras convergen hacia (50 %, 78 %) creciendo hasta ×1,35; la nave ocupa
+y 87–97 % centrada; el termómetro de amenaza va a 10 px del borde derecho
+entre y 14 % y 72 %, con la nube 30 px por encima; el cartel del vuelo de
+prueba queda en y 88 %. **El horizonte (§7.1) arranca en y 70 % y todo lo
+que dibuja queda por debajo del 62 %**, así que las palabras lo cruzan solo
+en su último tramo, ya grandes.
 
 ```
         0%        20%                             80%       100%
@@ -515,16 +540,22 @@ Tres consecuencias, y son las tres que más se van a incumplir:
 
 ## 6. Los iconos no pasan por acá
 
-Los dieciocho iconos —cinco de HUD, siete de powerup, seis de rango— **ya están
-hechos**. Son SVG dibujados a mano, no imágenes generadas: un icono de 16 px
-rasterizado sale sucio siempre, y estos tienen que leerse sobre un campo
-estelar en movimiento.
+Los veinte iconos —cinco de HUD, dos nubes del termómetro de amenaza, siete
+de powerup, seis de rango— **ya están hechos**. Son SVG dibujados a mano, no
+imágenes generadas: un icono de 16 px rasterizado sale sucio siempre, y
+estos tienen que leerse sobre un campo estelar en movimiento.
 
 ```
 Images/orbita/iconos/    corazón lleno y vacío · escudo entero y agrietado ·
-                         cristal · los siete powerups
+                         cristal · nube calma y nube de tormenta · los siete powerups
 Images/orbita/rangos/    cadete · piloto · explorador · as · capitán · leyenda
 ```
+
+**Lo que se ve GRANDE no es SVG.** La insignia del resultado y del podio, la
+gema del poder que llega a la nave y el cristal del saldo son objetos 3D
+generados (§7.3 y §7.4). Los componentes `InsigniaRango tamano="grande"` y
+`Gema` los cargan y, si el WebP todavía no existe, caen al SVG sin ruido:
+así el rediseño entra por tandas y nada queda roto entre una y otra.
 
 Dos convenciones, y las dos son funcionales:
 
@@ -553,3 +584,266 @@ node scripts/preview-orbita-iconos.mjs      # escribe .preview-orbita/iconos.png
 
 La fila del medio los dibuja a 20 px, que es donde un icono se rompe. Si algo no
 se distingue ahí, hay que rehacerlo antes de que llegue al HUD.
+
+---
+
+## 7. El rediseño estético: horizonte, estación, insignias y gemas
+
+La dirección de arte completa está en el artefacto "Rediseño visual de
+Órbita" (2026-09-02). La tesis en una línea: **Órbita es el mismo cuento de
+las islas, de noche, visto desde arriba.** Índigo en vez de negro, las
+mismas nubes del cielo de día como máscara nocturna, el mundo de las islas
+asomando debajo de la nave, el vidrio blanco esmerilado de la tarjeta de
+login en todas las pantallas, y objetos de caramelo donde algo se ve grande.
+La referencia de todo es `mundo-orbita` (§4.4), que ya está en estilo.
+
+Valen las cinco reglas de §1. El generador da 1024×1024, 1536×1024 y
+1024×1536: para las capas de 2560×1440 pedí 1536×1024 y escalá con el mismo
+criterio de siempre (mínimo 1920×1080; el importador nunca agranda).
+
+**Orden.** Primero el horizonte (7.1) y no sigas hasta que las palabras se
+lean encima con los tres tintes. Después estrellas y nebulosa juntas (7.5):
+se juzgan como un set. La estación (7.2) va sola. En insignias iterá
+**cadete** hasta que cierre y mandalo de molde para las otras cinco; en
+gemas el molde es **escudo**.
+
+### 7.1 `horizonte-source.png` — el mundo visto desde la órbita
+
+| | |
+|---|---|
+| **Guardar en** | `Images/orbita/fondo/horizonte-source.png` |
+| **Medida** | 2560×1440 (16:9). Mínimo 1920×1080 |
+| **Formato** | PNG con transparencia real |
+| **Referencias a adjuntar** | `public/assets/islands/island1/map.webp`, `public/assets/islands/island13/map.webp`, `public/assets/edutic-art/sky-soft-bg.webp` y `Images/orbita/orbes/mundo-orbita-source.png` |
+| **Sale como** | `public/assets/orbita/fondo/horizonte.webp` |
+
+**Qué tiene que lograr.** Darle lugar a la nave. Es la capa que convierte el
+vacío en "estoy volando encima de mi mundo". Vive solo en la franja de
+abajo: todo lo que esté por encima del 62 % de la altura tiene que ser
+transparente, porque ahí pasan las palabras y el resto del cielo lo ponen
+las otras capas.
+
+```
+Te paso imágenes de referencia de un juego infantil de mecanografía: dos islas
+flotantes del mapa, el cielo pastel del juego y el interior de un orbe de
+cristal con el espacio de noche. Tomá de ahí el estilo: 3D suave, colores
+brillantes y pasteles, luz cálida, aire de cuento.
+
+Necesito una capa de HORIZONTE para el fondo de un minijuego espacial. Imagen
+horizontal de 2560x1440, en PNG CON TRANSPARENCIA REAL.
+
+Es el mundo de esas islas visto desde muy arriba, desde la órbita, de noche.
+Ocupa SOLO la franja de abajo: la curva suave y ancha del planeta, cubierta
+por un mar de nubes nocturnas azul lavanda, y asomando entre las nubes cinco
+o seis islas flotantes diminutas, con sus cristales y sus ventanitas
+encendidas, como las luces de un pueblo visto desde un avión. Sobre la curva,
+un aro fino de atmósfera turquesa y rosa, como un amanecer que todavía no
+llegó.
+
+Condición que manda sobre todas las demás: el 62% SUPERIOR de la imagen tiene
+que ser COMPLETAMENTE TRANSPARENTE. Sin estrellas, sin nubes, sin brillo, sin
+degradado, sin nada. La curva del horizonte arranca alrededor del 70% de la
+altura y nada de lo dibujado sube más allá del 62%.
+
+La franja dibujada es de tono medio a oscuro: nubes azul lavanda con luz
+suave, nunca claras ni blancas. Encima de ese horizonte todavía pasan
+palabras que hay que leer.
+
+El centro de la franja de abajo tiene que ser la parte más tranquila: ahí se
+apoya la nave del jugador. Las islas y los detalles van hacia los costados,
+sin llegar a los 8% de cada borde.
+
+Sin naves, sin personajes, sin texto, sin interfaz, sin marco. Estilo limpio,
+de cuento, sin grano fotográfico.
+```
+
+**Salió bien si:** tapás mentalmente el 62 % de arriba y no perdés nada; las
+islas se reconocen como las del mapa; y en `preview-orbita-fondo.mjs` (que
+ahora apila el horizonte) las palabras que cruzan la franja se leen con el
+tinte coral. El importador mide la opacidad del 62 % superior (tope 0,03) y
+el brillo de la franja inferior (tope 0,35).
+
+### 7.2 `estacion-source.png` — la estación orbital
+
+| | |
+|---|---|
+| **Guardar en** | `Images/orbita/hub/estacion-source.png` |
+| **Medida** | 1536×1024 (3:2) |
+| **Formato** | PNG con transparencia real |
+| **Referencias a adjuntar** | `public/assets/islands/island1/map.webp`, `public/assets/islands/island4/map.webp`, `public/assets/edutic-art/skins/ship-t1-f3.webp` (para la escala del puerto) y `Images/orbita/orbes/mundo-orbita-source.png` |
+| **Sale como** | `public/assets/orbita/hub/estacion.webp` |
+
+**Qué tiene que lograr.** Ser una isla más, la que quedó en órbita. Misma
+piedra lavanda con runas encendidas, mismos cristales y plantitas de las
+islas, pero de noche y con un puerto: una plataforma redonda y despejada
+donde el juego apoya la nave con HTML (`.orb-puerto`). La nave NO va
+dibujada.
+
+```
+Te paso imágenes de referencia de un juego infantil de mecanografía: dos islas
+flotantes del mapa, la nave del jugador (solo para que sepas su tamaño y su
+estilo) y el interior de un orbe con el espacio de noche. Tomá de ahí el
+estilo: 3D suave, colores brillantes y pasteles, luz cálida, aire de cuento.
+
+Necesito UNA ISLA FLOTANTE NUEVA: una pequeña estación orbital, la isla que
+quedó flotando en el espacio, de noche. Imagen horizontal de 1536x1024 en PNG
+CON TRANSPARENCIA REAL, con la isla sola sobre fondo transparente, vista en
+tres cuartos desde arriba como las islas del mapa.
+
+Está hecha del mismo material que las islas de referencia: bloques de piedra
+lavanda con runas de luz turquesa, cristales que brillan, musgo y plantitas,
+raíces y piedritas colgando abajo. Lo que la hace estación: en el centro
+tiene una PLATAFORMA REDONDA, ANCHA Y DESPEJADA, de piedra lisa con un aro de
+luz suave en el borde, que ocupa alrededor de un tercio del ancho de la
+imagen. Es el puerto donde se apoya la nave, así que su superficie tiene que
+estar completamente vacía y ser de tono medio, más oscura que el vidrio claro
+de la nave. Alrededor de la plataforma, poca cosa: un farol de cristal, una
+antena parabólica pequeña y redonda, dos o tres cristales grandes, una
+bandera sin dibujo. Ventanitas encendidas con luz cálida en la piedra.
+
+La plataforma queda en el centro del cuadro, un poco por encima de la mitad,
+porque el juego apoya la nave ahí y la nave sobresale hacia arriba.
+
+Sin nave, sin personajes, sin texto, sin carteles con letras, sin interfaz,
+sin marco, sin fondo: solo la isla sobre transparencia.
+```
+
+**Salió bien si:** puesta al lado de la isla 1 parece de la misma serie, la
+plataforma está vacía y se ve como una mesa, y la nave (que la página apoya
+al 36 % del ancho, centrada, con su base a la altura del centro de la
+plataforma) queda apoyada sin tapar los cristales. El importador exige alpha
+real y recorta el margen transparente.
+
+### 7.3 `insignias/<rango>-source.png` — seis medallas de caramelo
+
+| | |
+|---|---|
+| **Guardar en** | `Images/orbita/insignias/cadete-source.png` y así con `piloto`, `explorador`, `as`, `capitan`, `leyenda` (sin tilde en los nombres) |
+| **Medida** | 1024×1024, la medalla centrada con un margen chico de aire |
+| **Formato** | PNG con transparencia real |
+| **Referencias a adjuntar** | Para **cadete**: `public/assets/edutic-art/mascot-proud.webp` (el material) y `Images/orbita/rangos/cadete.svg` (la forma). Para los otros cinco: **la medalla de cadete ya aprobada** más el SVG de ese rango |
+| **Sale como** | `public/assets/orbita/insignias/<rango>.webp` |
+
+**Qué tiene que lograr.** Que subir de rango se sienta como ganar un objeto.
+La forma de cada rango ya está decidida en los SVG y se distingue contando,
+sin depender del color: cadete la estrella sola, piloto suma un galón,
+explorador dos, as tres, capitán las alas, leyenda el cometa y el aro. Los
+SVG siguen valiendo para el HUD y las listas; estas medallas son para donde
+se ven grandes: el resultado, el podio, el hub.
+
+```
+Te paso dos imágenes de referencia de un juego infantil: un robot mascota, del
+que quiero el MATERIAL (esmalte color crema brillante, cantos dorados, gemas
+turquesa y violeta, luz cálida, 3D suave de caramelo), y un icono plano con
+la FORMA exacta de la medalla que necesito.
+
+Necesito esa medalla como OBJETO 3D, para un juego de islas flotantes de
+estética pastel. Imagen cuadrada de 1024x1024 en PNG CON TRANSPARENCIA REAL,
+la medalla centrada, ocupando casi todo el cuadro con un margen chico de
+aire, vista de frente con una leve inclinación que deje ver el grosor.
+
+Respetá la forma del icono: mismo contorno hexagonal, misma estrella de
+cuatro puntas en el centro, mismos elementos y en la misma cantidad. La
+cantidad de galones, alas o aros es lo que distingue un rango de otro, así
+que no agregues ni saques ninguno.
+
+Es una medalla de esmalte con cantos redondeados, borde dorado fino, un
+brillo especular arriba a la izquierda y una sombra suave dentro del propio
+objeto. Sin cinta, sin cadena, sin pedestal, sin fondo, sin sombra
+proyectada, sin texto ni números.
+
+RANGO: cadete / esmalte color menta (#54e8c6) / la estrella sola, sin galones.
+```
+
+| Archivo | Bloque RANGO |
+|---|---|
+| `cadete-source.png` | cadete / esmalte menta (#54e8c6) / la estrella sola, sin galones |
+| `piloto-source.png` | piloto / esmalte turquesa (#25c8df) / la estrella y UN galón abajo |
+| `explorador-source.png` | explorador / esmalte azul eléctrico (#536bff) / la estrella y DOS galones apilados |
+| `as-source.png` | as / esmalte violeta (#9b7cff) / la estrella y TRES galones apilados |
+| `capitan-source.png` | capitán / esmalte rosa (#ff9fca) / la estrella con dos alas abiertas a los costados |
+| `leyenda-source.png` | leyenda / esmalte dorado (#ffd552) con cantos crema / la estrella con un cometa cruzando y un aro de luz alrededor |
+
+Para las cinco que siguen a cadete, cambiá la primera oración por: *"Te paso
+la medalla de cadete ya hecha, que es el molde de material, tamaño, cámara y
+posición en el cuadro, y el icono plano con la forma de la medalla que
+necesito ahora"*. Después el prompt sigue igual con su bloque RANGO.
+
+**Salió bien si:** las seis en fila se ven como una familia (misma cámara,
+mismo tamaño, mismo brillo) y a 96 px todavía se cuentan los galones. El
+importador las recorta y las encuadra en un cuadrado con margen parejo.
+
+### 7.4 `gemas/<poder>-source.png` — las gemas de poder y el cristal
+
+| | |
+|---|---|
+| **Guardar en** | `Images/orbita/gemas/escudo-source.png` y así con `reparacion`, `pulso`, `lento`, `rayo`, `cosecha`, `mira`, `cristal` |
+| **Medida** | 1024×1024 |
+| **Formato** | PNG con transparencia real |
+| **Referencias a adjuntar** | Para **escudo**: `Images/orbita/orbes/cristal-source.png` (el vidrio), un cristal de `island1/map.webp` y `Images/orbita/iconos/pw-escudo.svg`. Para las otras: **la gema de escudo aprobada** más el SVG de ese poder (`lento` usa `pw-tiempo.svg`) |
+| **Sale como** | `public/assets/orbita/gemas/<poder>.webp` |
+
+**Qué tiene que lograr.** Que la sorpresa del poder, cuando llega a la nave,
+se revele como un objeto que dan ganas de agarrar, y que en el hangar y en
+el resultado se entienda qué es de un vistazo. Son cristales facetados con
+el símbolo del poder adentro, iluminado. En el HUD y en la palabra que vuela
+siguen los SVG.
+
+```
+Te paso tres imágenes de referencia de un juego infantil de estética pastel:
+una burbuja de cristal (el vidrio), un cristal de una de sus islas (la
+facetación y el brillo) y un icono plano con el SÍMBOLO que necesito adentro.
+
+Necesito una GEMA DE PODER: un cristal facetado, redondeado, como una cápsula
+de vidrio de colores, con el símbolo del icono flotando adentro, iluminado
+con luz propia. Imagen cuadrada de 1024x1024 en PNG CON TRANSPARENCIA REAL,
+la gema centrada, ocupando casi todo el cuadro con un margen chico de aire,
+vista de frente.
+
+Estilo 3D suave de caramelo, luz cálida, un brillo especular arriba a la
+izquierda, sombra suave dentro del propio objeto. El símbolo tiene que leerse
+a primera vista: simple, grueso, del color que digo abajo, sin detalles
+finos.
+
+Sin pedestal, sin fondo, sin sombra proyectada, sin texto, sin partículas
+alrededor.
+
+PODER: escudo / cristal color menta (#54e8c6) / adentro, un escudo redondeado
+blanco con una gema en el centro.
+```
+
+| Archivo | Bloque PODER |
+|---|---|
+| `escudo-source.png` | escudo / cristal menta (#54e8c6) / un escudo redondeado blanco con una gema en el centro |
+| `reparacion-source.png` | reparación / cristal rosa coral (#ff6b8a) / un corazón blanco con una cruz chiquita arriba a la derecha |
+| `pulso-source.png` | pulso / cristal celeste (#25c8df) / tres aros concéntricos blancos que se expanden |
+| `lento-source.png` | lento / cristal lavanda (#9b7cff) / un reloj de arena blanco |
+| `rayo-source.png` | rayo / cristal dorado (#ffd552) / dos rayos blancos en paralelo |
+| `cosecha-source.png` | cosecha / cristal violeta (#7c71ff) / dos cristalitos blancos pegados |
+| `mira-source.png` | mira / cristal rosa (#ff9fca) / una mira redonda blanca con un punto en el centro |
+| `cristal-source.png` | cristal / cristal violeta (#9b7cff) / sin símbolo adentro: es la gema pura, la moneda del modo |
+
+**Salió bien si:** las ocho en fila son una familia, el símbolo se reconoce
+a 72 px (el tamaño de la revelación sobre la nave) y el cristal de la moneda
+parece hermano de los cristales de la isla 1.
+
+### 7.5 Estrellas y nebulosa, versión 2
+
+Las fichas de §4.6 y §4.7 siguen valiendo con dos cambios de dirección, y se
+regeneran juntas porque se juzgan como un set:
+
+- **Estrellas:** cielo ÍNDIGO PROFUNDO, no negro — azul violáceo oscuro y
+  parejo que se aclara apenas hacia lavanda en las cuatro esquinas y en el
+  borde de arriba — y unas pocas estrellas grandes con forma de destello de
+  cuatro puntas, como las del cielo de día (`sky-soft-bg.webp`, que va de
+  referencia junto con `mundo-orbita-source.png`), siempre cerca de los
+  bordes. El tercio central sigue siendo lo más oscuro y vacío. El índigo
+  da más brillo que la versión 1 (que estaba en 0,04): está previsto, el
+  tope de 0,20 tiene aire.
+- **Nebulosa:** cúmulos redondos y esponjosos con la forma de las nubes de
+  `sky-soft-bg.webp` (que va de referencia), no jirones de nebulosa. Sigue
+  siendo una máscara en GRIS con el centro transparente: el juego le pone
+  el color de la amenaza, que ahora va de pervinca a violeta a coral.
+
+Guardá la versión anterior de cada una fuera de la carpeta (por ejemplo
+`estrellas-v1.png` en `Images/orbita/`) por si hay que volver.

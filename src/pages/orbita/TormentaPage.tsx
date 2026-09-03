@@ -29,7 +29,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { CharacterSkin } from "../../components/common/CharacterSkin";
 import {
   COLOR_DE_POWERUP,
-  ICONO_DE_POWERUP,
+  Gema,
   IconoOrbita,
   InsigniaRango,
 } from "../../components/orbita/OrbitaIconos";
@@ -71,12 +71,29 @@ function posicionDe(carril: number, progreso: number) {
   };
 }
 
-/* Azul calmo → violeta → rojo. El termómetro ambiental de la amenaza. */
+/* Pervinca calmo → violeta → coral. El termómetro ambiental de la amenaza.
+   Coral y no rojo sangre: la tensión es color de tormenta, dentro de la
+   paleta de marca; el rojo queda para la viñeta del último corazón.
+   (scripts/preview-orbita-fondo.mjs tiene los mismos tres: cambiar juntos.) */
 const TINTE_PARADAS: [number, [number, number, number]][] = [
-  [0, [58, 95, 208]],
-  [50, [124, 75, 216]],
-  [100, [208, 52, 79]],
+  [0, [84, 112, 224]],
+  [50, [146, 92, 236]],
+  [100, [236, 84, 124]],
 ];
+
+/* Lluvia de destellos sobre la tarjeta cuando hay récord nuevo. */
+const CONFETI = [
+  { x: "8%", c: "#ffd552", d: "0ms", s: "18px" },
+  { x: "20%", c: "#5be8ba", d: "160ms", s: "14px" },
+  { x: "33%", c: "#ff9fca", d: "60ms", s: "16px" },
+  { x: "45%", c: "#ffffff", d: "260ms", s: "12px" },
+  { x: "56%", c: "#ffd552", d: "120ms", s: "20px" },
+  { x: "68%", c: "#9b7cff", d: "320ms", s: "15px" },
+  { x: "79%", c: "#5be8ba", d: "40ms", s: "13px" },
+  { x: "90%", c: "#ff9fca", d: "220ms", s: "17px" },
+  { x: "14%", c: "#ffffff", d: "420ms", s: "11px" },
+  { x: "62%", c: "#ffd552", d: "480ms", s: "14px" },
+] as const;
 function tinteDeAmenaza(amenaza: number): string {
   let [a0, c0] = TINTE_PARADAS[0]!;
   let [a1, c1] = TINTE_PARADAS[TINTE_PARADAS.length - 1]!;
@@ -698,6 +715,16 @@ export function TormentaPage() {
       >
         <img className="orb-estrellas" src="/assets/orbita/fondo/estrellas.webp" alt="" />
         <div className="orb-tinte" />
+        {/* El mundo de las islas, abajo de la nave. Hasta que el WebP exista
+            (se genera aparte, ORBITA.md §7.1) se oculta solo. */}
+        <img
+          className="orb-horizonte"
+          src="/assets/orbita/fondo/horizonte.webp"
+          alt=""
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
+        />
         <img className="orb-polvo" src="/assets/orbita/fondo/polvo.webp" alt="" />
       </div>
 
@@ -763,12 +790,18 @@ export function TormentaPage() {
           />
         ))}
 
+        {/* Fogonazo + cuatro chispas de cuatro puntas (los <i> son las chispas). */}
         {chispas.map((c) => (
           <span
             key={c.id}
             className="orb-explosion"
             style={{ left: `${c.x}%`, top: `${c.y}%`, "--orb-boom-color": c.color } as React.CSSProperties}
-          />
+          >
+            <i />
+            <i />
+            <i />
+            <i />
+          </span>
         ))}
         {rayos.map((l) => (
           <span
@@ -798,22 +831,27 @@ export function TormentaPage() {
             <span className={`orb-escudo-aro ${escudo > 1 ? "orb-escudo-aro--doble" : ""}`} />
           )}
           <CharacterSkin kind="ship" alt="Tu nave" />
-          {/* Recién acá se sabe qué era: el icono explota sobre la nave. */}
+          {/* Recién acá se sabe qué era: la gema explota sobre la nave. */}
           {revelado && (
             <span
               key={revelado.id}
               className="orb-revelado"
               style={{ color: COLOR_DE_POWERUP[revelado.powerup] }}
             >
-              <IconoOrbita nombre={ICONO_DE_POWERUP[revelado.powerup]} className="w-full h-full" />
+              <Gema nombre={revelado.powerup} className="w-full h-full" />
             </span>
           )}
-          <div className="absolute left-1/2 -translate-x-1/2 -top-9 grid gap-1 justify-items-center">
+          <div className="absolute left-1/2 -translate-x-1/2 -top-10 grid gap-1 justify-items-center">
             {avisos.map((a) => (
               <span
                 key={a.id}
-                className="orb-aviso orb-dato font-bold text-lg"
-                style={{ color: a.color }}
+                className="orb-aviso font-bold text-base"
+                style={
+                  {
+                    "--orb-aviso-color": a.color,
+                    fontFamily: "var(--font-display)",
+                  } as React.CSSProperties
+                }
               >
                 {a.texto}
               </span>
@@ -838,7 +876,7 @@ export function TormentaPage() {
               key={n}
               nombre={n <= corazones ? "corazon-lleno" : "corazon-vacio"}
               className="w-7 h-7"
-              style={{ color: "#ff7d94" }}
+              style={{ color: n <= corazones ? "#ff7d94" : "rgba(184, 192, 232, 0.8)" }}
               titulo={n <= corazones ? "Vida" : "Vida perdida"}
             />
           ))}
@@ -887,9 +925,24 @@ export function TormentaPage() {
           </button>
         </div>
 
-        {/* Barra de amenaza + rango del momento */}
+        {/* El termómetro de tormenta: tubo + nube de tapa que despierta con la amenaza. */}
         <div className="orb-amenaza" aria-hidden="true">
           <i style={{ height: `${hud.amenaza}%` }} />
+        </div>
+        <div
+          className={`orb-amenaza-nube ${
+            hud.amenaza >= 70
+              ? "orb-amenaza-nube--tormenta"
+              : hud.amenaza >= 30
+                ? "orb-amenaza-nube--media"
+                : ""
+          }`}
+          aria-hidden="true"
+        >
+          <IconoOrbita
+            nombre={hud.amenaza >= 70 ? "nube-tormenta" : "nube-calma"}
+            className="w-full h-full"
+          />
         </div>
         <div
           className="orb-dato right-7 bottom-[16%] text-xs font-bold tracking-widest uppercase"
@@ -919,10 +972,12 @@ export function TormentaPage() {
           <div className="text-center">
             <div
               key={cuenta}
-              className="orb-cuenta orb-dato font-extrabold"
-              style={{ fontSize: "clamp(5rem, 18vh, 9rem)" }}
+              className="orb-cuenta-halo font-extrabold"
+              style={{ fontSize: "clamp(5rem, 18vh, 9rem)", fontFamily: "var(--font-display)" }}
             >
-              {cuenta === 0 ? "¡YA!" : cuenta}
+              <span className={`orb-cuenta ${cuenta === 0 ? "orb-cuenta--ya" : ""}`}>
+                {cuenta === 0 ? "¡YA!" : cuenta}
+              </span>
             </div>
             <p className="orb-dato text-lg font-semibold mt-2">
               Escribí las palabras antes de que lleguen a tu nave
@@ -931,115 +986,138 @@ export function TormentaPage() {
         </div>
       )}
 
-      {/* Resultado — la derrota es el cronómetro, no el veredicto. */}
+      {/* Resultado — la derrota es el cronómetro, no el veredicto. La tarjeta
+          es el vidrio de marca (el mismo de la pantalla de login) sobre el
+          juego teñido de índigo: un ventanal, no un cartel oscuro. */}
       {fase === "resultado" && resultado && (
-        <div className="absolute inset-0 grid place-items-center p-4 bg-[rgba(5,10,26,0.72)]">
+        <div
+          className="absolute inset-0 grid place-items-center p-4"
+          style={{ background: "rgba(20, 27, 77, 0.55)" }}
+        >
           <section
-            className="w-[min(30rem,94vw)] max-h-[88vh] overflow-y-auto rounded-[28px] p-6 text-center grid gap-4"
-            style={{
-              background: "rgba(16, 26, 56, 0.92)",
-              border: "1px solid rgba(148, 178, 226, 0.28)",
-              boxShadow: "0 24px 70px rgba(0, 0, 0, 0.55)",
-              color: "#eef4ff",
-            }}
+            className="orb-vidrio w-[min(30rem,94vw)] max-h-[88vh] overflow-y-auto p-6 text-center grid gap-4"
             aria-label="Resultado de la partida"
           >
-            <header className="grid gap-1 justify-items-center">
-              <InsigniaRango rango={resultado.rango} className="w-20 h-20" />
-              <h1 className="font-[var(--font-display)] font-extrabold text-2xl m-0">
+            {!(record && record.puntaje > resultado.puntaje) && (
+              <div className="orb-confeti" aria-hidden="true">
+                {CONFETI.map((c, i) => (
+                  <i
+                    key={i}
+                    style={{ "--x": c.x, "--c": c.c, "--d": c.d, "--s": c.s } as React.CSSProperties}
+                  />
+                ))}
+              </div>
+            )}
+
+            <header className="grid gap-1 justify-items-center relative">
+              <InsigniaRango rango={resultado.rango} tamano="grande" className="w-28 h-28" />
+              <h1
+                className="font-extrabold text-2xl m-0"
+                style={{ fontFamily: "var(--font-display)", color: "#17355f" }}
+              >
                 ¡Llegaste a {rango.nombre}!
               </h1>
-              <p className="m-0 text-sm opacity-80">
+              <p className="orb-suave m-0 text-sm font-semibold">
                 Aguantaste {Math.round(resultado.duracionMs / 1000)} segundos · amenaza máxima{" "}
                 {resultado.amenazaMax}
               </p>
             </header>
 
-            <div className="font-extrabold text-5xl tabular-nums" style={{ color: "#ffd552" }}>
+            <div
+              className="font-extrabold text-5xl tabular-nums"
+              style={{
+                fontFamily: "var(--font-display)",
+                color: "#c98a00",
+                textShadow: "0 0 18px rgba(255, 213, 82, 0.45)",
+              }}
+            >
               {resultado.puntaje.toLocaleString("es-AR")}
             </div>
 
             <div className="grid grid-cols-3 gap-2 text-sm">
-              <div className="rounded-2xl p-2 bg-white/5">
-                <b className="block text-lg" style={{ color: "#5be8ba" }}>
-                  {resultado.ppmPico}
-                </b>
-                PPM pico
-              </div>
-              <div className="rounded-2xl p-2 bg-white/5">
-                <b className="block text-lg" style={{ color: "#25c8df" }}>
-                  {resultado.precision}%
-                </b>
-                precisión
-              </div>
-              <div className="rounded-2xl p-2 bg-white/5">
-                <b className="block text-lg" style={{ color: "#ff9fca" }}>
-                  {resultado.palabras}
-                </b>
-                palabras
-              </div>
+              {[
+                { valor: String(resultado.ppmPico), rotulo: "PPM pico", color: "#1fb5a6" },
+                { valor: `${resultado.precision}%`, rotulo: "precisión", color: "#2b9fd6" },
+                { valor: String(resultado.palabras), rotulo: "palabras", color: "#d64a8a" },
+              ].map((dato) => (
+                <div
+                  key={dato.rotulo}
+                  className="rounded-2xl p-2 font-semibold"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.72)",
+                    border: "1px solid rgba(255, 255, 255, 0.92)",
+                    color: "#52658f",
+                  }}
+                >
+                  <b
+                    className="block text-lg tabular-nums"
+                    style={{ color: dato.color, fontFamily: "var(--font-display)" }}
+                  >
+                    {dato.valor}
+                  </b>
+                  {dato.rotulo}
+                </div>
+              ))}
             </div>
 
-            <div className="flex items-center justify-center gap-2 font-bold">
-              <IconoOrbita nombre="cristal" className="w-6 h-6" style={{ color: "#9b7cff" }} />
+            <div
+              className="flex items-center justify-center gap-2 font-bold"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              <Gema nombre="cristal" className="w-8 h-8" />
               <span>+{resultado.cristales} cristales</span>
               {respuestaServidor && !respuestaServidor.ranked && (
-                <span className="text-xs opacity-70">(partida sin ranking)</span>
+                <span className="orb-suave text-xs font-semibold">(partida sin ranking)</span>
               )}
             </div>
 
             {record && record.puntaje > resultado.puntaje ? (
-              <p className="m-0 text-sm opacity-80">
+              <p className="orb-suave m-0 text-sm font-semibold">
                 Tu récord sigue en {record.puntaje.toLocaleString("es-AR")}. ¡Cerca!
               </p>
             ) : (
-              <p className="m-0 text-sm font-bold" style={{ color: "#ffd552" }}>
+              <p
+                className="m-0 text-base font-extrabold"
+                style={{ color: "#c98a00", fontFamily: "var(--font-display)" }}
+              >
                 ¡Nuevo récord personal!
               </p>
             )}
 
             {respuestaServidor?.positions && (
-              <div className="flex justify-center gap-3 text-xs opacity-90 flex-wrap">
+              <div className="flex justify-center gap-3 text-xs font-bold flex-wrap">
                 {respuestaServidor.positions.global && (
-                  <span>Global: #{respuestaServidor.positions.global.pos}</span>
+                  <span className="orb-pildora text-xs">
+                    Global #{respuestaServidor.positions.global.pos}
+                  </span>
                 )}
                 {respuestaServidor.positions.sede && (
-                  <span>Tu escuela: #{respuestaServidor.positions.sede.pos}</span>
+                  <span className="orb-pildora text-xs">
+                    Tu escuela #{respuestaServidor.positions.sede.pos}
+                  </span>
                 )}
                 {respuestaServidor.positions.grado && (
-                  <span>Tu grado: #{respuestaServidor.positions.grado.pos}</span>
+                  <span className="orb-pildora text-xs">
+                    Tu grado #{respuestaServidor.positions.grado.pos}
+                  </span>
                 )}
               </div>
             )}
             {!sincroniza && (
-              <p className="m-0 text-xs opacity-70">
+              <p className="orb-suave m-0 text-xs font-semibold">
                 Jugando de prueba: el puntaje no entra al ranking.
               </p>
             )}
 
             <div className="grid gap-2">
-              <button
-                type="button"
-                onClick={otraVez}
-                className="flex items-center justify-center gap-2 h-13 rounded-2xl border-0 cursor-pointer font-bold text-base text-[#0b2437] py-3"
-                style={{
-                  background: "linear-gradient(90deg, #54e8c6, #25c8df, #536bff)",
-                  boxShadow: "0 10px 24px rgba(35, 190, 210, 0.4)",
-                }}
-              >
+              <button type="button" onClick={otraVez} className="orb-boton-primario">
                 <RotateCcw size={19} /> Otra vez
               </button>
               <div className="grid grid-cols-2 gap-2">
-                <Link
-                  to="/orbita/hangar"
-                  className="grid place-items-center py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 font-bold text-sm no-underline text-inherit"
-                >
+                <Link to="/orbita/hangar" className="orb-boton-vidrio text-sm">
                   Hangar
                 </Link>
-                <Link
-                  to="/orbita"
-                  className="grid place-items-center py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 font-bold text-sm no-underline text-inherit"
-                >
+                <Link to="/orbita" className="orb-boton-vidrio text-sm">
                   Volver a Órbita
                 </Link>
               </div>

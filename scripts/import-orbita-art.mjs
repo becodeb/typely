@@ -9,13 +9,29 @@
      Images/orbita/orbes/cristal-source.png      ->  orbes/cristal.webp
      Images/orbita/orbes/brillo-source.png       ->  orbes/brillo.webp
      Images/orbita/orbes/mundo-<modo>-source.png ->  orbes/mundo-<modo>.webp
+     Images/orbita/fondo/horizonte-source.png    ->  fondo/horizonte.webp
+     Images/orbita/hub/estacion-source.png       ->  hub/estacion.webp
+     Images/orbita/insignias/<rango>-source.png  ->  insignias/<rango>.webp
+     Images/orbita/gemas/<poder>-source.png      ->  gemas/<poder>.webp
 
    todo bajo public/assets/orbita/.
 
    Uso:
      node scripts/import-orbita-art.mjs           todo lo que tenga fuente
-     node scripts/import-orbita-art.mjs fondo     solo las tres capas
+     node scripts/import-orbita-art.mjs fondo     solo las capas del fondo
      node scripts/import-orbita-art.mjs orbes     solo los orbes
+     node scripts/import-orbita-art.mjs hub insignias gemas   (se combinan)
+
+   Las piezas del rediseño (horizonte, estación, insignias, gemas) traen
+   sus propias medidas, y son las que un ojo no ve hasta que es tarde:
+     · el horizonte tiene que ser TRANSPARENTE en el 62 % de arriba, porque
+       por ahí pasan las palabras, y de tono medio-oscuro en la franja de
+       abajo, porque por ahí también pasan al final;
+     · la estación, las insignias y las gemas vienen sobre transparencia y
+       se les recorta el margen vacío, así el tamaño en pantalla depende del
+       objeto y no del aire que dejó el generador. Las insignias y las gemas
+       se encuadran además en un cuadrado, para que las seis (u ocho) se
+       vean del mismo tamaño en fila.
 
    Qué hace por vos:
 
@@ -71,7 +87,28 @@ const PIEZAS = [
 
   { grupo: "orbes", base: "cristal",   tope: 1024, alfa: true, cuadrada: true, centroLimpio: 0.14, centroFraccion: 0.70 },
   { grupo: "orbes", base: "brillo",    tope: 1024, alfa: true, cuadrada: true, centroLimpio: 0.22, centroFraccion: 0.70 },
+
+  /* El horizonte vive SOLO en la franja de abajo (ORBITA.md §7.1). */
+  { grupo: "fondo", base: "horizonte", tope: 2560, alfa: true, arribaLimpio: 0.03, arribaFraccion: 0.62, franjaBrilloMax: 0.35 },
+  /* La estación del hub: la isla sola sobre transparencia, sin encuadrar
+     (es 3:2 y la página la apoya por CSS). */
+  { grupo: "hub", base: "estacion", tope: 1536, alfa: true, recortar: true },
 ];
+
+/** Insignias y gemas son listas ABIERTAS como los mundos: cualquier
+ *  `<nombre>-source.png` en su carpeta entra. Se recortan y se encuadran
+ *  en un cuadrado con margen parejo, así la fila del ranking o del hangar
+ *  muestra objetos del mismo tamaño aunque el generador haya dejado
+ *  distinto aire en cada uno. */
+function abiertas(grupo) {
+  const dir = path.join(FUENTES, grupo);
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .map((f) => /^([a-z0-9-]+)-source\.(png|jpg|jpeg|webp)$/i.exec(f))
+    .filter(Boolean)
+    .map((m) => ({ grupo, base: m[1], tope: 1024, alfa: true, recortar: true, encuadrar: true }));
+}
 
 /* Realce de textura por pieza — un problema de REPRODUCCIÓN, no de dibujo.
  *
@@ -175,6 +212,40 @@ function opacidadCentral({ data, info }, fraccion = 0.7) {
   return n ? suma / n : 0;
 }
 
+/** Opacidad media de la franja SUPERIOR (las primeras `fraccion` filas):
+ *  el horizonte tiene que dejar ese aire vacío para las palabras. */
+function opacidadArriba({ data, info }, fraccion) {
+  const hasta = Math.round(info.height * fraccion);
+  let suma = 0;
+  let n = 0;
+  for (let y = 0; y < hasta; y += 3) {
+    for (let x = 0; x < info.width; x += 3) {
+      suma += data[(y * info.width + x) * info.channels + 3] / 255;
+      n++;
+    }
+  }
+  return n ? suma / n : 0;
+}
+
+/** Luminancia media de lo DIBUJADO en la franja inferior (desde la fila
+ *  `desde`), pesada por su alfa: por ahí pasan las palabras al final del
+ *  viaje y necesitan un fondo de tono medio-oscuro. */
+function brilloFranjaInferior({ data, info }, desde) {
+  const y0 = Math.round(info.height * desde);
+  let suma = 0;
+  let peso = 0;
+  for (let y = y0; y < info.height; y += 3) {
+    for (let x = 0; x < info.width; x += 3) {
+      const i = (y * info.width + x) * info.channels;
+      const a = data[i + 3] / 255;
+      if (a < 0.03) continue;
+      suma += a * ((0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]) / 255);
+      peso += a;
+    }
+  }
+  return peso ? suma / peso : 0;
+}
+
 /* ------------------------------------------------------------------ */
 
 function fuenteDe(grupo, base) {
@@ -241,20 +312,73 @@ async function importar(pieza) {
     if (o > pieza.centroLimpio) error = true;
   }
 
+  if (pieza.arribaLimpio != null) {
+    const o = opacidadArriba(px, pieza.arribaFraccion);
+    const marca = o > pieza.arribaLimpio ? "ERROR" : "ok";
+    notas.push(
+      `${marca}: opacidad del ${Math.round(pieza.arribaFraccion * 100)} % superior ${o.toFixed(3)} (tope ${pieza.arribaLimpio}) — ahí pasan las palabras y el cielo lo ponen otras capas`,
+    );
+    if (o > pieza.arribaLimpio) error = true;
+  }
+
+  if (pieza.franjaBrilloMax != null) {
+    const b = brilloFranjaInferior(px, pieza.arribaFraccion ?? 0.62);
+    const marca = b > pieza.franjaBrilloMax ? "ERROR" : "ok";
+    notas.push(
+      `${marca}: brillo de la franja de abajo ${b.toFixed(3)} (tope ${pieza.franjaBrilloMax}) — las palabras cruzan esa franja al final del viaje`,
+    );
+    if (b > pieza.franjaBrilloMax) error = true;
+  }
+
   if (error) {
     notas.push("NO se escribió nada. Corregí la fuente y volvé a correr.");
     return { notas, error };
   }
 
+  /* Recorte del margen transparente: el tamaño en pantalla lo decide el
+     objeto, no el aire que dejó el generador (mismo criterio que
+     import-island-art). Se hace en un paso aparte porque sharp aplica el
+     trim ANTES de medir el tamaño para escalar. */
+  let entrada = origen;
+  let ancho = w;
+  let alto = h;
+  if (pieza.recortar) {
+    const buf = await sharp(origen).ensureAlpha().trim({ threshold: 12 }).png().toBuffer();
+    const meta = await sharp(buf).metadata();
+    entrada = buf;
+    ancho = meta.width;
+    alto = meta.height;
+    notas.push(`margen transparente recortado -> ${ancho}x${alto}`);
+  }
+
   /* Nunca agrandar: si la fuente es más chica que el tope, se deja. */
-  const lado = Math.max(w, h);
+  const lado = Math.max(ancho, alto);
   const escala = Math.min(1, pieza.tope / lado);
   if (escala === 1 && lado < pieza.tope) notas.push(`no se agranda (${lado}px < tope ${pieza.tope}px)`);
 
-  let img = sharp(origen);
-  const anchoFinal = Math.round(w * escala);
-  const altoFinal = Math.round(h * escala);
-  if (escala < 1) img = img.resize(anchoFinal, altoFinal);
+  let img = sharp(entrada);
+  let anchoFinal = Math.round(ancho * escala);
+  let altoFinal = Math.round(alto * escala);
+  if (pieza.encuadrar) {
+    /* Cuadrado con margen parejo del 6 %: las insignias y las gemas se
+       ven del mismo tamaño en fila. */
+    const ladoFinal = Math.round(lado * escala);
+    const interior = Math.round(ladoFinal * 0.88);
+    img = sharp(entrada)
+      .resize(interior, interior, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .extend({
+        top: Math.floor((ladoFinal - interior) / 2),
+        bottom: Math.ceil((ladoFinal - interior) / 2),
+        left: Math.floor((ladoFinal - interior) / 2),
+        right: Math.ceil((ladoFinal - interior) / 2),
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      });
+    anchoFinal = ladoFinal;
+    altoFinal = ladoFinal;
+    notas.push("encuadrado en cuadrado con margen parejo");
+  } else if (escala < 1) {
+    img = img.resize(anchoFinal, altoFinal);
+  }
 
   if (pieza.realce) {
     const r = pieza.realce;
@@ -285,8 +409,9 @@ async function importar(pieza) {
 
 /* ------------------------------------------------------------------ */
 
-const filtro = process.argv.slice(2).filter((a) => a === "fondo" || a === "orbes");
-const todas = [...PIEZAS, ...mundosPresentes()];
+const GRUPOS = ["fondo", "orbes", "hub", "insignias", "gemas"];
+const filtro = process.argv.slice(2).filter((a) => GRUPOS.includes(a));
+const todas = [...PIEZAS, ...mundosPresentes(), ...abiertas("insignias"), ...abiertas("gemas")];
 const objetivo = filtro.length ? todas.filter((p) => filtro.includes(p.grupo)) : todas;
 
 let hubo = false;
@@ -303,7 +428,7 @@ for (const pieza of objetivo) {
 
 console.log("");
 if (!hubo) {
-  console.log("Nada que importar. Las fuentes van en Images/orbita/fondo/ y Images/orbita/orbes/,");
+  console.log("Nada que importar. Las fuentes van en Images/orbita/{fondo,orbes,hub,insignias,gemas}/,");
   console.log("con el sufijo -source. Los prompts están en Images/orbita/ORBITA.md.");
 } else if (fallo) {
   console.log("Quedaron piezas sin importar. Cada ERROR de arriba dice qué medir y por qué importa.");
