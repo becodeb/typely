@@ -663,6 +663,17 @@ ahora apila el horizonte) las palabras que cruzan la franja se leen con el
 tinte coral. El importador mide la opacidad del 62 % superior (tope 0,03) y
 el brillo de la franja inferior (tope 0,35).
 
+⚠️ **No la generes llenando el cuadro. Ya lo probamos y no funciona.**
+La franja dibujada ocupa el 30 % de una imagen 16:9, así que dos tercios de
+los píxeles son transparentes, y es tentador pedirla "más cerca" para ganar
+detalle. El problema es geométrico: para que la franja entre en el tercio de
+abajo **a lo ancho de la pantalla**, la imagen tendría que ser de proporción
+5:1. Una 16:9 que llena el cuadro se despliega sobre TODA la pantalla — las
+islas quedan grandes y contrastadas justo donde vuelan las palabras, y el
+tinte de la amenaza casi no se ve porque el horizonte tapa el 75 % del cielo.
+Medido: en la zona de vuelo daba 0,231 de brillo y 0,123 de contraste, contra
+0,012 y 0,067 de la versión buena. El importador ahora lo rechaza solo.
+
 **El importador la ATENÚA** (`ATENUAR` en `import-orbita-art.mjs`: brillo
 ×0,62, saturación ×0,82) y recién ahí mide, porque lo que hay que aprobar es
 lo que se sirve, no la fuente. La primera versión aprobada medía 0,424 —
