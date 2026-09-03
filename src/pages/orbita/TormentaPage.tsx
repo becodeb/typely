@@ -710,7 +710,12 @@ export function TormentaPage() {
       <div
         ref={fondoRef}
         className="orb-fondo"
-        style={{ "--orb-nebulosa": "url(/assets/orbita/fondo/nebulosa.webp)" } as React.CSSProperties}
+        style={
+          {
+            "--orb-nebulosa": "url(/assets/orbita/fondo/nebulosa.webp)",
+            "--orb-horizonte": "url(/assets/orbita/fondo/horizonte.webp)",
+          } as React.CSSProperties
+        }
         aria-hidden="true"
       >
         <img className="orb-estrellas" src="/assets/orbita/fondo/estrellas.webp" alt="" />
@@ -722,9 +727,13 @@ export function TormentaPage() {
           src="/assets/orbita/fondo/horizonte.webp"
           alt=""
           onError={(e) => {
+            /* Si la imagen no está, se van las DOS capas: la de tinte sin
+               máscara sería un rectángulo de color tapando la escena. */
             e.currentTarget.style.display = "none";
+            e.currentTarget.nextElementSibling?.setAttribute("style", "display:none");
           }}
         />
+        <div className="orb-horizonte-tinte" />
         <img className="orb-polvo" src="/assets/orbita/fondo/polvo.webp" alt="" />
       </div>
 

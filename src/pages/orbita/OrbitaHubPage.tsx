@@ -33,6 +33,13 @@ const ocultarSiFalta = (e: React.SyntheticEvent<HTMLImageElement>) => {
   e.currentTarget.style.display = "none";
 };
 
+/** El horizonte y su capa de tinte se ocultan JUNTOS: la de tinte sin
+ *  máscara sería un rectángulo de color tapando la pantalla. */
+const ocultarHorizonte = (e: React.SyntheticEvent<HTMLImageElement>) => {
+  e.currentTarget.style.display = "none";
+  e.currentTarget.nextElementSibling?.setAttribute("style", "display:none");
+};
+
 /** Las capas del juego con el tinte quieto en pervinca: el hub es la calma
  *  antes de la tormenta. Lo comparten el ranking y el hangar. */
 export function FondoEspacio({
@@ -48,6 +55,7 @@ export function FondoEspacio({
       style={
         {
           "--orb-nebulosa": "url(/assets/orbita/fondo/nebulosa.webp)",
+          "--orb-horizonte": "url(/assets/orbita/fondo/horizonte.webp)",
           "--orb-tinte": tinte,
           "--orb-tinte-fuerza": fuerza,
         } as React.CSSProperties
@@ -60,8 +68,9 @@ export function FondoEspacio({
         className="orb-horizonte orb-horizonte--quieto"
         src="/assets/orbita/fondo/horizonte.webp"
         alt=""
-        onError={ocultarSiFalta}
+        onError={ocultarHorizonte}
       />
+      <div className="orb-horizonte-tinte orb-horizonte-tinte--quieto" />
       <img className="orb-polvo" src="/assets/orbita/fondo/polvo.webp" alt="" />
     </div>
   );

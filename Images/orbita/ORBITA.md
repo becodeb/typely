@@ -663,6 +663,22 @@ ahora apila el horizonte) las palabras que cruzan la franja se leen con el
 tinte coral. El importador mide la opacidad del 62 % superior (tope 0,03) y
 el brillo de la franja inferior (tope 0,35).
 
+**El importador la ATENÚA** (`ATENUAR` en `import-orbita-art.mjs`: brillo
+×0,62, saturación ×0,82) y recién ahí mide, porque lo que hay que aprobar es
+lo que se sirve, no la fuente. La primera versión aprobada medía 0,424 —
+preciosa sola, pero un mediodía debajo de palabras blancas — y con la
+atenuación queda en 0,246. **Generala igual como te guste**: bajarle la
+exposición es un arreglo de reproducción, como el realce de `mundo-dormido`,
+y la fuente queda intacta. Si con la atenuación puesta el brillo sigue
+arriba del tope, ahí sí hay que regenerarla.
+
+**Y se tiñe con la amenaza.** El horizonte se dibuja ARRIBA de la capa de
+tinte, así que sin ayuda se quedaba azul mientras el cielo se iba a coral y
+la pantalla se partía en dos. `.orb-horizonte-tinte` lo tiñe con el mismo
+color, enmascarado por el propio horizonte y en `mix-blend-mode: color` (toma
+el tono, deja la luminosidad), a media fuerza: el mundo se contagia de la
+tormenta, no se disfraza.
+
 ### 7.2 `estacion-source.png` — la estación orbital
 
 | | |

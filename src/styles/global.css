@@ -943,6 +943,26 @@ a { color: inherit; text-decoration: none; }
   animation: orbDerivaLenta 120s ease-in-out infinite alternate;
 }
 .orb-horizonte--quieto { animation: none; }
+/* El horizonte va ARRIBA del tinte, así que sin esto se quedaba azul
+   mientras el cielo se iba a coral y la pantalla se partía en dos. Esta
+   capa lo tiñe con el mismo color de la amenaza, enmascarada por el propio
+   horizonte y en modo `color`: toma el tono, deja la luminosidad — las
+   islas siguen siendo islas, pero la tormenta también las alcanza. A media
+   fuerza a propósito: el mundo se contagia, no se disfraza. */
+.orb-horizonte-tinte {
+  background-color: var(--orb-tinte, #5470e0);
+  -webkit-mask-image: var(--orb-horizonte);
+  mask-image: var(--orb-horizonte);
+  -webkit-mask-size: cover;
+  mask-size: cover;
+  -webkit-mask-position: center bottom;
+  mask-position: center bottom;
+  mix-blend-mode: color;
+  opacity: calc(var(--orb-tinte-fuerza, 0.7) * 0.55);
+  transition: background-color 1.2s linear, opacity 1.2s linear;
+  animation: orbDerivaLenta 120s ease-in-out infinite alternate;
+}
+.orb-horizonte-tinte--quieto { animation: none; }
 @keyframes orbDerivaLenta {
   from { transform: translate3d(-0.6%, 0, 0) scale(1.01); }
   to   { transform: translate3d(0.6%, 0, 0) scale(1.03); }
@@ -1637,7 +1657,7 @@ a { color: inherit; text-decoration: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .orb-estrellas, .orb-tinte, .orb-polvo, .orb-horizonte, .orb-nave img,
+  .orb-estrellas, .orb-tinte, .orb-polvo, .orb-horizonte, .orb-horizonte-tinte, .orb-nave img,
   .orb-orbe__mundo, .orb-orbe__brillo, .orb-escudo-aro, .orb-plataforma,
   .orb-vineta, .orb-flota-a, .orb-flota-b, .orb-flota-c, .orb-amenaza-nube--tormenta,
   .orb-mini--estela::before, .orb-mini--rayo::before, .orb-confeti i, .orb-cuenta-halo::after,

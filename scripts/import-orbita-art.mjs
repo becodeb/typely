@@ -128,6 +128,20 @@ const REALCE = {
   "mundo-dormido": { linear: [1.55, -58], saturacion: 0.85, nitidez: { sigma: 2.5, m1: 0, m2: 2.2 } },
 };
 
+/* Atenuación por pieza — el otro arreglo de REPRODUCCIÓN, y el inverso del
+ * realce. Un generador de imágenes dibuja para que la imagen se vea linda
+ * SOLA, y devuelve un mediodía saturado; acá esa capa es el suelo sobre el
+ * que hay que leer texto blanco en movimiento. Bajarle la exposición no
+ * cambia el dibujo, cambia la hora del día, y es lo que la vuelve fondo.
+ *
+ * Se aplica ANTES de medir, no después: lo que el importador tiene que
+ * aprobar es lo que va a ver el chico, no la fuente. Si con la atenuación
+ * puesta el brillo sigue arriba del tope, la imagen está mal de verdad y
+ * hay que regenerarla — el error sigue siendo un error. */
+const ATENUAR = {
+  horizonte: { brillo: 0.62, saturacion: 0.82 },
+};
+
 /** Los mundos son abiertos: cualquier `mundo-<modo>-source.png` entra, así
  *  sumar un modo futuro no obliga a tocar este archivo. */
 function mundosPresentes() {
@@ -270,7 +284,22 @@ async function importar(pieza) {
 
   const notas = [];
   let error = false;
-  const px = await pixeles(origen);
+
+  /* La atenuación va primero: se mide lo que se va a servir. */
+  const atenuar = ATENUAR[pieza.base];
+  let fuente = origen;
+  if (atenuar) {
+    fuente = await sharp(origen)
+      .ensureAlpha()
+      .modulate({ brightness: atenuar.brillo, saturation: atenuar.saturacion })
+      .png()
+      .toBuffer();
+    notas.push(
+      `atenuada al importar: brillo ×${atenuar.brillo}, saturación ×${atenuar.saturacion} (ver ATENUAR arriba)`,
+    );
+  }
+
+  const px = await pixeles(fuente);
   const { width: w, height: h } = px.info;
   notas.push(`fuente ${path.basename(origen)} · ${w}x${h}`);
 
@@ -339,11 +368,11 @@ async function importar(pieza) {
      objeto, no el aire que dejó el generador (mismo criterio que
      import-island-art). Se hace en un paso aparte porque sharp aplica el
      trim ANTES de medir el tamaño para escalar. */
-  let entrada = origen;
+  let entrada = fuente;
   let ancho = w;
   let alto = h;
   if (pieza.recortar) {
-    const buf = await sharp(origen).ensureAlpha().trim({ threshold: 12 }).png().toBuffer();
+    const buf = await sharp(fuente).ensureAlpha().trim({ threshold: 12 }).png().toBuffer();
     const meta = await sharp(buf).metadata();
     entrada = buf;
     ancho = meta.width;
