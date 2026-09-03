@@ -1623,11 +1623,16 @@ a { color: inherit; text-decoration: none; }
 }
 .orb-mini--rayo img { translate: -50% -50%; left: 22%; width: 26px; }
 @keyframes orbMiniLate { 50% { opacity: 0.55; scale: 0.85; } }
+/* El rayo se DISPARA y se queda: la primera versión lo mostraba 0,48 s de
+   cada 1,6 s, así que siete de cada diez miradas caían sobre una caja
+   vacía — el mismo problema que el círculo de color que vino a reemplazar.
+   Ahora está visible el 75 % del ciclo y el disparo es el acento. */
 @keyframes orbMiniDispara {
   0% { opacity: 0; scale: 0.2 1; }
-  15% { opacity: 1; scale: 1 1; }
-  45% { opacity: 0; }
-  100% { opacity: 0; }
+  12% { opacity: 1; scale: 1 1; }
+  70% { opacity: 1; scale: 1 1; }
+  90% { opacity: 0.25; scale: 1 1; }
+  100% { opacity: 0; scale: 1 1; }
 }
 
 /* ---- Lluvia de destellos sobre la tarjeta de récord ---- */
