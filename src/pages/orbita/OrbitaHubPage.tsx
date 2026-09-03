@@ -79,15 +79,23 @@ export function FondoEspacio({
 /** La estación con la nave apoyada. `estela` es el color de la estela
  *  equipada (o null). Lo comparten el hub y el hangar. */
 export function Puerto({ estela, className }: { estela: string | null; className?: string }) {
+  /* Sin estación, la nave necesita algo donde posarse: un aro de luz. Con
+     la estación puesta sobra, porque su plataforma ya lo trae pintado. */
+  const [hayEstacion, setHayEstacion] = useState(true);
   return (
-    <div className={`orb-puerto ${className ?? ""}`}>
-      <img
-        className="orb-estacion"
-        src="/assets/orbita/hub/estacion.webp"
-        alt=""
-        onError={ocultarSiFalta}
-      />
-      <span className="orb-plataforma" aria-hidden="true" />
+    <div
+      className={`orb-puerto ${hayEstacion ? "" : "orb-puerto--sin-estacion"} ${className ?? ""}`}
+    >
+      {hayEstacion ? (
+        <img
+          className="orb-estacion"
+          src="/assets/orbita/hub/estacion.webp"
+          alt=""
+          onError={() => setHayEstacion(false)}
+        />
+      ) : (
+        <span className="orb-plataforma" aria-hidden="true" />
+      )}
       <div className="orb-puerto__nave">
         {estela && (
           <span

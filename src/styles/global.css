@@ -1506,35 +1506,49 @@ a { color: inherit; text-decoration: none; }
    del centro; la nave se apoya ahí por CSS. Hasta que la imagen exista, el
    aro de luz de la plataforma sostiene solo a la nave; después queda como
    resplandor sobre la plataforma real. */
+/* La ALTURA la pone la imagen, no el CSS: si algún día la estación se
+   regenera y el importador la recorta distinto, la nave sigue cayendo en su
+   plataforma. Por eso `height: auto` y nada de aspect-ratio acá — el único
+   que la necesita es el respaldo, que no tiene imagen que lo sostenga. */
 .orb-puerto {
   position: relative;
   width: min(52vh, 34rem, 92vw);
-  aspect-ratio: 3 / 2;
 }
 .orb-estacion {
-  position: absolute;
-  inset: 0;
+  display: block;
   width: 100%;
-  height: 100%;
-  object-fit: contain;
+  height: auto;
   filter: drop-shadow(0 24px 40px rgba(5, 11, 30, 0.55));
 }
+.orb-puerto--sin-estacion { aspect-ratio: 1125 / 938; }
+/* Aro de luz de respaldo: solo mientras la estación no exista. Con la
+   estación puesta sobraría — su plataforma ya trae el aro pintado. */
 .orb-plataforma {
   position: absolute;
-  left: 50%;
-  top: 47%;
-  width: 40%;
-  aspect-ratio: 2.7;
+  left: 48.5%;
+  top: 41%;
+  width: 46%;
+  aspect-ratio: 2.4;
   translate: -50% -50%;
   border-radius: 50%;
   border: 2px solid rgba(84, 232, 198, 0.6);
   box-shadow: 0 0 26px rgba(84, 232, 198, 0.4), inset 0 0 28px rgba(84, 232, 198, 0.28);
   animation: orbCapsulaLate 2.6s ease-in-out infinite;
 }
+/* Apoyada en la plataforma pintada, que está en el 48,5 % / 41 % de la
+   imagen de la estación.
+   El 48,5 % no es un 50 % mal escrito: la isla está dibujada en tres
+   cuartos y su plataforma no cae en el centro exacto del cuadro.
+   Y el `bottom` no apunta a la plataforma sino más abajo, porque la caja
+   de la nave NO termina donde termina la nave: su PNG cuadrado trae un
+   17,2 % de aire transparente abajo (medido sobre el canal alfa). Con el
+   valor "obvio" la nave quedaba flotando cinco puntos por encima de su
+   plataforma. La base dibujada cae en el 44 %, apenas delante del centro
+   de la elipse, que es donde se apoyaría algo posado ahí. */
 .orb-puerto__nave {
   position: absolute;
-  left: 50%;
-  bottom: 51%;
+  left: 48.5%;
+  bottom: 48.5%;
   width: 36%;
   translate: -50% 0;
 }
