@@ -789,6 +789,20 @@ necesito ahora"*. Después el prompt sigue igual con su bloque RANGO.
 mismo tamaño, mismo brillo) y a 96 px todavía se cuentan los galones. El
 importador las recorta y las encuadra en un cuadrado con margen parejo.
 
+**No se aprueban sueltas**, igual que los orbes: una insignia sola siempre
+parece linda, y el problema aparece en fila, que es como se ven en el podio.
+
+```bash
+node scripts/preview-orbita-objetos.mjs   # insignias y gemas, en fila
+```
+
+Las dibuja a 140, 96 y 40 px sobre los DOS fondos en los que viven: el índigo
+de la escena y el vidrio claro de la tarjeta de resultado. Los 40 px son solo
+de referencia — a ese tamaño la app usa el SVG, no la imagen.
+
+El par que más se parece es **explorador (dos galones) y as (tres)**: si a
+96 px no los podés contar, es ahí donde hay que insistir.
+
 ### 7.4 `gemas/<poder>-source.png` — las gemas de poder y el cristal
 
 | | |
