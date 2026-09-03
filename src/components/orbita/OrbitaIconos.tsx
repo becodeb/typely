@@ -12,9 +12,10 @@
  *
  * Lo que se ve GRANDE (la insignia del resultado y del podio, la gema del
  * poder que llega a la nave, el cristal del saldo) no es SVG: son objetos
- * 3D generados (`public/assets/orbita/{insignias,gemas}/`, ver ORBITA.md).
- * `InsigniaRango tamano="grande"` y `Gema` los cargan, y si el WebP todavía
- * no existe caen al SVG sin ruido: así el rediseño entra por tandas.
+ * 3D generados (`public/assets/orbita/{insignias,gemas}/`, ver ORBITA.md
+ * §7). `InsigniaRango tamano="grande"` y `Gema` los cargan, y si el WebP
+ * todavía no existe caen al SVG sin ruido: así el rediseño entra por
+ * tandas y nada queda roto entre una y otra.
  */
 import { useEffect, useState, type CSSProperties } from "react";
 

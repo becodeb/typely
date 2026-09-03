@@ -934,7 +934,7 @@ a { color: inherit; text-decoration: none; }
 .orb-fondo > * { position: absolute; inset: -4%; width: 108%; height: 108%; }
 .orb-estrellas { object-fit: cover; animation: orbDeriva 90s ease-in-out infinite alternate; }
 /* El mundo de las islas visto desde la órbita: vive solo en la franja de
-   abajo (Images/orbita/ORBITA.md §4.9) y es lo más lejano, así que deriva
+   abajo (Images/orbita/ORBITA.md §7.1) y es lo más lejano, así que deriva
    menos que todo lo demás. Si el WebP todavía no existe, la página lo
    oculta (onError) y la escena queda como antes. */
 .orb-horizonte {
@@ -943,6 +943,26 @@ a { color: inherit; text-decoration: none; }
   animation: orbDerivaLenta 120s ease-in-out infinite alternate;
 }
 .orb-horizonte--quieto { animation: none; }
+/* El horizonte va ARRIBA del tinte, así que sin esto se quedaba azul
+   mientras el cielo se iba a coral y la pantalla se partía en dos. Esta
+   capa lo tiñe con el mismo color de la amenaza, enmascarada por el propio
+   horizonte y en modo `color`: toma el tono, deja la luminosidad — las
+   islas siguen siendo islas, pero la tormenta también las alcanza. A media
+   fuerza a propósito: el mundo se contagia, no se disfraza. */
+.orb-horizonte-tinte {
+  background-color: var(--orb-tinte, #5470e0);
+  -webkit-mask-image: var(--orb-horizonte);
+  mask-image: var(--orb-horizonte);
+  -webkit-mask-size: cover;
+  mask-size: cover;
+  -webkit-mask-position: center bottom;
+  mask-position: center bottom;
+  mix-blend-mode: color;
+  opacity: calc(var(--orb-tinte-fuerza, 0.7) * 0.55);
+  transition: background-color 1.2s linear, opacity 1.2s linear;
+  animation: orbDerivaLenta 120s ease-in-out infinite alternate;
+}
+.orb-horizonte-tinte--quieto { animation: none; }
 @keyframes orbDerivaLenta {
   from { transform: translate3d(-0.6%, 0, 0) scale(1.01); }
   to   { transform: translate3d(0.6%, 0, 0) scale(1.03); }
@@ -1308,10 +1328,10 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* Cuenta regresiva 3-2-1: Baloo 2 con el degradado de marca, halo oscuro
-   detrás y un aro de luz que se expande con cada número. "¡YA!" en dorado. */
-/* El halo y el aro van en un ENVOLTORIO: Chrome no combina
-   background-clip: text con filter en el mismo elemento (el degradado
-   desaparece y queda el glifo oscuro). */
+   detrás y un aro de luz que se expande con cada número. "¡YA!" en dorado.
+   El halo y el aro van en un ENVOLTORIO: Chrome no combina
+   background-clip: text con filter en el mismo elemento — el degradado
+   desaparece y queda el glifo oscuro. */
 .orb-cuenta-halo {
   position: relative;
   display: inline-block;
@@ -1482,39 +1502,53 @@ a { color: inherit; text-decoration: none; }
 .orb-campo::placeholder { color: #8d9bbd; font-weight: 600; }
 
 /* ---- La estación orbital: la isla del hub y del hangar ----
-   La imagen es 3:2 (ORBITA.md §4.10) con la plataforma un poco por encima
+   La imagen es 3:2 (ORBITA.md §7.2) con la plataforma un poco por encima
    del centro; la nave se apoya ahí por CSS. Hasta que la imagen exista, el
    aro de luz de la plataforma sostiene solo a la nave; después queda como
    resplandor sobre la plataforma real. */
+/* La ALTURA la pone la imagen, no el CSS: si algún día la estación se
+   regenera y el importador la recorta distinto, la nave sigue cayendo en su
+   plataforma. Por eso `height: auto` y nada de aspect-ratio acá — el único
+   que la necesita es el respaldo, que no tiene imagen que lo sostenga. */
 .orb-puerto {
   position: relative;
   width: min(52vh, 34rem, 92vw);
-  aspect-ratio: 3 / 2;
 }
 .orb-estacion {
-  position: absolute;
-  inset: 0;
+  display: block;
   width: 100%;
-  height: 100%;
-  object-fit: contain;
+  height: auto;
   filter: drop-shadow(0 24px 40px rgba(5, 11, 30, 0.55));
 }
+.orb-puerto--sin-estacion { aspect-ratio: 1125 / 938; }
+/* Aro de luz de respaldo: solo mientras la estación no exista. Con la
+   estación puesta sobraría — su plataforma ya trae el aro pintado. */
 .orb-plataforma {
   position: absolute;
-  left: 50%;
-  top: 47%;
-  width: 40%;
-  aspect-ratio: 2.7;
+  left: 48.5%;
+  top: 41%;
+  width: 46%;
+  aspect-ratio: 2.4;
   translate: -50% -50%;
   border-radius: 50%;
   border: 2px solid rgba(84, 232, 198, 0.6);
   box-shadow: 0 0 26px rgba(84, 232, 198, 0.4), inset 0 0 28px rgba(84, 232, 198, 0.28);
   animation: orbCapsulaLate 2.6s ease-in-out infinite;
 }
+/* Apoyada en la plataforma pintada, que está en el 48,5 % / 41 % de la
+   imagen de la estación.
+   El 48,5 % no es un 50 % mal escrito: la isla está dibujada en tres
+   cuartos y su plataforma no cae en el centro exacto del cuadro.
+   Y el `bottom` no apunta a la plataforma sino más abajo, porque la caja
+   de la nave NO termina donde termina la nave: su PNG cuadrado trae un
+   17,2 % de aire transparente abajo (medido sobre el canal alfa). Con el
+   valor "obvio" la nave quedaba flotando cinco puntos por encima de su
+   plataforma. La base dibujada cae en el 44 %, apenas delante del centro
+   de la elipse, que es donde se apoyaría algo posado ahí. */
 .orb-puerto__nave {
   position: absolute;
-  left: 50%;
-  bottom: 51%;
+  left: 48.5%;
+  bottom: 48.5%;
   width: 36%;
   translate: -50% 0;
 }
@@ -1603,11 +1637,16 @@ a { color: inherit; text-decoration: none; }
 }
 .orb-mini--rayo img { translate: -50% -50%; left: 22%; width: 26px; }
 @keyframes orbMiniLate { 50% { opacity: 0.55; scale: 0.85; } }
+/* El rayo se DISPARA y se queda: la primera versión lo mostraba 0,48 s de
+   cada 1,6 s, así que siete de cada diez miradas caían sobre una caja
+   vacía — el mismo problema que el círculo de color que vino a reemplazar.
+   Ahora está visible el 75 % del ciclo y el disparo es el acento. */
 @keyframes orbMiniDispara {
   0% { opacity: 0; scale: 0.2 1; }
-  15% { opacity: 1; scale: 1 1; }
-  45% { opacity: 0; }
-  100% { opacity: 0; }
+  12% { opacity: 1; scale: 1 1; }
+  70% { opacity: 1; scale: 1 1; }
+  90% { opacity: 0.25; scale: 1 1; }
+  100% { opacity: 0; scale: 1 1; }
 }
 
 /* ---- Lluvia de destellos sobre la tarjeta de récord ---- */
@@ -1637,7 +1676,7 @@ a { color: inherit; text-decoration: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .orb-estrellas, .orb-tinte, .orb-polvo, .orb-horizonte, .orb-nave img,
+  .orb-estrellas, .orb-tinte, .orb-polvo, .orb-horizonte, .orb-horizonte-tinte, .orb-nave img,
   .orb-orbe__mundo, .orb-orbe__brillo, .orb-escudo-aro, .orb-plataforma,
   .orb-vineta, .orb-flota-a, .orb-flota-b, .orb-flota-c, .orb-amenaza-nube--tormenta,
   .orb-mini--estela::before, .orb-mini--rayo::before, .orb-confeti i, .orb-cuenta-halo::after,

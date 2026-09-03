@@ -88,8 +88,14 @@ const PIEZAS = [
   { grupo: "orbes", base: "cristal",   tope: 1024, alfa: true, cuadrada: true, centroLimpio: 0.14, centroFraccion: 0.70 },
   { grupo: "orbes", base: "brillo",    tope: 1024, alfa: true, cuadrada: true, centroLimpio: 0.22, centroFraccion: 0.70 },
 
-  /* El horizonte vive SOLO en la franja de abajo (ORBITA.md §4.9). */
-  { grupo: "fondo", base: "horizonte", tope: 2560, alfa: true, arribaLimpio: 0.03, arribaFraccion: 0.62, franjaBrilloMax: 0.35 },
+  /* El horizonte vive SOLO en la franja de abajo (ORBITA.md §7.1), y lo que
+     de verdad hay que proteger es la ZONA DE VUELO: el pasillo por el que
+     las palabras van del punto de fuga a la nave. */
+  {
+    grupo: "fondo", base: "horizonte", tope: 2560, alfa: true,
+    arribaLimpio: 0.03, arribaFraccion: 0.62, franjaBrilloMax: 0.35,
+    vueloBrilloMax: 0.08, vueloContrasteMax: 0.09,
+  },
   /* La estación del hub: la isla sola sobre transparencia, sin encuadrar
      (es 3:2 y la página la apoya por CSS). */
   { grupo: "hub", base: "estacion", tope: 1536, alfa: true, recortar: true },
@@ -100,6 +106,16 @@ const PIEZAS = [
  *  en un cuadrado con margen parejo, así la fila del ranking o del hangar
  *  muestra objetos del mismo tamaño aunque el generador haya dejado
  *  distinto aire en cada uno. */
+/* Los nombres válidos de cada lista abierta. NO es burocracia: el juego
+ * pide `gemas/<PowerupId>.webp` y `insignias/<RangoId>.webp`, así que un
+ * nombre mal escrito no rompe nada — simplemente esa gema no aparece
+ * NUNCA y el componente cae al SVG en silencio. Es el peor tipo de error:
+ * el que se descubre en el aula. Pasó con `reparacio-source.png`. */
+const NOMBRES = {
+  insignias: ["cadete", "piloto", "explorador", "as", "capitan", "leyenda"],
+  gemas: ["cristal", "reparacion", "escudo", "pulso", "lento", "rayo", "cosecha", "mira"],
+};
+
 function abiertas(grupo) {
   const dir = path.join(FUENTES, grupo);
   if (!fs.existsSync(dir)) return [];
@@ -107,7 +123,15 @@ function abiertas(grupo) {
     .readdirSync(dir)
     .map((f) => /^([a-z0-9-]+)-source\.(png|jpg|jpeg|webp)$/i.exec(f))
     .filter(Boolean)
-    .map((m) => ({ grupo, base: m[1], tope: 1024, alfa: true, recortar: true, encuadrar: true }));
+    .map((m) => ({
+      grupo,
+      base: m[1],
+      tope: 1024,
+      alfa: true,
+      recortar: true,
+      encuadrar: true,
+      nombreValido: NOMBRES[grupo],
+    }));
 }
 
 /* Realce de textura por pieza — un problema de REPRODUCCIÓN, no de dibujo.
@@ -126,6 +150,20 @@ function abiertas(grupo) {
  * reaparece y el orbe sigue siendo el más callado de los tres. */
 const REALCE = {
   "mundo-dormido": { linear: [1.55, -58], saturacion: 0.85, nitidez: { sigma: 2.5, m1: 0, m2: 2.2 } },
+};
+
+/* Atenuación por pieza — el otro arreglo de REPRODUCCIÓN, y el inverso del
+ * realce. Un generador de imágenes dibuja para que la imagen se vea linda
+ * SOLA, y devuelve un mediodía saturado; acá esa capa es el suelo sobre el
+ * que hay que leer texto blanco en movimiento. Bajarle la exposición no
+ * cambia el dibujo, cambia la hora del día, y es lo que la vuelve fondo.
+ *
+ * Se aplica ANTES de medir, no después: lo que el importador tiene que
+ * aprobar es lo que va a ver el chico, no la fuente. Si con la atenuación
+ * puesta el brillo sigue arriba del tope, la imagen está mal de verdad y
+ * hay que regenerarla — el error sigue siendo un error. */
+const ATENUAR = {
+  horizonte: { brillo: 0.62, saturacion: 0.82 },
 };
 
 /** Los mundos son abiertos: cualquier `mundo-<modo>-source.png` entra, así
@@ -227,6 +265,36 @@ function opacidadArriba({ data, info }, fraccion) {
   return n ? suma / n : 0;
 }
 
+/** La ZONA DE VUELO: el pasillo por el que las palabras van del punto de
+ *  fuga (50 %, 24 %) a la nave (50 %, 78 %), medido sobre el 60 % central
+ *  del ancho. Devuelve el brillo medio y el contraste, los dos pesados por
+ *  alfa — lo transparente no molesta a nadie.
+ *
+ *  Por qué existe. Una capa puede tener un brillo PROMEDIO bajísimo y aun
+ *  así arruinar el juego, si toda su luz está concentrada justo donde vuela
+ *  el texto. Pasó: una versión del horizonte que llenaba el cuadro midió
+ *  0.260 de brillo general —aprobada— y 0.231 con 0.123 de contraste en la
+ *  zona de vuelo, contra 0.012 y 0.067 de la versión buena. Diez veces más
+ *  luz exactamente donde hay que leer. El promedio no lo veía; esto sí. */
+function zonaDeVuelo({ data, info }) {
+  const x0 = Math.round(info.width * 0.2);
+  const x1 = Math.round(info.width * 0.8);
+  const y0 = Math.round(info.height * 0.24);
+  const y1 = Math.round(info.height * 0.78);
+  const vals = [];
+  for (let y = y0; y < y1; y += 2) {
+    for (let x = x0; x < x1; x += 2) {
+      const i = (y * info.width + x) * info.channels;
+      const a = data[i + 3] / 255;
+      vals.push(a * ((0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]) / 255));
+    }
+  }
+  if (!vals.length) return { brillo: 0, contraste: 0 };
+  const m = vals.reduce((a, b) => a + b, 0) / vals.length;
+  const sd = Math.sqrt(vals.reduce((a, v) => a + (v - m) ** 2, 0) / vals.length);
+  return { brillo: m, contraste: sd };
+}
+
 /** Luminancia media de lo DIBUJADO en la franja inferior (desde la fila
  *  `desde`), pesada por su alfa: por ahí pasan las palabras al final del
  *  viaje y necesitan un fondo de tono medio-oscuro. */
@@ -270,9 +338,31 @@ async function importar(pieza) {
 
   const notas = [];
   let error = false;
-  const px = await pixeles(origen);
+
+  /* La atenuación va primero: se mide lo que se va a servir. */
+  const atenuar = ATENUAR[pieza.base];
+  let fuente = origen;
+  if (atenuar) {
+    fuente = await sharp(origen)
+      .ensureAlpha()
+      .modulate({ brightness: atenuar.brillo, saturation: atenuar.saturacion })
+      .png()
+      .toBuffer();
+    notas.push(
+      `atenuada al importar: brillo ×${atenuar.brillo}, saturación ×${atenuar.saturacion} (ver ATENUAR arriba)`,
+    );
+  }
+
+  const px = await pixeles(fuente);
   const { width: w, height: h } = px.info;
   notas.push(`fuente ${path.basename(origen)} · ${w}x${h}`);
+
+  if (pieza.nombreValido && !pieza.nombreValido.includes(pieza.base)) {
+    notas.push(
+      `ERROR: "${pieza.base}" no es un nombre que el juego busque. Los de ${pieza.grupo} son: ${pieza.nombreValido.join(", ")}. Con otro nombre la imagen no aparece nunca y se usa el SVG de respaldo, sin avisar.`,
+    );
+    error = true;
+  }
 
   if (pieza.cuadrada && Math.abs(w - h) > 2) {
     notas.push(`ERROR: tiene que ser cuadrada y vino ${w}x${h}. Se recorta en círculo.`);
@@ -321,6 +411,17 @@ async function importar(pieza) {
     if (o > pieza.arribaLimpio) error = true;
   }
 
+  if (pieza.vueloBrilloMax != null) {
+    const v = zonaDeVuelo(px);
+    const malBrillo = v.brillo > pieza.vueloBrilloMax;
+    const malContraste = v.contraste > pieza.vueloContrasteMax;
+    const marca = malBrillo || malContraste ? "ERROR" : "ok";
+    notas.push(
+      `${marca}: zona de vuelo — brillo ${v.brillo.toFixed(3)} (tope ${pieza.vueloBrilloMax}) y contraste ${v.contraste.toFixed(3)} (tope ${pieza.vueloContrasteMax}) — es el pasillo por el que van las palabras: tiene que estar VACÍO`,
+    );
+    if (malBrillo || malContraste) error = true;
+  }
+
   if (pieza.franjaBrilloMax != null) {
     const b = brilloFranjaInferior(px, pieza.arribaFraccion ?? 0.62);
     const marca = b > pieza.franjaBrilloMax ? "ERROR" : "ok";
@@ -339,11 +440,11 @@ async function importar(pieza) {
      objeto, no el aire que dejó el generador (mismo criterio que
      import-island-art). Se hace en un paso aparte porque sharp aplica el
      trim ANTES de medir el tamaño para escalar. */
-  let entrada = origen;
+  let entrada = fuente;
   let ancho = w;
   let alto = h;
   if (pieza.recortar) {
-    const buf = await sharp(origen).ensureAlpha().trim({ threshold: 12 }).png().toBuffer();
+    const buf = await sharp(fuente).ensureAlpha().trim({ threshold: 12 }).png().toBuffer();
     const meta = await sharp(buf).metadata();
     entrada = buf;
     ancho = meta.width;

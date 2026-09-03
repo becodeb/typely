@@ -932,7 +932,9 @@ horizonte de las islas (`fondo/horizonte.webp`) y la estación del hub
 (`hub/estacion.webp`) se ocultan solos hasta que existan. Las fichas y los
 prompts de esas piezas están en `Images/orbita/ORBITA.md` §7; el importador
 las mide (`node scripts/import-orbita-art.mjs`) y `preview-orbita-fondo.mjs`
-apila el horizonte con palabras encima para aprobarlo.
+apila el horizonte con palabras encima para aprobarlo. Ojo Chrome:
+`background-clip: text` no convive con `filter` en el mismo elemento — por
+eso la cuenta regresiva usa el envoltorio `.orb-cuenta-halo`.
 
 **CSS:** prefijo `.orb-*` en `global.css`, antes del compact-height pass. El
 borde de gradiente sigue siendo exclusivo de la consigna; Órbita no lo usa.

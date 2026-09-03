@@ -148,6 +148,10 @@ await sharp({
   .png()
   .toFile(salida);
 
-console.log(`${MOMENTOS.length} momentos · ${W}x${H} cada uno${conHorizonte ? " · con horizonte" : " · SIN horizonte (falta fondo/horizonte.webp)"}`);
+console.log(
+  `${MOMENTOS.length} momentos · ${W}x${H} cada uno${conHorizonte ? " · con horizonte" : " · SIN horizonte (falta fondo/horizonte.webp)"}`,
+);
 console.log(`-> ${path.relative(RAIZ, salida)}`);
-console.log("Mirá una sola cosa: si las palabras se leen en los tres, sobre todo en coral y cruzando el horizonte.");
+console.log(
+  "Mirá una sola cosa: si las palabras se leen en los tres, sobre todo en coral y cruzando el horizonte.",
+);

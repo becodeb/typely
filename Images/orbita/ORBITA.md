@@ -32,18 +32,19 @@ Las dos carpetas ya existen. El importador produce los WebP en
 
 ### Las diez piezas del rediseño (2026-09-02)
 
-El rediseño estético (§7) suma **dieciocho imágenes en tres tandas**. Las
-fichas están en §7; esta tabla es la respuesta a *qué nombre y dónde*. El
-importador ya conoce las cuatro carpetas y sus chequeos.
+El rediseño estético (§7) suma **diez imágenes nuevas más dos rehechas**, en
+tres tandas. Las fichas y los prompts están en §7; esta tabla es la
+respuesta a *qué nombre y dónde*. El importador ya conoce las carpetas
+nuevas y sus chequeos.
 
-| # | Guardar como | Medida | Transparencia | Tanda | Qué es |
-|---|---|---|---|---|---|
-| 9 | `Images/orbita/fondo/horizonte-source.png` | 2560×1440 | **Sí** | 1 | El mundo de las islas visto desde la órbita, solo la franja de abajo |
-| 6′ | `Images/orbita/fondo/estrellas-source.png` (v2) | 2560×1440 | No | 1 | El campo estelar rehecho en índigo, con destellos ✦ |
-| 7′ | `Images/orbita/fondo/nebulosa-source.png` (v2) | 2560×1440 | **Sí**, en gris | 1 | Las nubes del cielo de día, como máscara |
-| 10 | `Images/orbita/hub/estacion-source.png` | 1536×1024 | **Sí** | 2 | La estación orbital donde se apoya la nave |
-| 11–16 | `Images/orbita/insignias/<rango>-source.png` | 1024×1024 | **Sí** | 2 | Seis medallas de caramelo (cadete … leyenda) |
-| 17–24 | `Images/orbita/gemas/<poder>-source.png` | 1024×1024 | **Sí** | 3 | Siete gemas de poder y `cristal`, la moneda |
+| Guardar como | Medida | Transparencia | Tanda | Qué es |
+|---|---|---|---|---|
+| `Images/orbita/fondo/horizonte-source.png` | 2560×1440 | **Sí** | 1 | El mundo de las islas visto desde la órbita, solo la franja de abajo |
+| `Images/orbita/fondo/estrellas-source.png` (v2) | 2560×1440 | No | 1 | El campo estelar rehecho en índigo, con destellos ✦ |
+| `Images/orbita/fondo/nebulosa-source.png` (v2) | 2560×1440 | **Sí**, en gris | 1 | Las nubes del cielo de día, como máscara |
+| `Images/orbita/hub/estacion-source.png` | 1536×1024 | **Sí** | 2 | La estación orbital donde se apoya la nave |
+| `Images/orbita/insignias/<rango>-source.png` | 1024×1024 | **Sí** | 2 | Seis medallas de caramelo (cadete … leyenda) |
+| `Images/orbita/gemas/<poder>-source.png` | 1024×1024 | **Sí** | 3 | Siete gemas de poder y `cristal`, la moneda |
 
 Salen como `fondo/horizonte.webp`, `hub/estacion.webp`,
 `insignias/<rango>.webp` y `gemas/<poder>.webp`. Insignias y gemas son
@@ -586,7 +587,7 @@ se distingue ahí, hay que rehacerlo antes de que llegue al HUD.
 
 ---
 
-## 7. El rediseño: horizonte, estación, insignias y gemas
+## 7. El rediseño estético: horizonte, estación, insignias y gemas
 
 La dirección de arte completa está en el artefacto "Rediseño visual de
 Órbita" (2026-09-02). La tesis en una línea: **Órbita es el mismo cuento de
@@ -658,9 +659,36 @@ de cuento, sin grano fotográfico.
 
 **Salió bien si:** tapás mentalmente el 62 % de arriba y no perdés nada; las
 islas se reconocen como las del mapa; y en `preview-orbita-fondo.mjs` (que
-apila el horizonte solo) las palabras que cruzan la franja se leen con el
+ahora apila el horizonte) las palabras que cruzan la franja se leen con el
 tinte coral. El importador mide la opacidad del 62 % superior (tope 0,03) y
 el brillo de la franja inferior (tope 0,35).
+
+⚠️ **No la generes llenando el cuadro. Ya lo probamos y no funciona.**
+La franja dibujada ocupa el 30 % de una imagen 16:9, así que dos tercios de
+los píxeles son transparentes, y es tentador pedirla "más cerca" para ganar
+detalle. El problema es geométrico: para que la franja entre en el tercio de
+abajo **a lo ancho de la pantalla**, la imagen tendría que ser de proporción
+5:1. Una 16:9 que llena el cuadro se despliega sobre TODA la pantalla — las
+islas quedan grandes y contrastadas justo donde vuelan las palabras, y el
+tinte de la amenaza casi no se ve porque el horizonte tapa el 75 % del cielo.
+Medido: en la zona de vuelo daba 0,231 de brillo y 0,123 de contraste, contra
+0,012 y 0,067 de la versión buena. El importador ahora lo rechaza solo.
+
+**El importador la ATENÚA** (`ATENUAR` en `import-orbita-art.mjs`: brillo
+×0,62, saturación ×0,82) y recién ahí mide, porque lo que hay que aprobar es
+lo que se sirve, no la fuente. La primera versión aprobada medía 0,424 —
+preciosa sola, pero un mediodía debajo de palabras blancas — y con la
+atenuación queda en 0,246. **Generala igual como te guste**: bajarle la
+exposición es un arreglo de reproducción, como el realce de `mundo-dormido`,
+y la fuente queda intacta. Si con la atenuación puesta el brillo sigue
+arriba del tope, ahí sí hay que regenerarla.
+
+**Y se tiñe con la amenaza.** El horizonte se dibuja ARRIBA de la capa de
+tinte, así que sin ayuda se quedaba azul mientras el cielo se iba a coral y
+la pantalla se partía en dos. `.orb-horizonte-tinte` lo tiñe con el mismo
+color, enmascarado por el propio horizonte y en `mix-blend-mode: color` (toma
+el tono, deja la luminosidad), a media fuerza: el mundo se contagia de la
+tormenta, no se disfraza.
 
 ### 7.2 `estacion-source.png` — la estación orbital
 
@@ -771,6 +799,20 @@ necesito ahora"*. Después el prompt sigue igual con su bloque RANGO.
 **Salió bien si:** las seis en fila se ven como una familia (misma cámara,
 mismo tamaño, mismo brillo) y a 96 px todavía se cuentan los galones. El
 importador las recorta y las encuadra en un cuadrado con margen parejo.
+
+**No se aprueban sueltas**, igual que los orbes: una insignia sola siempre
+parece linda, y el problema aparece en fila, que es como se ven en el podio.
+
+```bash
+node scripts/preview-orbita-objetos.mjs   # insignias y gemas, en fila
+```
+
+Las dibuja a 140, 96 y 40 px sobre los DOS fondos en los que viven: el índigo
+de la escena y el vidrio claro de la tarjeta de resultado. Los 40 px son solo
+de referencia — a ese tamaño la app usa el SVG, no la imagen.
+
+El par que más se parece es **explorador (dos galones) y as (tres)**: si a
+96 px no los podés contar, es ahí donde hay que insistir.
 
 ### 7.4 `gemas/<poder>-source.png` — las gemas de poder y el cristal
 

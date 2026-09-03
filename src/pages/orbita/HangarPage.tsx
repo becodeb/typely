@@ -205,7 +205,11 @@ export function HangarPage() {
               <article
                 key={item.id}
                 className="orb-vidrio !rounded-[22px] px-3.5 py-3 flex items-center gap-3"
-                style={puesto ? { outline: "3px solid rgba(84, 232, 198, 0.8)", outlineOffset: "1px" } : undefined}
+                style={
+                  puesto
+                    ? { outline: "3px solid rgba(84, 232, 198, 0.8)", outlineOffset: "1px" }
+                    : undefined
+                }
               >
                 <Miniatura item={item} />
                 <div className="flex-1 min-w-0">
@@ -233,7 +237,11 @@ export function HangarPage() {
                       type="button"
                       disabled={ocupado === item.id}
                       onClick={() => void equipar(item, puesto)}
-                      className={`orb-boton--chico ${puesto ? "orb-pildora orb-pildora--boton orb-pildora--activa" : "orb-boton-vidrio"}`}
+                      className={`orb-boton--chico ${
+                        puesto
+                          ? "orb-pildora orb-pildora--boton orb-pildora--activa"
+                          : "orb-boton-vidrio"
+                      }`}
                     >
                       {puesto ? (
                         <span className="flex items-center gap-1">

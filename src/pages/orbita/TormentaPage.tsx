@@ -710,21 +710,30 @@ export function TormentaPage() {
       <div
         ref={fondoRef}
         className="orb-fondo"
-        style={{ "--orb-nebulosa": "url(/assets/orbita/fondo/nebulosa.webp)" } as React.CSSProperties}
+        style={
+          {
+            "--orb-nebulosa": "url(/assets/orbita/fondo/nebulosa.webp)",
+            "--orb-horizonte": "url(/assets/orbita/fondo/horizonte.webp)",
+          } as React.CSSProperties
+        }
         aria-hidden="true"
       >
         <img className="orb-estrellas" src="/assets/orbita/fondo/estrellas.webp" alt="" />
         <div className="orb-tinte" />
         {/* El mundo de las islas, abajo de la nave. Hasta que el WebP exista
-            (se genera aparte, ORBITA.md §4.9) se oculta solo. */}
+            (se genera aparte, ORBITA.md §7.1) se oculta solo. */}
         <img
           className="orb-horizonte"
           src="/assets/orbita/fondo/horizonte.webp"
           alt=""
           onError={(e) => {
+            /* Si la imagen no está, se van las DOS capas: la de tinte sin
+               máscara sería un rectángulo de color tapando la escena. */
             e.currentTarget.style.display = "none";
+            e.currentTarget.nextElementSibling?.setAttribute("style", "display:none");
           }}
         />
+        <div className="orb-horizonte-tinte" />
         <img className="orb-polvo" src="/assets/orbita/fondo/polvo.webp" alt="" />
       </div>
 
@@ -846,7 +855,12 @@ export function TormentaPage() {
               <span
                 key={a.id}
                 className="orb-aviso font-bold text-base"
-                style={{ "--orb-aviso-color": a.color, fontFamily: "var(--font-display)" } as React.CSSProperties}
+                style={
+                  {
+                    "--orb-aviso-color": a.color,
+                    fontFamily: "var(--font-display)",
+                  } as React.CSSProperties
+                }
               >
                 {a.texto}
               </span>
@@ -1082,13 +1096,19 @@ export function TormentaPage() {
             {respuestaServidor?.positions && (
               <div className="flex justify-center gap-3 text-xs font-bold flex-wrap">
                 {respuestaServidor.positions.global && (
-                  <span className="orb-pildora text-xs">Global #{respuestaServidor.positions.global.pos}</span>
+                  <span className="orb-pildora text-xs">
+                    Global #{respuestaServidor.positions.global.pos}
+                  </span>
                 )}
                 {respuestaServidor.positions.sede && (
-                  <span className="orb-pildora text-xs">Tu escuela #{respuestaServidor.positions.sede.pos}</span>
+                  <span className="orb-pildora text-xs">
+                    Tu escuela #{respuestaServidor.positions.sede.pos}
+                  </span>
                 )}
                 {respuestaServidor.positions.grado && (
-                  <span className="orb-pildora text-xs">Tu grado #{respuestaServidor.positions.grado.pos}</span>
+                  <span className="orb-pildora text-xs">
+                    Tu grado #{respuestaServidor.positions.grado.pos}
+                  </span>
                 )}
               </div>
             )}

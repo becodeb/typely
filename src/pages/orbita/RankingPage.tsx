@@ -31,12 +31,31 @@ const ALCANCES: { id: Alcance; nombre: string }[] = [
   { id: "grade", nombre: "Mi grado" },
 ];
 
+/* Dorado oscuro: el #ffd552 de la paleta no llega a 4.5:1 sobre el vidrio
+   claro, y el puntaje es el dato que hay que poder leer. */
 const ORO = "#c98a00";
+
+/* Atajo de desarrollo: ?demo=1 llena el ranking con filas de mentira.
+   El podio es el único lugar donde las insignias se ven grandes y una al
+   lado de la otra, y hasta ahora no había forma de mirarlo sin una cuenta
+   de verdad — se revisaba a ciegas. Mismo trato que el ?banda= y el ?bot=
+   de la partida: en producción la condición es constante false y el
+   bundler se lleva puesto todo esto. */
+const FILAS_DEMO: ArcadeBoardRow[] = [
+  { pos: 1, alias: "Nova", realName: null, score: 1240, rankId: "leyenda", wpmPeak: 78, mine: false },
+  { pos: 2, alias: "Pixel", realName: null, score: 1105, rankId: "capitan", wpmPeak: 71, mine: false },
+  { pos: 3, alias: "Kiwi", realName: null, score: 980, rankId: "as", wpmPeak: 66, mine: false },
+  { pos: 4, alias: "Tuki", realName: null, score: 812, rankId: "explorador", wpmPeak: 59, mine: true },
+  { pos: 5, alias: "Momo", realName: null, score: 640, rankId: "piloto", wpmPeak: 48, mine: false },
+  { pos: 6, alias: "Vera", realName: null, score: 410, rankId: "cadete", wpmPeak: 37, mine: false },
+];
 
 export function RankingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const sincroniza = sincronizaArcade(user?.role);
+  const demo =
+    import.meta.env.DEV && new URLSearchParams(window.location.search).has("demo");
+  const sincroniza = demo || sincronizaArcade(user?.role);
 
   const [alcance, setAlcance] = useState<Alcance>("global");
   const [periodo, setPeriodo] = useState<Periodo>("week");
@@ -46,6 +65,12 @@ export function RankingPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (demo) {
+      setFilas(FILAS_DEMO);
+      setYo({ pos: 4, score: 812 });
+      setCargando(false);
+      return;
+    }
     if (!sincroniza) return;
     let cancelado = false;
     setCargando(true);
@@ -68,7 +93,7 @@ export function RankingPage() {
     return () => {
       cancelado = true;
     };
-  }, [alcance, periodo, sincroniza]);
+  }, [alcance, periodo, sincroniza, demo]);
 
   const pildora = (activo: boolean) =>
     `orb-pildora orb-pildora--boton text-sm ${activo ? "orb-pildora--activa" : ""}`;
@@ -102,7 +127,10 @@ export function RankingPage() {
 
         {!sincroniza ? (
           <section className="orb-vidrio w-[min(28rem,94vw)] p-6 text-center grid gap-2">
-            <p className="m-0 font-bold" style={{ fontFamily: "var(--font-display)", fontSize: "1.15rem" }}>
+            <p
+              className="m-0 font-bold"
+              style={{ fontFamily: "var(--font-display)", fontSize: "1.15rem" }}
+            >
               El ranking es de las cuentas de verdad.
             </p>
             <p className="orb-suave m-0 text-sm font-semibold">
@@ -123,10 +151,18 @@ export function RankingPage() {
                 </button>
               ))}
               <span className="w-2" />
-              <button type="button" className={pildora(periodo === "week")} onClick={() => setPeriodo("week")}>
+              <button
+                type="button"
+                className={pildora(periodo === "week")}
+                onClick={() => setPeriodo("week")}
+              >
                 Esta semana
               </button>
-              <button type="button" className={pildora(periodo === "all")} onClick={() => setPeriodo("all")}>
+              <button
+                type="button"
+                className={pildora(periodo === "all")}
+                onClick={() => setPeriodo("all")}
+              >
                 Histórico
               </button>
             </div>
@@ -137,7 +173,11 @@ export function RankingPage() {
                   <div
                     key={f.pos}
                     className={`orb-vidrio orb-podio__lugar orb-podio__lugar--${f.pos}`}
-                    style={f.mine ? { outline: "3px solid rgba(84, 232, 198, 0.8)", outlineOffset: "2px" } : undefined}
+                    style={
+                      f.mine
+                        ? { outline: "3px solid rgba(84, 232, 198, 0.8)", outlineOffset: "2px" }
+                        : undefined
+                    }
                   >
                     <span className="orb-podio__puesto">
                       {f.pos === 1 ? "1.º puesto" : f.pos === 2 ? "2.º" : "3.º"}
@@ -149,7 +189,10 @@ export function RankingPage() {
                     />
                     <b
                       className="block truncate max-w-full"
-                      style={{ fontFamily: "var(--font-display)", fontSize: f.pos === 1 ? "1.15rem" : "1rem" }}
+                      style={{
+                        fontFamily: "var(--font-display)",
+                        fontSize: f.pos === 1 ? "1.15rem" : "1rem",
+                      }}
                     >
                       {f.alias}
                       {f.mine && <span className="orb-suave font-semibold"> (vos)</span>}
@@ -157,11 +200,17 @@ export function RankingPage() {
                     {f.realName && <span className="orb-suave text-xs font-semibold">{f.realName}</span>}
                     <span
                       className="font-extrabold tabular-nums"
-                      style={{ color: ORO, fontFamily: "var(--font-display)", fontSize: f.pos === 1 ? "1.4rem" : "1.1rem" }}
+                      style={{
+                        color: ORO,
+                        fontFamily: "var(--font-display)",
+                        fontSize: f.pos === 1 ? "1.4rem" : "1.1rem",
+                      }}
                     >
                       {f.score.toLocaleString("es-AR")}
                     </span>
-                    <span className="orb-suave text-xs font-semibold tabular-nums">{f.wpmPeak} PPM</span>
+                    <span className="orb-suave text-xs font-semibold tabular-nums">
+                      {f.wpmPeak} PPM
+                    </span>
                   </div>
                 ))}
               </section>
@@ -196,19 +245,24 @@ export function RankingPage() {
                     >
                       <span
                         className="w-8 text-center font-extrabold tabular-nums"
-                        style={{ fontFamily: "var(--font-display)", color: f.pos <= 3 ? ORO : "#52658f" }}
+                        style={{ fontFamily: "var(--font-display)", color: "#52658f" }}
                       >
                         {f.pos}
                       </span>
                       <InsigniaRango rango={f.rankId as RangoId} className="w-7 h-7" />
-                      <span className="flex-1 font-bold truncate" style={{ fontFamily: "var(--font-display)" }}>
+                      <span
+                        className="flex-1 font-bold truncate"
+                        style={{ fontFamily: "var(--font-display)" }}
+                      >
                         {f.alias}
                         {f.mine && <span className="orb-suave font-semibold"> (vos)</span>}
                         {f.realName && (
                           <span className="orb-suave block text-xs font-medium">{f.realName}</span>
                         )}
                       </span>
-                      <span className="orb-suave text-xs font-semibold tabular-nums">{f.wpmPeak} PPM</span>
+                      <span className="orb-suave text-xs font-semibold tabular-nums">
+                        {f.wpmPeak} PPM
+                      </span>
                       <span
                         className="font-extrabold tabular-nums"
                         style={{ color: ORO, fontFamily: "var(--font-display)" }}

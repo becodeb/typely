@@ -9,7 +9,7 @@
  * parte de la ficción, no un formulario. El demo juega sin alias y sin
  * ranking.
  *
- * La estación es una imagen generada aparte (ORBITA.md §4.10). Hasta que
+ * La estación es una imagen generada aparte (ORBITA.md §7.2). Hasta que
  * exista, el aro de luz de la plataforma sostiene solo a la nave.
  */
 import { ArrowLeft, Play, Rocket, Trophy } from "lucide-react";
@@ -33,15 +33,29 @@ const ocultarSiFalta = (e: React.SyntheticEvent<HTMLImageElement>) => {
   e.currentTarget.style.display = "none";
 };
 
+/** El horizonte y su capa de tinte se ocultan JUNTOS: la de tinte sin
+ *  máscara sería un rectángulo de color tapando la pantalla. */
+const ocultarHorizonte = (e: React.SyntheticEvent<HTMLImageElement>) => {
+  e.currentTarget.style.display = "none";
+  e.currentTarget.nextElementSibling?.setAttribute("style", "display:none");
+};
+
 /** Las capas del juego con el tinte quieto en pervinca: el hub es la calma
  *  antes de la tormenta. Lo comparten el ranking y el hangar. */
-export function FondoEspacio({ tinte = "rgb(84, 112, 224)", fuerza = 0.55 }: { tinte?: string; fuerza?: number }) {
+export function FondoEspacio({
+  tinte = "rgb(84, 112, 224)",
+  fuerza = 0.55,
+}: {
+  tinte?: string;
+  fuerza?: number;
+}) {
   return (
     <div
       className="orb-fondo"
       style={
         {
           "--orb-nebulosa": "url(/assets/orbita/fondo/nebulosa.webp)",
+          "--orb-horizonte": "url(/assets/orbita/fondo/horizonte.webp)",
           "--orb-tinte": tinte,
           "--orb-tinte-fuerza": fuerza,
         } as React.CSSProperties
@@ -54,8 +68,9 @@ export function FondoEspacio({ tinte = "rgb(84, 112, 224)", fuerza = 0.55 }: { t
         className="orb-horizonte orb-horizonte--quieto"
         src="/assets/orbita/fondo/horizonte.webp"
         alt=""
-        onError={ocultarSiFalta}
+        onError={ocultarHorizonte}
       />
+      <div className="orb-horizonte-tinte orb-horizonte-tinte--quieto" />
       <img className="orb-polvo" src="/assets/orbita/fondo/polvo.webp" alt="" />
     </div>
   );
@@ -64,13 +79,29 @@ export function FondoEspacio({ tinte = "rgb(84, 112, 224)", fuerza = 0.55 }: { t
 /** La estación con la nave apoyada. `estela` es el color de la estela
  *  equipada (o null). Lo comparten el hub y el hangar. */
 export function Puerto({ estela, className }: { estela: string | null; className?: string }) {
+  /* Sin estación, la nave necesita algo donde posarse: un aro de luz. Con
+     la estación puesta sobra, porque su plataforma ya lo trae pintado. */
+  const [hayEstacion, setHayEstacion] = useState(true);
   return (
-    <div className={`orb-puerto ${className ?? ""}`}>
-      <img className="orb-estacion" src="/assets/orbita/hub/estacion.webp" alt="" onError={ocultarSiFalta} />
-      <span className="orb-plataforma" aria-hidden="true" />
+    <div
+      className={`orb-puerto ${hayEstacion ? "" : "orb-puerto--sin-estacion"} ${className ?? ""}`}
+    >
+      {hayEstacion ? (
+        <img
+          className="orb-estacion"
+          src="/assets/orbita/hub/estacion.webp"
+          alt=""
+          onError={() => setHayEstacion(false)}
+        />
+      ) : (
+        <span className="orb-plataforma" aria-hidden="true" />
+      )}
       <div className="orb-puerto__nave">
         {estela && (
-          <span className="orb-estela" style={{ "--orb-estela-color": estela } as React.CSSProperties} />
+          <span
+            className="orb-estela"
+            style={{ "--orb-estela-color": estela } as React.CSSProperties}
+          />
         )}
         <CharacterSkin kind="ship" className="block w-full orb-flota-a" alt="Tu nave" />
       </div>
