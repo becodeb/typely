@@ -888,3 +888,68 @@ regeneran juntas porque se juzgan como un set:
 
 Guardá la versión anterior de cada una fuera de la carpeta (por ejemplo
 `estrellas-v1.png` en `Images/orbita/`) por si hay que volver.
+
+### 7.6 `gemas/<mejora>-source.png` — las ocho gemas de las mejoras
+
+Las mejoras permanentes por nivel (plan del 2026-09-04, artefacto "Mejoras de
+Tormenta") reemplazan a los poderes caídos. Son trece; **cuatro reusan gemas
+que ya existen** (`lento` → Viento a favor, `mira` → Foco, `escudo` → Escudo
+latente, `pulso` → Onda de choque), **una reusa `reparacion`** (+1 vida: el
+corazón con la cruz ya dice "una vida más"), y **ocho hay que generar**.
+
+| | |
+|---|---|
+| **Guardar en** | `Images/orbita/gemas/<nombre>-source.png` con estos nombres exactos: `bala`, `regeneracion`, `critico`, `congelar`, `iman`, `racha`, `teclas`, `segunda` |
+| **Medida** | 1024×1024 (o 1254×1254: el importador recorta y encuadra) |
+| **Formato** | PNG con transparencia real |
+| **Referencias a adjuntar** | **La gema de escudo aprobada** (`Images/orbita/gemas/escudo-source.png`) como molde de material, cámara, tamaño y posición. Si el generador acepta una segunda, la lámina `.preview-orbita/objetos.png` para que vea la familia entera. Nada más: no hay SVG todavía |
+| **Sale como** | `public/assets/orbita/gemas/<nombre>.webp` |
+
+**Qué tienen que lograr.** Que cada carta de la pantalla de nivel se reconozca
+antes de leer su nombre, y que las trece en fila —viejas y nuevas— sean UNA
+familia. La rareza **no** va en la gema: la pone el marco de la carta, así
+la misma gema sirve en el HUD, en la carta y en la tarjeta de resultado.
+
+```
+Te paso la gema de poder ya hecha de un juego infantil de estética pastel:
+es el MOLDE de material, tamaño, cámara y posición en el cuadro. Necesito
+otra gema de la misma familia, que en fila con ella parezca su hermana.
+
+Una GEMA DE MEJORA: un cristal facetado, redondeado, como una cápsula de
+vidrio de colores, con el símbolo que describo abajo flotando adentro,
+iluminado con luz propia. Imagen cuadrada de 1024x1024 en PNG CON
+TRANSPARENCIA REAL, la gema centrada, ocupando casi todo el cuadro con un
+margen chico de aire, vista de frente, exactamente como la referencia.
+
+Estilo 3D suave de caramelo, luz cálida, un brillo especular arriba a la
+izquierda, sombra suave dentro del propio objeto. El símbolo tiene que
+leerse a primera vista a tamaño chico: simple, grueso, blanco, sin detalles
+finos, sin texto salvo donde lo pido.
+
+Sin pedestal, sin fondo, sin sombra proyectada, sin texto, sin partículas
+alrededor.
+
+MEJORA: bala extra / cristal dorado (#ffd552) / dos flechas blancas gruesas
+que se abren en V desde un mismo punto de abajo.
+```
+
+| Archivo | Bloque MEJORA |
+|---|---|
+| `bala-source.png` | bala extra / cristal dorado (#ffd552) / dos flechas blancas gruesas que se abren en V desde un mismo punto de abajo |
+| `regeneracion-source.png` | regeneración / cristal rosa (#ff9fca) / un corazón blanco rodeado por dos flechas curvas blancas que giran en círculo |
+| `critico-source.png` | golpe crítico / cristal violeta (#9b7cff) / una estrella de impacto blanca de ocho puntas, gruesa |
+| `congelar-source.png` | congelar / cristal celeste hielo (#cfeeff) / un copo de nieve blanco de seis brazos, grueso y simple |
+| `iman-source.png` | imán / cristal azul eléctrico (#536bff) / un imán blanco en herradura con las dos puntas hacia arriba |
+| `racha-source.png` | racha blindada / cristal menta (#54e8c6) / una llamita blanca de tres lenguas |
+| `teclas-source.png` | teclas difíciles / cristal violeta azulado (#7c71ff) / una tecla cuadrada blanca con una Ñ grande del color del cristal |
+| `segunda-source.png` | segunda oportunidad / cristal dorado claro (#ffe08a) / un corazón blanco con un destello de cuatro puntas apoyado en su hombro derecho |
+
+Ojo con los tres corazones (vida, regeneración, segunda oportunidad): se
+distinguen por lo que los rodea —la cruz, las flechas, el destello— y por el
+color del cristal. Si a 72 px se confunden, el que cambia es el de regeneración
+(por un reloj de arena con un corazón chico adentro), nunca el de vida.
+
+**Salió bien si:** en `node scripts/preview-orbita-objetos.mjs` las trece en
+fila se ven como una familia, y a 96 px se reconoce cada símbolo sin leer el
+nombre. Importar con `node scripts/import-orbita-art.mjs gemas`; el importador
+rechaza cualquier nombre que no sea uno de los ocho.
