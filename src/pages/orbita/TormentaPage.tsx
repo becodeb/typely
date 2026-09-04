@@ -63,12 +63,45 @@ const FUGA_Y = 24;
 const NAVE_Y = 84;
 const ABANICO_X = 34;
 
+/* La palabra nace chica en el punto de fuga y llega GRANDE a la nave: con
+   la base de 2rem, la escala 0,6 → 2,0 da 19 px al nacer y 64 px al
+   impactar. Antes era 14 → 35 y un chico recién la leía encima de la nave.
+   El abanico se cierra menos al final (0,72 en vez de 0,82) porque dos
+   palabras de 64 px que converjan al mismo centro se pisan. */
 function posicionDe(carril: number, progreso: number) {
   return {
-    x: 50 + carril * ABANICO_X * (1 - progreso * 0.82),
+    x: 50 + carril * ABANICO_X * (1 - progreso * 0.72),
     y: FUGA_Y + (NAVE_Y - 6 - FUGA_Y) * progreso,
-    escala: 0.55 + progreso * 0.8,
+    escala: 0.6 + progreso * 1.4,
   };
+}
+
+/* Una palabra muerta, desarmándose letra por letra. Vive 900 ms. */
+interface Cadaver {
+  id: number;
+  x: number;
+  y: number;
+  escala: number;
+  color: string;
+  impacto: boolean;
+  letras: { ch: string; dx: number; dy: number; rot: number; d: number; mayus: boolean }[];
+}
+
+/* Rumbo de cada letra al morir. Destruida por el jugador: estalla en todas
+   direcciones. Impactó en la nave: cae hacia abajo, más lejos. */
+function letrasQueVuelan(texto: string, impacto: boolean): Cadaver["letras"] {
+  return [...texto].map((ch, i) => {
+    const ang = impacto ? Math.PI / 2 + (Math.random() - 0.5) * 1.2 : Math.random() * Math.PI * 2;
+    const dist = impacto ? 40 + Math.random() * 70 : 30 + Math.random() * 60;
+    return {
+      ch,
+      dx: Math.round(Math.cos(ang) * dist),
+      dy: Math.round(Math.sin(ang) * dist),
+      rot: Math.round((Math.random() - 0.5) * 160),
+      d: i * 18,
+      mayus: /[A-ZÁÉÍÓÚÜÑ]/.test(ch),
+    };
+  });
 }
 
 /* Pervinca calmo → violeta → coral. El termómetro ambiental de la amenaza.
@@ -238,6 +271,7 @@ export function TormentaPage() {
   const [rayos, setRayos] = useState<Rayo[]>([]);
   const [avisos, setAvisos] = useState<Aviso[]>([]);
   const [viajes, setViajes] = useState<Viaje[]>([]);
+  const [cadaveres, setCadaveres] = useState<Cadaver[]>([]);
   const [revelado, setRevelado] = useState<Revelado | null>(null);
   const [erroneaId, setErroneaId] = useState<number | null>(null);
   const [resultado, setResultado] = useState<ResultadoPartida | null>(null);
@@ -279,6 +313,7 @@ export function TormentaPage() {
     setHud({ ppm: 0, racha: 0, amenaza: 2, cristales: 0, prueba: false });
     setChispas([]);
     setRayos([]);
+    setCadaveres([]);
     setAvisos([]);
     setViajes([]);
     setRevelado(null);
@@ -298,6 +333,26 @@ export function TormentaPage() {
       const motor = motorRef.current;
       if (!motor) return;
 
+      /* Deja un cadáver donde estaba la palabra: mismo lugar, misma
+         escala, mismo texto, y las letras salen volando. Hay que llamarlo
+         ANTES de borrar el elemento del mapa, que es de donde sale todo. */
+      const enterrar = (id: number, color: string, impacto: boolean) => {
+        const el = palabraEls.current.get(id);
+        const escena = escenaRef.current;
+        if (!el || !escena) return;
+        const r = el.getBoundingClientRect();
+        const e = escena.getBoundingClientRect();
+        const x = ((r.left + r.width / 2 - e.left) / e.width) * 100;
+        const y = ((r.top + r.height / 2 - e.top) / e.height) * 100;
+        const escala = Number(/scale\(([\d.]+)\)/.exec(el.style.transform)?.[1] ?? 1);
+        const idCad = efectoIds.current++;
+        setCadaveres((prev) => [
+          ...prev,
+          { id: idCad, x, y, escala, color, impacto, letras: letrasQueVuelan(el.textContent ?? "", impacto) },
+        ]);
+        window.setTimeout(() => setCadaveres((prev) => prev.filter((c) => c.id !== idCad)), 900);
+      };
+
       for (const ev of eventos) {
         switch (ev.tipo) {
           case "nace":
@@ -307,6 +362,7 @@ export function TormentaPage() {
             ]);
             break;
           case "destruida": {
+            enterrar(ev.id, "#5be8ba", false);
             const el = palabraEls.current.get(ev.id);
             const escena = escenaRef.current;
             if (el && escena) {
@@ -422,6 +478,7 @@ export function TormentaPage() {
             break;
           }
           case "impacto":
+            enterrar(ev.id, "#ff8fa8", true);
             palabraEls.current.delete(ev.id);
             setPalabras((prev) => prev.filter((p) => p.id !== ev.id));
             setCorazones(motor.corazones);
@@ -495,6 +552,10 @@ export function TormentaPage() {
         motor.t < motor.efectos.miraHasta
           ? [...motor.vivas].sort((a, b) => b.progreso - a.progreso)[0]?.id ?? null
           : null;
+      /* El rectángulo de la escena se lee UNA vez, antes de escribir
+         estilos: leerlo dentro del bucle forzaría un layout por palabra. */
+      const escenaRect = escenaRef.current?.getBoundingClientRect();
+      let hayPeligro = false;
       for (const p of motor.vivas) {
         const el = palabraEls.current.get(p.id);
         if (!el) continue;
@@ -502,22 +563,43 @@ export function TormentaPage() {
         el.style.left = `${pos.x}%`;
         el.style.top = `${pos.y}%`;
         el.style.transform = `translate(-50%, -50%) scale(${pos.escala.toFixed(3)})`;
-        const hecho = el.querySelector("b");
-        const resto = el.querySelector("span");
+        /* Cercanía al cuadrado: las lejanas vienen quietas y el tambaleo
+           arranca en el último tramo, cuando ya es una amenaza. */
+        el.style.setProperty("--orb-cerca", (p.progreso * p.progreso).toFixed(3));
+        if (escenaRect) {
+          /* La estela apunta CONTRA LA VELOCIDAD, no hacia el punto de fuga
+             como lugar: las palabras nacen ya desplegadas a lo ancho a la
+             altura de la fuga, así que "hacia la fuga" al nacer sería una
+             cola horizontal. La velocidad sale de derivar posicionDe():
+             en x se cierra hacia el centro, en y baja de FUGA_Y a la nave.
+             El elemento "mira" hacia abajo (+y); rotarlo θ lo deja
+             apuntando a (−sin θ, cos θ), que tiene que ser ese versor. */
+          const bx = (escenaRect.width * (p.carril * ABANICO_X * 0.72)) / 100;
+          const by = (escenaRect.height * -(NAVE_Y - 6 - FUGA_Y)) / 100;
+          const ang = (Math.atan2(-bx, by) * 180) / Math.PI;
+          el.style.setProperty("--orb-cola-ang", `${ang.toFixed(1)}deg`);
+        }
+        const hecho = el.querySelector(".orb-palabra__hecho");
+        const resto = el.querySelector(".orb-palabra__resto");
         if (hecho && resto) {
           /* Se compara contra el DOM real, no contra una marca propia: si
              React vuelve a escribir el span (re-render por otra prop), la
              marca mentiría y quedaría el prefijo con el resto entero —
-             "¿C¿Cómo estás?". Son ≤8 palabras: comparar es gratis. */
-          const prefijo = p.texto.slice(0, p.escrito);
+             "¿C¿Cómo estás?". Son ≤8 palabras: comparar es gratis.
+             El prefijo también marca mayúsculas: si no, la M grande de
+             "Mundo" se achicaría en el instante de tipearla. */
+          const hechoHtml = marcarMayusculas(p.texto.slice(0, p.escrito));
           const restoHtml = marcarMayusculas(p.texto.slice(p.escrito));
-          if (hecho.textContent !== prefijo) hecho.textContent = prefijo;
+          if (hecho.innerHTML !== hechoHtml) hecho.innerHTML = hechoHtml;
           if (resto.innerHTML !== restoHtml) resto.innerHTML = restoHtml;
         }
+        const peligro = p.progreso > 0.72;
+        if (peligro) hayPeligro = true;
         el.classList.toggle("orb-palabra--enganchada", p.id === enganche);
-        el.classList.toggle("orb-palabra--peligro", p.progreso > 0.72);
+        el.classList.toggle("orb-palabra--peligro", peligro);
         el.classList.toggle("orb-palabra--mira", p.id === masUrgente);
       }
+      escenaRef.current?.classList.toggle("orb-escena--peligro", hayPeligro);
 
       /* HUD y tinte, a ~3 Hz — no hace falta más y ahorra renders. */
       acumuladorHud += dt;
@@ -762,7 +844,7 @@ export function TormentaPage() {
                    pisar en cada re-render y el resto de la palabra
                    parpadearía entero hasta el frame siguiente. Se llena
                    acá, al montar, para que no haya un frame en blanco. */
-                const resto = el.querySelector("span");
+                const resto = el.querySelector(".orb-palabra__resto");
                 if (resto && !resto.innerHTML) resto.innerHTML = marcarMayusculas(p.texto);
               } else {
                 palabraEls.current.delete(p.id);
@@ -775,10 +857,48 @@ export function TormentaPage() {
             ]
               .filter(Boolean)
               .join(" ")}
-            style={{ fontSize: "1.6rem" }}
+            style={{ fontSize: "2rem" }}
           >
-            <b />
-            <span />
+            <i className="orb-palabra__cola" aria-hidden="true" />
+            <span className="orb-palabra__cuerpo">
+              <b className="orb-palabra__hecho" />
+              <span className="orb-palabra__resto" />
+            </span>
+          </span>
+        ))}
+
+        {/* Las que acaban de morir, desarmándose letra por letra. */}
+        {cadaveres.map((c) => (
+          <span
+            key={c.id}
+            className="orb-cadaver"
+            aria-hidden="true"
+            style={
+              {
+                left: `${c.x}%`,
+                top: `${c.y}%`,
+                fontSize: "2rem",
+                "--orb-esc": c.escala,
+                "--orb-cad-color": c.color,
+              } as React.CSSProperties
+            }
+          >
+            {c.letras.map((l, i) => (
+              <i
+                key={i}
+                className={l.mayus ? "orb-cadaver__mayus" : undefined}
+                style={
+                  {
+                    "--orb-dx": `${l.dx}px`,
+                    "--orb-dy": `${l.dy}px`,
+                    "--orb-rot": `${l.rot}deg`,
+                    "--orb-d": `${l.d}ms`,
+                  } as React.CSSProperties
+                }
+              >
+                {l.ch === " " ? " " : l.ch}
+              </i>
+            ))}
           </span>
         ))}
 

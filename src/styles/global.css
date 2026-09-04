@@ -997,49 +997,131 @@ a { color: inherit; text-decoration: none; }
     0 1px 2px rgba(5, 11, 30, 0.95);
 }
 
-/* ---- Las palabras que vuelan ---- */
+/* ---- Las palabras que vuelan ----
+   Tres capas, y la división no es capricho:
+     .orb-palabra          posición + escala. Las escribe el rAF, imperativo.
+       .orb-palabra__cola  la estela, rotada hacia el punto de fuga.
+       .orb-palabra__cuerpo el texto: nace, tambalea y late con animaciones
+                           CSS. Van en un hijo porque el padre ya tiene su
+                           transform escrito por JS cada frame — una
+                           animación CSS ahí lo pisaría o lo pelearía.
+   El texto va DERECHO siempre. Es un juego de tipeo: el ataque se cuenta
+   con tamaño (nace a 19 px, impacta a 64), estela, vibración y luz —
+   nunca inclinando lo que hay que leer. */
 .orb-palabra {
   position: absolute;
   left: 0;
   top: 0;
   transform: translate(-50%, -50%);
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: 800;
   white-space: nowrap;
   color: #f2f7ff;
+  /* --orb-cerca: 0 recién nacida → 1 sobre la nave (es progreso², así las
+     lejanas vienen quietas y la vibración arranca en el último tramo).
+     --orb-cola-ang: hacia dónde apunta la estela. Los dos los pone el rAF. */
+  --orb-cerca: 0;
+  --orb-cola-ang: 0deg;
+  will-change: transform;
+  pointer-events: none;
+}
+.orb-palabra__cuerpo {
+  display: inline-block;
   /* Halo oscuro DETRÁS del glifo — legible sobre estrellas en movimiento. */
   text-shadow:
     0 0 6px rgba(5, 11, 30, 0.95),
     0 0 14px rgba(5, 11, 30, 0.8),
     0 2px 3px rgba(5, 11, 30, 0.9);
-  will-change: transform;
+  animation:
+    orbPalabraNace 380ms cubic-bezier(0.2, 1.4, 0.4, 1) both,
+    orbTambalea 900ms ease-in-out 380ms infinite;
+}
+/* Nace con un "pop" desde el punto de fuga: un destello que se asienta. */
+@keyframes orbPalabraNace {
+  0%   { scale: 0.15; opacity: 0; filter: brightness(2.4); }
+  60%  { opacity: 1; }
+  100% { scale: 1; opacity: 1; filter: brightness(1); }
+}
+/* Tambaleo proporcional a la cercanía: a --orb-cerca 0 no se mueve nada. */
+@keyframes orbTambalea {
+  0%, 100% { translate: 0 0; }
+  25%  { translate: calc(var(--orb-cerca) * -5px) calc(var(--orb-cerca) * 2px); }
+  50%  { translate: 0 calc(var(--orb-cerca) * -3px); }
+  75%  { translate: calc(var(--orb-cerca) * 5px) calc(var(--orb-cerca) * 2px); }
+}
+/* La estela: nace en el centro de la palabra y se extiende hacia ATRÁS,
+   hacia el punto de fuga. Escala con la palabra, así cerca de la nave es
+   más larga — más velocidad aparente justo cuando importa. Sin blur: son
+   hasta ocho a la vez en una Chromebook. */
+.orb-palabra__cola {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0.36em;
+  height: 3.4em;
+  transform-origin: 50% 0;
+  transform: translateX(-50%) rotate(var(--orb-cola-ang));
+  border-radius: 999px;
+  background: linear-gradient(
+    to bottom,
+    rgba(242, 247, 255, 0.6),
+    rgba(155, 124, 255, 0.4) 38%,
+    rgba(84, 112, 224, 0.15) 70%,
+    transparent
+  );
+  opacity: calc(0.4 + var(--orb-cerca) * 0.55);
+  z-index: -1;
   pointer-events: none;
 }
 /* El prefijo ya escrito: cambia PESO además de color — el estado nunca
    depende solo del color. */
-.orb-palabra b { color: #5be8ba; font-weight: 800; }
+.orb-palabra__hecho { color: #5be8ba; font-weight: 800; }
 /* Enganchada: marco, no solo tinte. */
-.orb-palabra--enganchada {
+.orb-palabra--enganchada .orb-palabra__cuerpo {
   color: #ffffff;
   text-shadow:
     0 0 6px rgba(5, 11, 30, 0.95),
     0 0 16px rgba(37, 200, 223, 0.9),
     0 0 30px rgba(37, 200, 223, 0.55);
 }
-.orb-palabra--peligro { color: #ffc7d1; }
-.orb-palabra--mira { text-decoration: underline wavy rgba(255, 159, 202, 0.9) 2px; }
-.orb-palabra--error { animation: orbSacudida 220ms ease-in-out; }
+/* Peligro (pasó el 72 % del viaje): late en coral y crece un poco en cada
+   latido. Se relista la animación entera porque el shorthand reemplaza. */
+.orb-palabra--peligro .orb-palabra__cuerpo {
+  color: #ffd4dc;
+  animation:
+    orbPalabraNace 380ms cubic-bezier(0.2, 1.4, 0.4, 1) both,
+    orbTambalea 900ms ease-in-out 380ms infinite,
+    orbLate 520ms ease-in-out infinite;
+}
+@keyframes orbLate {
+  0%, 100% {
+    scale: 1;
+    text-shadow: 0 0 6px rgba(5, 11, 30, 0.95), 0 0 18px rgba(236, 84, 124, 0.55), 0 2px 3px rgba(5, 11, 30, 0.9);
+  }
+  50% {
+    scale: 1.07;
+    text-shadow: 0 0 6px rgba(5, 11, 30, 0.95), 0 0 30px rgba(236, 84, 124, 0.95), 0 0 52px rgba(236, 84, 124, 0.5);
+  }
+}
+.orb-palabra--peligro .orb-palabra__cola {
+  background: linear-gradient(to bottom, rgba(255, 212, 220, 0.75), rgba(236, 84, 124, 0.45) 40%, transparent);
+}
+.orb-palabra--mira .orb-palabra__cuerpo { text-decoration: underline wavy rgba(255, 159, 202, 0.9) 2px; }
+.orb-palabra--error .orb-palabra__cuerpo { animation: orbSacudida 220ms ease-in-out; }
 @keyframes orbSacudida {
   0%, 100% { margin-left: 0; }
   25% { margin-left: -7px; }
   60% { margin-left: 6px; }
 }
 
-/* Las MAYÚSCULAS van doradas: se ve que hace falta Shift antes de tipear.
-   Cambia el color Y lleva su propio halo — el estado nunca depende solo
-   del color, pero acá además el peso ya lo pone el prefijo escrito. */
+/* Las MAYÚSCULAS van doradas Y un 30 % más grandes: se ve de lejos que
+   hace falta Shift antes de tipear. `line-height: 0` para que la letra
+   grande no agrande la caja de línea y desplace la palabra al aparecer
+   (o al pasar del resto al prefijo escrito). */
 .orb-palabra em {
   font-style: normal;
+  font-size: 1.3em;
+  line-height: 0;
   color: #ffd552;
   text-shadow:
     0 0 6px rgba(5, 11, 30, 0.95),
@@ -1047,26 +1129,58 @@ a { color: inherit; text-decoration: none; }
     0 2px 3px rgba(5, 11, 30, 0.9);
 }
 
+/* La pantalla entera tiembla apenas mientras haya una palabra en peligro. */
+.orb-escena--peligro { animation: orbEscenaTiembla 260ms ease-in-out infinite; }
+@keyframes orbEscenaTiembla {
+  0%, 100% { translate: 0 0; }
+  25% { translate: 1.5px -1px; }
+  75% { translate: -1.5px 1px; }
+}
+
+/* La palabra que muere se desarma letra por letra: cada <i> vuela con su
+   propio rumbo (--orb-dx/dy/rot) y una demora escalonada (--orb-d). Es
+   el único lugar donde las letras rotan — ya no hay que leerlas. Menta
+   cuando la destruyó el jugador, coral cuando impactó en la nave. */
+.orb-cadaver {
+  position: absolute;
+  transform: translate(-50%, -50%) scale(var(--orb-esc, 1));
+  font-family: var(--font-display);
+  font-weight: 800;
+  white-space: nowrap;
+  color: var(--orb-cad-color, #5be8ba);
+  pointer-events: none;
+}
+.orb-cadaver i {
+  display: inline-block;
+  font-style: normal;
+  text-shadow: 0 0 6px rgba(5, 11, 30, 0.95), 0 0 12px currentColor;
+  animation: orbLetraVuela 640ms cubic-bezier(0.2, 0.6, 0.3, 1) both;
+  animation-delay: var(--orb-d, 0ms);
+}
+.orb-cadaver__mayus { font-size: 1.3em; line-height: 0; color: #ffd552; }
+@keyframes orbLetraVuela {
+  0%   { opacity: 1; translate: 0 0; rotate: 0deg; scale: 1; }
+  100% { opacity: 0; translate: var(--orb-dx) var(--orb-dy); rotate: var(--orb-rot); scale: 0.35; }
+}
+
 /* Palabra que trae un PODER escondido: estela de cometa iridiscente — la
    misma para todos los poderes, a propósito: es una sorpresa, y cuál era
    se sabe recién cuando llega a la nave. */
-.orb-palabra--poder {
-  animation: orbPoderCicla 2.4s linear infinite;
+.orb-palabra--poder .orb-palabra__cuerpo {
+  animation:
+    orbPalabraNace 380ms cubic-bezier(0.2, 1.4, 0.4, 1) both,
+    orbTambalea 900ms ease-in-out 380ms infinite,
+    orbPoderCicla 2.4s linear infinite;
 }
-.orb-palabra--poder::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: 88%;
-  width: 0.42em;
-  height: 2.8em;
-  transform: translateX(-50%);
-  border-radius: 999px;
-  background: linear-gradient(to top, #5be8ba, #9b7cff 45%, #ff9fca 70%, transparent);
-  filter: blur(3px);
-  opacity: 0.85;
+/* Su estela es la misma cola de todas, pero iridiscente, más larga y con
+   el arcoíris girando: es la única señal de que trae algo. */
+.orb-palabra--poder .orb-palabra__cola {
+  width: 0.46em;
+  height: 4em;
+  background: linear-gradient(to bottom, #5be8ba, #9b7cff 45%, #ff9fca 70%, transparent);
+  filter: blur(2px);
+  opacity: 0.95;
   animation: orbPoderEstela 2.4s linear infinite;
-  pointer-events: none;
 }
 .orb-palabra--poder::after {
   content: "✦";
@@ -1691,6 +1805,16 @@ a { color: inherit; text-decoration: none; }
   /* La estela de poder se queda fija pero VISIBLE: sigue siendo la señal. */
   .orb-palabra--poder { text-shadow: 0 0 6px rgba(5,11,30,.95), 0 0 14px #9b7cff, 0 0 28px rgba(155,124,255,.6); }
   .orb-palabra--error { animation: none; }
+  /* Las palabras aparecen y viajan quietas: sin pop, sin tambaleo, sin
+     latido ni temblor de pantalla. La estela y el color de peligro quedan
+     fijos, porque son información. La muerte se acorta a un destello. */
+  .orb-palabra__cuerpo, .orb-palabra__cola, .orb-escena--peligro,
+  .orb-palabra--error .orb-palabra__cuerpo, .orb-palabra--peligro .orb-palabra__cuerpo,
+  .orb-palabra--poder .orb-palabra__cuerpo, .orb-palabra--poder .orb-palabra__cola {
+    animation: none;
+  }
+  .orb-palabra--poder .orb-palabra__cuerpo { text-shadow: 0 0 6px rgba(5,11,30,.95), 0 0 14px #9b7cff, 0 0 28px rgba(155,124,255,.6); }
+  .orb-cadaver i { animation-duration: 160ms; animation-delay: 0ms; }
   /* El viaje y la revelación se acortan a un destello, no se anulan: son
      información (qué poder llegó), no decoración. */
   .orb-viaje { animation-duration: 120ms; }
