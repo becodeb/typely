@@ -924,7 +924,12 @@ fuera de la escena del juego es el **vidrio de marca** (`.orb-vidrio`,
 `.orb-pildora`, `.orb-boton-primario`, `.orb-boton-vidrio`, `.orb-campo`):
 blanco esmerilado con blur, resplandor turquesa/violeta/rosa y texto azul de
 tinta, el mismo de la tarjeta de login. Dentro de la escena el HUD sigue
-siendo texto suelto con halo, nunca tarjetas. Lo que se ve grande (insignia
+siendo texto suelto con halo, nunca tarjetas. Las palabras que vuelan nacen a
+19 px y llegan a 64 px sobre la nave (`posicionDe`, escala 0,6 → 2,0 sobre
+2rem), con estela hacia atrás, "pop" al nacer, tambaleo que crece con la
+cercanía y latido coral pasado el 72 % del viaje; las mayúsculas van doradas
+y un 30 % más grandes; y el texto va SIEMPRE derecho — es un juego de tipeo,
+nada rota salvo las letras de una palabra que ya murió. Lo que se ve grande (insignia
 del resultado y del podio, gema del poder que llega a la nave, cristal del
 saldo) son objetos 3D generados en `public/assets/orbita/{insignias,gemas}/`
 que `InsigniaRango tamano="grande"` y `Gema` cargan con respaldo SVG; el

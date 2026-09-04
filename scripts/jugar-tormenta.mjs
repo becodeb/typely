@@ -100,6 +100,7 @@ function jugar(esc, semilla) {
     tFinPrueba: null,
     corazonesEn: [],
     roces: 0,
+    rebotes: 0,
     amenazaEn: {},
     maxVivas: 0,
     maxVivasPrueba: 0,
@@ -126,8 +127,9 @@ function jugar(esc, semilla) {
     for (const ev of eventos) {
       if (ev.tipo === "fin") m.fin = ev.resultado;
       if (ev.tipo === "roce") m.roces++;
+      if (ev.tipo === "rebote") m.rebotes++;
       if (ev.tipo === "impacto" && !ev.escudoAbsorbio) m.corazonesEn.push(Math.round(t));
-      if (ev.tipo === "destruida" || ev.tipo === "impacto" || ev.tipo === "suelta" || ev.tipo === "roce") {
+      if (ev.tipo === "destruida" || ev.tipo === "impacto" || ev.tipo === "suelta" || ev.tipo === "roce" || ev.tipo === "rebote") {
         reaccionando = 0.25 + rng() * 0.35;
       }
       if (ev.tipo === "poderAplicado") {
@@ -257,7 +259,7 @@ for (const esc of ESCENARIOS) {
       ` · vuelo de prueba termina a los ${prueba.toFixed(1)} s`,
   );
   console.log(`    amenaza en el tiempo → ${amz}`);
-  console.log(`    corazones perdidos (semilla 1) en s: ${corazones} · roces en prueba: ${corridas[0].roces}`);
+  console.log(`    corazones perdidos (semilla 1) en s: ${corazones} · roces en prueba: ${corridas[0].roces} · rebotes: ${corridas.reduce((a, c) => a + c.rebotes, 0)}`);
   console.log(
     `    hueco máx sin palabras ${hueco.toFixed(1)} s · ahogo (≥6 vivas) ${ahogo.toFixed(1)} s` +
       ` · máx vivas ${Math.max(...corridas.map((c) => c.maxVivas))} (prueba ${Math.max(...corridas.map((c) => c.maxVivasPrueba))})`,

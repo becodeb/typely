@@ -90,7 +90,7 @@ function simular(perfil, semilla) {
       if (ev.tipo === "impacto") impactos++;
       if (ev.tipo === "poderAplicado") capsulas++;
       /* Cambio de objetivo → tiempo de reacción humano. */
-      if (ev.tipo === "destruida" || ev.tipo === "impacto" || ev.tipo === "suelta") {
+      if (ev.tipo === "destruida" || ev.tipo === "impacto" || ev.tipo === "suelta" || ev.tipo === "rebote") {
         reaccionando = 0.25 + rng() * 0.35;
       }
     }
