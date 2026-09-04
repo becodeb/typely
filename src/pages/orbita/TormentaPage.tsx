@@ -477,6 +477,13 @@ export function TormentaPage() {
             setPalabras((prev) => prev.filter((p) => p.id !== ev.id));
             break;
           }
+          case "rebote":
+            /* Llegó en plena invulnerabilidad: no lastima, pero se va. Se
+               desarma en gris, sin sonido de golpe. */
+            enterrar(ev.id, "#8fa4cc", true);
+            palabraEls.current.delete(ev.id);
+            setPalabras((prev) => prev.filter((p) => p.id !== ev.id));
+            break;
           case "impacto":
             enterrar(ev.id, "#ff8fa8", true);
             palabraEls.current.delete(ev.id);

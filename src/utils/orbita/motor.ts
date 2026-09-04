@@ -304,6 +304,10 @@ export type EventoMotor =
   /** Una palabra llegó a la nave DURANTE el vuelo de prueba: no lastima,
    *  solo termina la medición. */
   | { tipo: "roce"; id: number }
+  /** Una palabra llegó a la nave dentro de la ventana de invulnerabilidad
+   *  que sigue a un impacto: rebota sin daño. La página tiene que borrarla
+   *  igual que a cualquier otra que ya no está en `vivas`. */
+  | { tipo: "rebote"; id: number }
   | { tipo: "respiro" }
   | { tipo: "fin"; resultado: ResultadoPartida };
 
@@ -609,7 +613,15 @@ export class MotorTormenta {
         continue;
       }
 
-      if (this.t < this.invulnerableHasta) continue; // rebota sin daño
+      if (this.t < this.invulnerableHasta) {
+        /* Rebota sin daño — pero la página TIENE que enterarse. Antes esto
+           era un `continue` pelado: la palabra salía de `vivas` sin evento,
+           y su elemento quedaba en pantalla para siempre, pegado a la nave,
+           sin poder tipearse (el motor ya no la conocía) y sin impactar
+           nunca (ya había llegado). Con el tambaleo encima, temblaba. */
+        eventos.push({ tipo: "rebote", id: p.id });
+        continue;
+      }
 
       let escudoAbsorbio = false;
       if (this.escudo > 0) {
