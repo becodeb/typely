@@ -325,6 +325,31 @@ prueba("D4 · mover: soltar en el mismo lugar o adentro de sí mismo no hace nad
   igual(P.despuesDe(base, "r"), { tipo: "final" });
 });
 
+/* El hit-test del conector del ancla verde vive en `EditorBloques.tsx` y
+   necesita `getBoundingClientRect`: acá no hay DOM, así que ESO sólo se
+   puede comprobar en el navegador. Lo que sí se puede fijar es la
+   semántica que el arreglo eligió para ese conector, que es de dónde
+   sale el bug: con la cadena verde vacía el destino es `final`, y cuando
+   se agarra la cadena entera desde su primer bloque también —porque
+   `moverCadena` corta ANTES de colocar, y sobre la lista ya cortada
+   `final` es la posición 0. Si `colocarCadena` dejara de cumplirlo,
+   soltar sobre el verde volvería a dejar la cadena suelta. */
+prueba("D4b · el conector del ancla verde: `final` sobre una lista vacía es el principio", () => {
+  const cadena = [acc("move_forward", "a"), acc("harvest", "h")];
+  igual(P.colocarCadena([], cadena, { tipo: "final" }).map((n) => n.id), ["a", "h"], "cadena verde vacía");
+  const base = [acc("turn_left", "z")];
+  igual(
+    P.colocarCadena(base, cadena, { tipo: "antes", id: "z" }).map((n) => n.id),
+    ["a", "h", "z"],
+    "con bloques, encastrar en el ancla mete la cadena ANTES del primero",
+  );
+  // Reenganchar la cadena entera: se corta desde su primer bloque, el
+  // resto queda vacío, y `final` la devuelve al principio.
+  const corte = P.cortarEn([...cadena], "a");
+  igual(corte.restante, [], "cortar desde el primero no deja nada");
+  igual(P.colocarCadena(corte.restante, corte.agarrado, { tipo: "final" }).map((n) => n.id), ["a", "h"]);
+});
+
 prueba("D5 · desplazar con el teclado: un lugar por vez, dentro de su lista, sin salirse", () => {
   const base = [acc("move_forward", "a"), acc("turn_left", "b"), rep(2, [acc("harvest", "h"), acc("turn_right", "g")], "r")];
   igual(P.desplazarNodo(base, "b", -1).map((n) => n.id), ["b", "a", "r"]);

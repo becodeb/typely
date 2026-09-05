@@ -17,8 +17,13 @@
  *
  * TRES FORMAS DE EDITAR, y ninguna es la única (MVP.md §7):
  *
- *   - TOCAR: en la caja agrega al final de la cadena verde; en el
- *     lienzo quita ese bloque (la cadena se vuelve a unir).
+ *   - TOCAR: en la caja agrega al final de la cadena verde. En el LIENZO
+ *     un toque sobre una pieza NO hace nada — antes la quitaba, y eso
+ *     peleaba con el tachito: el chico apoyaba el dedo para acomodar una
+ *     cadena y le desaparecía un bloque. Lo único que sigue reaccionando
+ *     al toque adentro de una pieza son sus perillas (la ranura del
+ *     número, la pastilla del sensor) y la × de quitar, que es un botón
+ *     aparte y visible, no la pieza entera.
  *   - ARRASTRAR: sacar una pieza de la caja o agarrar un bloque puesto
  *     —y con él, todo lo que cuelga debajo (`cortarEn`, programa.ts)—
  *     y soltarlo donde va. Con Pointer Events y no con el
@@ -801,6 +806,35 @@ export function EditorBloques(props: Props) {
         if (brazoMedio) ofrecer(brazoMedio.left, brazoMedio.top, ref, inicioDe("sino"));
       }
 
+      // 3.bis · el ANCLA VERDE es un conector más. No lleva
+      // `data-clase`/`data-pila` —no es un nodo del programa, es el
+      // sombrero fijo del lienzo— así que el escaneo de arriba jamás la
+      // veía, y con la cadena verde VACÍA no había un solo conector en
+      // toda la libreta: nada podía encastrarse en el programa y todo
+      // caía como pila suelta. Su borde de abajo es "el principio de la
+      // cadena verde".
+      const ancla = lienzo.querySelector("[data-ancla]");
+      if (ancla) {
+        const verde = propsRef.current.programa;
+        const primero = verde[0];
+        // Si el bloque que se está arrastrando ES el primero de la cadena
+        // verde, después del corte no queda ninguno: el destino correcto
+        // pasa a ser `final` sobre la lista ya cortada (`moverCadena`
+        // corta y recién ahí coloca). Con `antes` de sí mismo, `ofrecer`
+        // lo descartaría y volver a colgar la cadena del verde sería
+        // imposible: quedaría suelta para siempre.
+        const quedaPrimero =
+          primero !== undefined &&
+          !(a.origen.desde === "lienzo" && a.origen.ref.donde === "verde" && tocaLaCadena(a.cadena, primero.id));
+        const r = ancla.getBoundingClientRect();
+        ofrecer(
+          r.left,
+          r.bottom,
+          { donde: "verde" },
+          quedaPrimero ? { tipo: "antes", id: primero!.id } : { tipo: "final" },
+        );
+      }
+
       if (mejorRef && mejorDestino) {
         const prog = obtenerLista(mejorRef);
         const prof = profundidadParaDestino(prog, mejorDestino);
@@ -1235,9 +1269,8 @@ export function EditorBloques(props: Props) {
             data-pila={puedeArrastrar ? claveDePila(refPila!) : undefined}
             disabled={corriendo}
             onPointerDown={puedeArrastrar ? (ev) => agarrar(ev, { desde: "lienzo", ref: refPila!, id: nodo.id }) : undefined}
-            onClick={alClick(() => onQuitar(nodo.id))}
             onKeyDown={teclas(nodo.id, refPila)}
-            aria-label={`${nombreDe(nodo)}. Tocar para quitar; flechas para mover`}
+            aria-label={`${nombreDe(nodo)}. Arrastrar para mover; flechas para moverlo con el teclado; Suprimir para quitarlo`}
           >
             <IcoHacer />
           </button>
@@ -1293,9 +1326,8 @@ export function EditorBloques(props: Props) {
           data-pila={puedeArrastrar ? claveDePila(refPila!) : undefined}
           disabled={corriendo}
           onPointerDown={puedeArrastrar ? (ev) => agarrar(ev, { desde: "lienzo", ref: refPila!, id: nodo.id }) : undefined}
-          onClick={alClick(() => onQuitar(nodo.id))}
           onKeyDown={teclas(nodo.id, refPila)}
-          aria-label={`${nombreDe(nodo)}. Tocar para quitar; flechas para mover`}
+          aria-label={`${nombreDe(nodo)}. Arrastrar para mover; flechas para moverlo con el teclado; Suprimir para quitarlo`}
         >
           <DibujoContador tipo={nodo.type} />
         </button>
@@ -1323,9 +1355,8 @@ export function EditorBloques(props: Props) {
         data-pila={puedeArrastrar ? claveDePila(refPila!) : undefined}
         disabled={corriendo}
         onPointerDown={puedeArrastrar ? (ev) => agarrar(ev, { desde: "lienzo", ref: refPila!, id: accion.id }) : undefined}
-        onClick={alClick(() => onQuitar(accion.id))}
         onKeyDown={teclas(accion.id, refPila)}
-        aria-label={`${nombreDe(accion)}. Tocar para quitar; flechas para mover`}
+        aria-label={`${nombreDe(accion)}. Arrastrar para mover; flechas para moverlo con el teclado; Suprimir para quitarlo`}
       >
         <Dibujo tipo={accion.type} />
       </button>
@@ -1438,11 +1469,20 @@ export function EditorBloques(props: Props) {
           style={{ transform: `translate(${vista.x}px, ${vista.y}px) scale(${vista.z})` }}
         >
           {/* El ancla verde: fija, con forma de sombrero, sin `data-nodo`
-              — no se arrastra, sólo su cadena. */}
+              — no se arrastra, sólo su cadena. `data-ancla` la convierte
+              en BLANCO de encastre: `calcularDestinoLienzo` ofrece su
+              borde de abajo como principio de la cadena verde, que es lo
+              único que permite empezar un programa desde cero.
+              Ya no es `aria-hidden`: dejó de ser adorno, y lo mismo que
+              el tachito se anuncia como una imagen con nombre. Sigue sin
+              ser enfocable (no es un botón, y lleva `pointer-events:
+              none`), así que no hay ningún foco escondido detrás. */}
           <div
             className="auto-inicio"
             style={{ left: datosLienzo.inicio.x, top: datosLienzo.inicio.y }}
-            aria-hidden="true"
+            data-ancla=""
+            role="img"
+            aria-label="Bloque de arranque: acá empieza el programa"
           >
             <IcoInicio className="w-[28px] h-[28px]" />
           </div>
