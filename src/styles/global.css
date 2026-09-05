@@ -2608,6 +2608,7 @@ a { color: inherit; text-decoration: none; }
   .auto-flota,
   .auto-sombra,
   .auto-mejora--corto,
+  .auto-lejos,
   .auto-caja--llena .auto-bloque { animation: none; }
   .auto-caja--llena .auto-bloque { opacity: 0.85; }
   .auto-papelera--activa { transform: none; }
@@ -2849,6 +2850,48 @@ a { color: inherit; text-decoration: none; }
     inset 0 0 18px rgba(84, 232, 198, 0.2);
   pointer-events: none;
 }
+
+/* Las flechas de "hay más piezas para allá": una por GRUPO que quedó
+   fuera del viewport del lienzo (la cadena verde, cada `Mi rutina`, cada
+   pila suelta), clavada al borde y apuntando a dónde está. Importa más
+   ahora que las pilas sueltas gastan memoria: el chico puede quedarse sin
+   lugar por culpa de bloques que ni siquiera ve.
+   Vive DENTRO del envoltorio del HUD —portado a `document.body`, porque
+   `.auto-taller` lleva `backdrop-filter` y eso vuelve `position: fixed`
+   relativo A ÉL (decisión #8)— así que es `absolute`, como el tachito y
+   el recentrar. 44 px, el piso táctil (CLAUDE.md §6.5). Va del color del
+   grupo al que apunta, que es lo que permite distinguir "allá está tu
+   programa" de "allá quedó una pila suelta". */
+.auto-lejos {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--auto-tono) 76%, #fff),
+    color-mix(in srgb, var(--auto-tono) 92%, #000)
+  );
+  color: #fff;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 8px 20px rgba(54, 86, 134, 0.3);
+  cursor: pointer;
+  animation: auto-lejos-late 1.9s ease-in-out infinite;
+}
+.auto-lejos:hover { filter: brightness(1.06); }
+.auto-lejos:active { transform: scale(0.94); }
+.auto-lejos:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+/* La flecha gira para apuntar; el botón no, así el círculo queda quieto. */
+.auto-lejos__flecha { display: block; transform: rotate(var(--auto-giro, 0deg)); }
+/* El aro que se abre y se apaga: el mismo lenguaje que ya usa el pulso de
+   la plataforma actual del mapa de mundos, del color del grupo. */
+@keyframes auto-lejos-late {
+  0%, 100% { box-shadow: 0 8px 20px rgba(54, 86, 134, 0.3), 0 0 0 0 color-mix(in srgb, var(--auto-tono) 55%, transparent); }
+  50% { box-shadow: 0 8px 20px rgba(54, 86, 134, 0.3), 0 0 0 9px transparent; }
+}
+
 
 /* ════════════════════════════════════════════════════════════════════
    COMPACT-HEIGHT PASS — ventana SIN pantalla completa (la barra del

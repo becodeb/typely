@@ -539,6 +539,21 @@ export function IcoRecentrar({ className }: Props) {
   );
 }
 
+/** La flecha de "hay más piezas para allá": marca un grupo de bloques que
+ *  quedó fuera del viewport del lienzo. Dibujada apuntando a la DERECHA
+ *  (0°) a propósito: quien la usa la gira con un solo `rotate`, y un
+ *  ángulo en pantalla se lee directamente del `atan2` sin sumarle
+ *  ninguna corrección. Las tres rayitas de atrás son estela: dicen
+ *  "esto viene de lejos", no sólo "para allá". */
+export function IcoLejos({ className }: Props) {
+  return (
+    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
+      <path d="M13 17h13M20 10l7 7-7 7" {...trazo} strokeWidth="4.2" />
+      <path d="M9 17h1.5M5 17h1.5" {...trazo} strokeWidth="4.2" opacity="0.6" />
+    </svg>
+  );
+}
+
 /** El tachito: la papelera del lienzo (tarea 3.1). Tapa con asa y tres
  *  costillas adentro del cuerpo, la misma silueta de siempre para que se
  *  lea como "basura" sin necesidad de texto. */

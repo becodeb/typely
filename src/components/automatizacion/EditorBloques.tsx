@@ -62,6 +62,7 @@ import {
   IcoContadorMas,
   IcoEsperar,
   IcoInicio,
+  IcoLejos,
   IcoRecentrar,
   IcoRetroceder,
   IcoCosechar,
@@ -420,6 +421,18 @@ const MARGEN = 40;
 const ZOOM_MIN = 0.6;
 const ZOOM_MAX = 2.4;
 
+/** A qué altura del viewport queda el ancla de un grupo al que se saltó
+ *  con una flecha: arriba, no en el medio, porque la pila cuelga. */
+const ALTO_ENFOQUE = 0.28;
+/** Medio botón de flecha: 44 px es el piso táctil (CLAUDE.md §6.5). */
+const RADIO_FLECHA = 22;
+/** La franja del viewport donde se pueden clavar las flechas. No es un
+ *  margen parejo a propósito: arriba a la derecha vive la hilera de la
+ *  memoria y abajo el tachito y el recentrar, y una flecha encima de
+ *  cualquiera de los tres taparía algo que hace falta ver o donde hace
+ *  falta soltar. */
+const BANDA_FLECHA = { lado: 26, arriba: 62, abajo: 92 };
+
 export function EditorBloques(props: Props) {
   const {
     programa,
@@ -513,18 +526,37 @@ export function EditorBloques(props: Props) {
    *  #9 (design.md) para no perderlo nunca de vista. */
   const recentrar = useCallback(() => setVista({ z: 1, x: MARGEN, y: MARGEN }), []);
 
+  /** Trae a la vista un punto del lienzo, sin tocar el zoom: es lo que
+   *  hace tocar una de las flechas de "hay más piezas para allá". Lo deja
+   *  centrado a lo ancho pero ARRIBA a lo alto (`ALTO_ENFOQUE`), no en el
+   *  medio: una pila cuelga hacia abajo, así que centrar su ancla dejaría
+   *  la mitad de los bloques debajo del borde otra vez. */
+  const irAlPunto = useCallback((p: Punto) => {
+    const r = lienzoRef.current?.getBoundingClientRect();
+    if (!r) return;
+    setVista((v) => ({ ...v, x: r.width / 2 - p.x * v.z, y: r.height * ALTO_ENFOQUE - p.y * v.z }));
+  }, []);
+
   /* De pantalla a lienzo: dónde cae una pila nueva (tarea 2b.1) y dónde se
-     dibuja su contorno fantasma (tarea 2b.2). `aPantalla` queda lista para
-     cuando algo necesite la vuelta (hoy nada la usa: el contorno vive
-     ADENTRO de `.auto-lienzo__capa`, en coordenadas de lienzo directas). */
+     dibuja su contorno fantasma (tarea 2b.2). La vuelta —de lienzo a
+     pantalla— la usan las flechas de las pilas que quedaron fuera del
+     viewport: el contorno no la necesita porque vive ADENTRO de
+     `.auto-lienzo__capa`, en coordenadas de lienzo directas. */
   const aLienzo = useCallback((cx: number, cy: number): Punto | null => {
     const capa = capaRef.current;
     if (!capa) return null;
     const r = capa.getBoundingClientRect();
     return { x: (cx - r.left) / vistaRef.current.z, y: (cy - r.top) / vistaRef.current.z };
   }, []);
-  const aPantalla = (p: Punto, r: DOMRect, z: number): Punto => ({ x: r.left + p.x * z, y: r.top + p.y * z });
-  void aPantalla;
+  /** Pide sólo la esquina (no un `DOMRect` entero) porque el llamador de
+   *  las flechas la CALCULA en vez de medirla: leer el DOM en pleno
+   *  render no da un valor estable, y la esquina de la capa es
+   *  exactamente `viewport + traslación` con `transform-origin: 0 0`. Un
+   *  `DOMRect` sigue encajando en el tipo. */
+  const aPantalla = (p: Punto, r: { left: number; top: number }, z: number): Punto => ({
+    x: r.left + p.x * z,
+    y: r.top + p.y * z,
+  });
 
   /** ¿El evento salió de un panel del HUD? Portado a `document.body`
    *  (decisión #8): nunca es descendiente de la capa, pero el chequeo se
@@ -1411,6 +1443,57 @@ export function EditorBloques(props: Props) {
       />
     ) : null;
 
+  /* Las flechas de "hay más piezas para allá". Un GRUPO es cada cosa que
+     el chico puede perder de vista paneando: la cadena verde, cada
+     `Mi rutina` y cada pila suelta — las mismas tres que gastan memoria,
+     y por eso importa poder encontrarlas: se puede quedar sin lugar para
+     una pieza nueva por culpa de bloques que ni siquiera ve.
+     Se mide el punto de ANCLA de cada grupo, no su caja entera: medirla
+     pediría un `getBoundingClientRect` por pila en cada repintado, y para
+     decir "está para ese lado" el ancla alcanza. La esquina de la capa se
+     CALCULA (`viewport + traslación`) en vez de leerse del DOM, que en
+     pleno render todavía no tiene el transform de esta pasada.
+     Mientras hay algo en el aire no se dibujan: taparían el lienzo justo
+     cuando hace falta verlo, y son botones — un dedo que suelta encima de
+     uno dispararía un salto de cámara sin quererlo. */
+  const flechas: { clave: string; punto: Punto; color: string; etiqueta: string; x: number; y: number; giro: number }[] =
+    [];
+  if (
+    hudRect &&
+    !arrastre &&
+    hudRect.width > BANDA_FLECHA.lado * 2 + 24 &&
+    hudRect.height > BANDA_FLECHA.arriba + BANDA_FLECHA.abajo + 24
+  ) {
+    const esquina = { left: hudRect.left + vista.x, top: hudRect.top + vista.y };
+    const grupos = [
+      { clave: "verde", punto: datosLienzo.inicio, color: "#22c7b8", etiqueta: "Ir al programa, que quedó fuera de la vista" },
+      ...rutinas.map((def, i) => ({
+        clave: `rutina:${def.id}`,
+        punto: datosLienzo.rutinas[def.id] ?? puntoRutinaPorDefecto(i),
+        color: COLOR_LLAMADA[def.rutina],
+        etiqueta: `Ir a Mi rutina ${def.rutina}, que quedó fuera de la vista`,
+      })),
+      ...pilasSueltas.map((pila) => ({
+        clave: `suelta:${pila.id}`,
+        punto: { x: pila.x, y: pila.y } as Punto,
+        color: pila.nodos[0] ? colorDe(pila.nodos[0]) : "#8fa3c8",
+        etiqueta: "Ir a una pila suelta, que quedó fuera de la vista",
+      })),
+    ];
+    for (const g of grupos) {
+      const s = aPantalla(g.punto, esquina, vista.z);
+      const rx = s.x - hudRect.left;
+      const ry = s.y - hudRect.top;
+      if (rx >= 0 && rx <= hudRect.width && ry >= 0 && ry <= hudRect.height) continue;
+      const x = Math.min(Math.max(rx, BANDA_FLECHA.lado), hudRect.width - BANDA_FLECHA.lado);
+      const y = Math.min(Math.max(ry, BANDA_FLECHA.arriba), hudRect.height - BANDA_FLECHA.abajo);
+      // El giro sale del vector "desde donde se clava la flecha hasta
+      // donde está de verdad el grupo": el dibujo apunta a la derecha a
+      // 0°, así que el ángulo se usa tal cual, sin corrección.
+      flechas.push({ ...g, x, y, giro: (Math.atan2(ry - y, rx - x) * 180) / Math.PI });
+    }
+  }
+
   return (
     <section className="auto-taller auto-vidrio" aria-label="Taller de programación">
       {/* La caja de piezas. Con más de siete, dos columnas: que se vean
@@ -1577,6 +1660,34 @@ export function EditorBloques(props: Props) {
             >
               <IcoRecentrar className="w-[22px] h-[22px]" />
             </button>
+
+            {/* Una flecha por grupo que quedó fuera del viewport, clavada
+                al borde y apuntando a dónde está. Del color del grupo,
+                para que se distinga "allá está tu programa" de "allá
+                quedó una pila suelta"; tocarla lleva la cámara hasta él,
+                que es lo que la vuelve útil y no sólo un aviso. */}
+            {flechas.map((f) => (
+              <button
+                key={f.clave}
+                type="button"
+                className="auto-lejos"
+                style={
+                  {
+                    left: f.x - RADIO_FLECHA,
+                    top: f.y - RADIO_FLECHA,
+                    pointerEvents: "auto",
+                    "--auto-tono": f.color,
+                  } as CSSProperties
+                }
+                onClick={() => irAlPunto(f.punto)}
+                aria-label={f.etiqueta}
+              >
+                <IcoLejos
+                  className="auto-lejos__flecha w-[24px] h-[24px]"
+                  style={{ "--auto-giro": `${f.giro}deg` } as CSSProperties}
+                />
+              </button>
+            ))}
           </div>,
           document.body,
         )}
