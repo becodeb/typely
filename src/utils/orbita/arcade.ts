@@ -104,6 +104,12 @@ export function registrarPartida(
       charsTyped: resultado.caracteres,
       errors: resultado.errores,
       crystalsClaimed: resultado.cristales,
+      /* Mejoras permanentes: lo tipeado (sobre eso se acuñan los
+         cristales), el nivel y la build. El servidor lo usa para creerle a
+         una partida donde la bala destruyó palabras que nadie tipeó. */
+      wordsTyped: resultado.palabrasTipeadas,
+      level: resultado.nivel,
+      upgrades: resultado.mejoras.map((m) => ({ id: m.id, level: m.nivel })),
     },
   ]);
   return vaciarColaArcade(rol);

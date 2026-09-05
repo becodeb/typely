@@ -235,6 +235,11 @@ export interface ArcadeRunPayload {
   charsTyped: number;
   errors: number;
   crystalsClaimed: number;
+  /** Mejoras permanentes (migración 0004). Opcionales en el servidor para
+   *  que una cola vieja siga entrando; el cliente nuevo las manda siempre. */
+  wordsTyped: number;
+  level: number;
+  upgrades: { id: string; level: number }[];
 }
 
 export interface ArcadePosicion {

@@ -258,6 +258,12 @@ export const arcadeRuns = pgTable(
     crystalsEarned: integer("crystals_earned").notNull().default(0),
     weekKey: text("week_key").notNull(),
     ranked: boolean("ranked").notNull().default(true),
+    /* Mejoras permanentes por nivel (migración 0004). `wordsDestroyed`
+       cuenta también lo que cayó por bala o crítico; los cristales se
+       acuñan sobre `wordsTyped`. `upgrades` es JSON [{id, level}]. */
+    wordsTyped: integer("words_typed").notNull().default(0),
+    level: smallint("level").notNull().default(0),
+    upgrades: text("upgrades").notNull().default("[]"),
   },
   (t) => ({
     userTimeIdx: index("idx_arcade_runs_user_time").on(t.userId, t.endedAt),

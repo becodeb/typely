@@ -113,7 +113,11 @@ const PIEZAS = [
  * el que se descubre en el aula. Pasó con `reparacio-source.png`. */
 const NOMBRES = {
   insignias: ["cadete", "piloto", "explorador", "as", "capitan", "leyenda"],
-  gemas: ["cristal", "reparacion", "escudo", "pulso", "lento", "rayo", "cosecha", "mira"],
+  gemas: [
+    "cristal", "reparacion", "escudo", "pulso", "lento", "rayo", "cosecha", "mira",
+    /* Las mejoras permanentes (ORBITA.md §7.6). */
+    "bala", "regeneracion", "critico", "congelar", "iman", "racha", "teclas", "segunda",
+  ],
 };
 
 function abiertas(grupo) {
