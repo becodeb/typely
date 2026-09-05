@@ -1927,10 +1927,12 @@ a { color: inherit; text-decoration: none; }
 }
 .auto-caja .auto-bloque,
 .auto-pila .auto-bloque,
+.auto-pila--suelta .auto-bloque,
 .auto-repetir__lomo,
 .auto-repetir__brazo { cursor: grab; }
 .auto-caja .auto-bloque:active,
-.auto-pila .auto-bloque:active { cursor: grabbing; }
+.auto-pila .auto-bloque:active,
+.auto-pila--suelta .auto-bloque:active { cursor: grabbing; }
 
 /* La pieza que se levantó deja su sombra en el lugar de donde salió. */
 .auto-bloque--levantado,
@@ -2643,17 +2645,22 @@ a { color: inherit; text-decoration: none; }
   border-radius: 999px 999px 0 0;
   background: color-mix(in srgb, var(--auto-tono) 78%, #fff);
 }
-/* Sin asa (`arrastrable=false`, tarea 2a.7): el cursor de agarrar del
-   lomo/brazo genérico mentiría acá. */
-.auto-repetir--sombrero .auto-repetir__lomo,
-.auto-repetir--sombrero .auto-repetir__brazo { cursor: default; }
+/* Sin asa propia (`refPila=null`, tarea 2b): el sombrero no se arrastra a
+   sí mismo, así que el cursor de agarrar del lomo/brazo genérico
+   mentiría acá. Combinador DIRECTO (`>`), no descendiente: el CUERPO de
+   la rutina SÍ es arrastrable (`refHijos`, EditorBloques.tsx), y un
+   `Repetir` anidado ahí adentro no puede heredar el `cursor: default`
+   de su sombrero contenedor. */
+.auto-repetir--sombrero > .auto-repetir__lomo,
+.auto-repetir--sombrero > .auto-repetir__brazo { cursor: default; }
 
 /* Pila suelta: NO cuelga del bloque verde, así que no se ejecuta.
    Atenuada, nunca gris —el gris dice "no se puede"— y con la saturación
    casi intacta, que es lo que la separa del levantado (0.28 y
    desaturado, y además dura medio segundo). El sello punteado lo dice
-   sin depender del color. Nada la crea todavía en esta tanda (llega en
-   la tarea 2b), pero ya se dibuja si un guardado la trae. */
+   sin depender del color. Desde la tarea 2b es una pila arrastrable más
+   (agarrar su primer bloque se lleva la pila entera), no un dibujo
+   estático. */
 .auto-pila--suelta { position: absolute; opacity: 0.72; }
 .auto-pila--suelta .auto-bloque,
 .auto-pila--suelta .auto-repetir__lomo,
@@ -2688,6 +2695,20 @@ a { color: inherit; text-decoration: none; }
 }
 .auto-recentrar:hover { transform: translateY(-2px); }
 .auto-recentrar:active { transform: scale(0.94); }
+
+/* El contorno fantasma (tarea 2b.2): "acá va a caer como pila nueva".
+   Vive ADENTRO de `.auto-lienzo__capa`, en coordenadas de lienzo, así
+   hereda el pan/zoom sin cuentas aparte (`EditorBloques.tsx`). Sin
+   relleno de bloque y sin latido, para que no se confunda con el hueco
+   de encastre (`.auto-bloque--marca`), que sí late: uno dice "acá se
+   conecta", el otro "acá queda suelta". */
+.auto-contorno {
+  position: absolute;
+  border-radius: 14px;
+  border: 2.5px dashed rgba(84, 232, 198, 0.85);
+  background: rgba(84, 232, 198, 0.12);
+  pointer-events: none;
+}
 
 
 /* ════════════════════════════════════════════════════════════════════

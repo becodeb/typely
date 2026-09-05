@@ -730,6 +730,72 @@ prueba("L12 · el tope de nodos es del LIENZO ENTERO: tres listas, cada una por 
   cierto(A.validarCampo(guardado) !== null, "exactamente en el tope (60), sí entra");
 });
 
+prueba("L13 · cortarEn seguido de colocarCadena de vuelta al mismo lugar es identidad (round-trip)", () => {
+  const prog = [
+    acc("move_forward", "a"),
+    rep(2, [acc("harvest", "h"), acc("turn_right", "g"), acc("wait", "w")], "r"),
+    acc("plant", "p"),
+  ];
+  const corte = P.cortarEn(prog, "g");
+  cierto(corte !== null, "el bloque agarrado está en la cavidad de r");
+  igual(corte.agarrado.map((n) => n.id), ["g", "w"], "se lleva el bloque y lo que cuelga debajo");
+  // Encastrarla de vuelta EXACTAMENTE donde estaba: antes de "w" ya no
+  // existe como referencia (se fue con la cadena), así que el lugar
+  // equivalente es "dentro de r, después de lo que quedó" — el mismo
+  // `despuesDe` que EditorBloques usa para saber "pegado abajo".
+  const destino = P.despuesDe(corte.restante, "h");
+  const vuelta = P.colocarCadena(corte.restante, corte.agarrado, destino);
+  igual(vuelta, prog, "cortar y volver a colocar en el mismo lugar reproduce el árbol original, nodo por nodo");
+});
+
+prueba("L14 · una Mi rutina jamás entra como pila suelta, ni siquiera sola: descarta la partida entera", () => {
+  const base = M.estadoInicial(azar);
+  const { nave: _nave, ...guardado } = base;
+  guardado.schemaVersion = 3;
+  guardado.rutinas = [];
+  guardado.pilasSueltas = [{ id: "p1", x: 10, y: 10, nodos: [def("A", [acc("move_forward", "m")])] }];
+  igual(A.validarCampo(guardado), null, "un def dentro de pilasSueltas invalida TODO el snapshot, no sólo esa pila");
+
+  // De referencia: la MISMA rutina, en `rutinas` en vez de `pilasSueltas`, sí vale.
+  guardado.rutinas = [def("A", [acc("move_forward", "m")])];
+  guardado.pilasSueltas = [];
+  cierto(A.validarCampo(guardado) !== null, "la misma definición, en rutinas, sí es válida");
+});
+
+prueba("L15 · soltar una cadena agarrada como pila nueva conserva la identidad de los nodos y la capacidad total del lienzo", () => {
+  const programa = [
+    acc("move_forward", "a"),
+    rep(2, [acc("harvest", "h")], "r"),
+    acc("plant", "p"),
+  ];
+  const rutinas = [def("A", [acc("wait", "w")])];
+  const pilasSueltas = [];
+  const antes = P.capacidadDeLienzo(programa, rutinas, pilasSueltas);
+
+  // El mismo corte que hace `onSoltarCadena` (AutomatizacionPage.tsx): se
+  // agarra "r" — y con él, todo lo que cuelga debajo en la MISMA cadena
+  // ("p", su hermano de abajo) — y se envuelve en una `Pila` NUEVA: el id
+  // de la pila es nuevo, los NODOS no.
+  const corte = P.cortarEn(programa, "r");
+  cierto(corte !== null);
+  const nuevaPila = { id: "pila-nueva-999", x: 120, y: 340, nodos: corte.agarrado };
+  const programaSinR = corte.restante;
+  const pilasSueltasConNueva = [...pilasSueltas, nuevaPila];
+
+  igual(
+    corte.agarrado.map((n) => n.id),
+    ["r", "p"],
+    "agarrar r se lleva también lo que cuelga debajo en la misma cadena (p), como cualquier arrastre",
+  );
+  cierto(
+    corte.agarrado[0] === programa[1] && corte.agarrado[1] === programa[2],
+    "las MISMAS referencias de nodo viajan a la pila nueva: ninguna reconstrucción cambia su identidad",
+  );
+
+  const despues = P.capacidadDeLienzo(programaSinR, rutinas, pilasSueltasConNueva);
+  igual(despues, antes, "mover bloques del lienzo a una pila suelta nueva no cambia la capacidad total usada");
+});
+
 /* ================================================================== */
 console.log("\nCONTADOR Y TAMAÑO DEL CAMPO");
 

@@ -25,7 +25,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { BarraMejoras, type ClaveTienda } from "../../components/automatizacion/BarraMejoras";
 import { CampoCristales, type EventoCampo } from "../../components/automatizacion/CampoCristales";
-import { EditorBloques, crearNodo, type Pieza } from "../../components/automatizacion/EditorBloques";
+import { EditorBloques, crearNodo, type Pieza, type RefPila } from "../../components/automatizacion/EditorBloques";
 import { crearInterprete } from "../../utils/automatizacion/interprete";
 import { IcoContadorMas, IcoMineral, IcoProduccion } from "../../components/automatizacion/IconosAuto";
 import {
@@ -62,13 +62,16 @@ import {
   type EstadoCampo,
 } from "../../utils/automatizacion/motor";
 import {
+  buscarNodo,
+  cabeA,
   colocar,
+  colocarCadena,
   conSensor,
+  cortarEn,
   costoDeNodo,
   desplazarNodo,
   esContenedor,
   esDefinicion,
-  moverNodo,
   nuevoId,
   quitarNodo,
   type Destino,
@@ -272,97 +275,223 @@ export function AutomatizacionPage() {
   }, []);
 
   /* ---------------- edición del campo ---------------- */
-  /* PUENTE TEMPORAL (Lienzo, tarea 1.9 — se borra en la tarea 2b.5).
-   *
-   * `EditorBloques` todavía edita un `Programa` en lista, no un lienzo con
-   * rutinas aparte (el DIBUJO ya las separa para el lienzo — tarea 2a.6 —
-   * pero la edición sigue viajando fusionada). Mientras tanto le pasamos
-   * la UNIÓN de `e.rutinas` (las `Mi rutina`, siempre primero) y
-   * `e.programa` (la cadena verde), y en cada edición volvemos a
-   * separarlas: los `def` vuelven a `rutinas`, todo lo demás vuelve a
-   * `programa`. Sin esto, una partida migrada a v3 dejaría de mostrarle
-   * al chico su propia rutina aunque `Hacer A` la siga ejecutando — una
-   * regresión visible que la migración no puede introducir en silencio. */
-  const cambiarCampo = useCallback(
-    (fn: (p: Programa) => Programa) => {
-      if (corriendo) return;
-      const fusion = fn([...e.rutinas, ...e.programa]);
-      e.rutinas = fusion.filter(esDefinicion) as NodoDef[];
-      e.programa = fusion.filter((n) => !esDefinicion(n));
-      // Toda `Mi rutina` nueva necesita un lugar en el lienzo: la misma
-      // fila por defecto que usa la migración v1/v2→v3 (motor.ts).
-      e.rutinas.forEach((d, i) => {
-        if (!e.lienzo.rutinas[d.id]) e.lienzo.rutinas[d.id] = puntoRutinaPorDefecto(i);
-      });
-      guardador.current.pedir(usuario, e, true);
-      repintar();
+  /* Nativo desde la tarea 2b.5: el puente temporal de la tarea 1.9 —que
+   * fusionaba `e.rutinas` y `e.programa` para dibujar y volvía a
+   * separarlos en cada edición— se borró. `EditorBloques` recibe las tres
+   * pilas del lienzo por separado y edita cualquiera de ellas por su
+   * `RefPila` (verde / rutina / suelta): `guardarYRepintar` es el único
+   * punto de guardado + repintado, común a las nueve operaciones de acá
+   * abajo. */
+  const guardarYRepintar = useCallback(() => {
+    guardador.current.pedir(usuario, e, true);
+    repintar();
+  }, [e, repintar, usuario]);
+
+  /** La lista viva de una pila, por su referencia. `[]` si esa rutina o
+   *  pila suelta ya no existe: nunca revienta, sólo no encuentra nada. */
+  const listaDeRef = useCallback(
+    (ref: RefPila): NodoPrograma[] => {
+      if (ref.donde === "verde") return e.programa;
+      if (ref.donde === "rutina") return e.rutinas.find((r) => r.id === ref.id)?.body ?? [];
+      return e.pilasSueltas.find((p) => p.id === ref.id)?.nodos ?? [];
     },
-    [corriendo, e, repintar, usuario],
+    [e],
+  );
+
+  /** Reemplaza la lista de una pila por una nueva. Una pila suelta que
+   *  queda vacía se descarta —una idea que se vació de todo su contenido
+   *  no es una pila, es nada—; una `Mi rutina` NUNCA se descarta así,
+   *  aunque su cuerpo quede vacío: sigue siendo una rutina definida. */
+  const fijarListaDeRef = useCallback(
+    (ref: RefPila, lista: NodoPrograma[]) => {
+      if (ref.donde === "verde") {
+        e.programa = lista;
+      } else if (ref.donde === "rutina") {
+        e.rutinas = e.rutinas.map((r) => (r.id === ref.id ? { ...r, body: lista } : r));
+      } else if (lista.length === 0) {
+        e.pilasSueltas = e.pilasSueltas.filter((p) => p.id !== ref.id);
+      } else {
+        e.pilasSueltas = e.pilasSueltas.map((p) => (p.id === ref.id ? { ...p, nodos: lista } : p));
+      }
+    },
+    [e],
+  );
+
+  /** En qué pila vive `id`, mirando la cadena verde, cada cuerpo de
+   *  `Mi rutina` y cada pila suelta, en ese orden. `null` si no está en
+   *  ninguna (el bloque ya no existe: la llamada simplemente no hace
+   *  nada, nunca revienta). */
+  const ubicarPorId = useCallback(
+    (id: string): RefPila | null => {
+      if (buscarNodo(e.programa, id)) return { donde: "verde" };
+      for (const r of e.rutinas) if (buscarNodo(r.body, id)) return { donde: "rutina", id: r.id };
+      for (const p of e.pilasSueltas) if (buscarNodo(p.nodos, id)) return { donde: "suelta", id: p.id };
+      return null;
+    },
+    [e],
+  );
+
+  /** Edita la lista que contiene a `id`, sea cual sea la pila. */
+  const editarPorId = useCallback(
+    (id: string, editor: (lista: NodoPrograma[]) => NodoPrograma[]) => {
+      const ref = ubicarPorId(id);
+      if (!ref) return;
+      const lista = listaDeRef(ref);
+      const nueva = editor(lista);
+      if (nueva !== lista) fijarListaDeRef(ref, nueva);
+    },
+    [ubicarPorId, listaDeRef, fijarListaDeRef],
+  );
+
+  /** Una `Mi rutina` nueva SIEMPRE nace en `rutinas`, nunca en la cadena
+   *  verde ni en una pila suelta (L14: una rutina jamás es pila suelta) —
+   *  ni tocada en la caja, ni arrastrada y soltada sobre un conector, ni
+   *  soltada en el vacío. Arrastrarla no elige DÓNDE cae, sólo QUE exista;
+   *  nace en su fila por defecto (la misma que usa la migración v1/v2→v3,
+   *  motor.ts). Devuelve `true` si el nodo era una definición (y ya quedó
+   *  resuelto), para que el llamador no siga procesándolo. */
+  const agregarRutinaSiCorresponde = useCallback(
+    (nodo: NodoPrograma): boolean => {
+      if (!esDefinicion(nodo)) return false;
+      e.rutinas = [...e.rutinas, nodo];
+      if (!e.lienzo.rutinas[nodo.id]) {
+        e.lienzo = { ...e.lienzo, rutinas: { ...e.lienzo.rutinas, [nodo.id]: puntoRutinaPorDefecto(e.rutinas.length - 1) } };
+      }
+      return true;
+    },
+    [e],
   );
 
   const agregar = useCallback(
-    (pieza: Pieza, destino?: Destino) => {
+    (pieza: Pieza, pila?: RefPila, destino?: Destino) => {
+      if (corriendo) return;
       const nodo: NodoPrograma = crearNodo(pieza, nuevoId());
-
-      cambiarCampo((p) => {
-        // La memoria es de TODO el lienzo (PROGRESION.md §11): la cadena
-        // verde, las rutinas y las pilas sueltas — no sólo `p`.
-        if (capacidadUsadaCampo(e) + costoDeNodo(nodo) > capacidad(e)) return p;
-        // Arrastrada: cae donde el chico la soltó.
-        if (destino) return colocar(p, nodo, destino);
-        // Tocada: al final DE LA CADENA VERDE —no de la fusión con las
-        // rutinas, que sólo existe para que el puente temporal le siga
-        // mostrando sus rutinas al chico. Si el último bloque de la
-        // cadena verde es un contenedor y la pieza es una acción, entra
-        // ADENTRO — es lo que uno espera después de poner un `Repetir` o
-        // un `Si` vacío. (Si la cadena verde está vacía y sólo hay
-        // rutinas, `ultimo` es `undefined` y el bloque cae al final,
-        // nunca adentro de una `Mi rutina` ajena.)
-        const ultimo = e.programa[e.programa.length - 1];
-        if (ultimo && esContenedor(ultimo) && !esContenedor(nodo)) {
-          const adentro = colocar(p, nodo, { tipo: "dentro", id: ultimo.id });
-          if (adentro !== p) return adentro;
+      // La memoria es de TODO el lienzo (PROGRESION.md §11): la cadena
+      // verde, las rutinas y las pilas sueltas.
+      if (capacidadUsadaCampo(e) + costoDeNodo(nodo) > capacidad(e)) return;
+      if (agregarRutinaSiCorresponde(nodo)) {
+        guardarYRepintar();
+        return;
+      }
+      if (pila && destino) {
+        // Arrastrada desde la caja hasta un conector: cae ahí mismo.
+        const lista = listaDeRef(pila);
+        const nueva = colocar(lista, nodo, destino);
+        if (nueva === lista) return; // el anidamiento no lo permite
+        fijarListaDeRef(pila, nueva);
+        guardarYRepintar();
+        return;
+      }
+      // Tocada: al final de la cadena verde. Si el último bloque de la
+      // cadena verde es un contenedor y la pieza es una acción, entra
+      // ADENTRO — es lo que uno espera después de poner un `Repetir` o
+      // un `Si` vacío.
+      const ultimo = e.programa[e.programa.length - 1];
+      if (ultimo && esContenedor(ultimo) && !esContenedor(nodo)) {
+        const adentro = colocar(e.programa, nodo, { tipo: "dentro", id: ultimo.id });
+        if (adentro !== e.programa) {
+          e.programa = adentro;
+          guardarYRepintar();
+          return;
         }
-        return [...p, nodo];
-      });
+      }
+      e.programa = [...e.programa, nodo];
+      guardarYRepintar();
     },
-    [cambiarCampo, e],
+    [corriendo, e, agregarRutinaSiCorresponde, listaDeRef, fijarListaDeRef, guardarYRepintar],
+  );
+
+  /** Corta la cadena de `id` en `origen` y la encastra en `destino`,
+   *  adentro de `destinoPila` (la misma pila también vale: reordenar). */
+  const moverCadena = useCallback(
+    (origen: RefPila, id: string, destinoPila: RefPila, destino: Destino) => {
+      if (corriendo) return;
+      const corte = cortarEn(listaDeRef(origen), id);
+      if (!corte) return;
+      const mismaPila = origen.donde === destinoPila.donde && (origen.donde === "verde" || (origen as { id: string }).id === (destinoPila as { id: string }).id);
+      const listaDestino = mismaPila ? corte.restante : listaDeRef(destinoPila);
+      const nuevaDestino = colocarCadena(listaDestino, corte.agarrado, destino);
+      if (nuevaDestino === listaDestino) return; // `cabeA` ya lo rechazó del lado del editor; defensivo acá también
+      if (mismaPila) {
+        fijarListaDeRef(origen, nuevaDestino);
+      } else {
+        fijarListaDeRef(origen, corte.restante);
+        fijarListaDeRef(destinoPila, nuevaDestino);
+      }
+      guardarYRepintar();
+    },
+    [corriendo, listaDeRef, fijarListaDeRef, guardarYRepintar],
+  );
+
+  /** Corta la cadena de `id` en `origen` y la deja como pila suelta nueva
+   *  en (x, y). Los NODOS conservan su id (L15); sólo la `Pila` que los
+   *  envuelve es nueva. */
+  const soltarCadena = useCallback(
+    (origen: RefPila, id: string, x: number, y: number) => {
+      if (corriendo) return;
+      const corte = cortarEn(listaDeRef(origen), id);
+      if (!corte) return;
+      if (!cabeA(corte.agarrado, 0)) return; // el lienzo es profundidad 0
+      fijarListaDeRef(origen, corte.restante);
+      e.pilasSueltas = [...e.pilasSueltas, { id: nuevoId(), x, y, nodos: corte.agarrado }];
+      guardarYRepintar();
+    },
+    [corriendo, e, listaDeRef, fijarListaDeRef, guardarYRepintar],
+  );
+
+  /** Una pieza nueva de la caja, soltada en el vacío del lienzo: nace
+   *  como pila suelta de un solo bloque en (x, y) — salvo que sea una
+   *  `Mi rutina`, que jamás es pila suelta (L14). */
+  const soltarNueva = useCallback(
+    (pieza: Pieza, x: number, y: number) => {
+      if (corriendo) return;
+      const nodo = crearNodo(pieza, nuevoId());
+      if (capacidadUsadaCampo(e) + costoDeNodo(nodo) > capacidad(e)) return;
+      if (agregarRutinaSiCorresponde(nodo)) {
+        guardarYRepintar();
+        return;
+      }
+      e.pilasSueltas = [...e.pilasSueltas, { id: nuevoId(), x, y, nodos: [nodo] }];
+      guardarYRepintar();
+    },
+    [corriendo, e, agregarRutinaSiCorresponde, guardarYRepintar],
   );
 
   /** Tocar la pastilla del sensor pasa al siguiente de la lista. */
   const cambiarSensor = useCallback(
-    (id: string) =>
-      cambiarCampo((p) => {
-        const opciones = sensoresDisponibles(e);
-        const reemplazar = (nodos: Programa): Programa =>
-          nodos.map((n) => {
-            if (!esContenedor(n)) return n;
-            if (n.id === id && conSensor(n)) {
-              const i = opciones.findIndex((s) => mismoSensor(s, n.sensor));
-              return { ...n, sensor: opciones[(i + 1) % opciones.length] };
-            }
-            const copia = { ...n, body: reemplazar(n.body) };
-            if (n.type === "if" && n.sino) return { ...copia, sino: reemplazar(n.sino) } as NodoPrograma;
-            return copia as NodoPrograma;
-          });
-        return reemplazar(p);
-      }),
-    [cambiarCampo, e],
+    (id: string) => {
+      const opciones = sensoresDisponibles(e);
+      const reemplazar = (nodos: Programa): Programa =>
+        nodos.map((n) => {
+          if (!esContenedor(n)) return n;
+          if (n.id === id && conSensor(n)) {
+            const i = opciones.findIndex((s) => mismoSensor(s, n.sensor));
+            return { ...n, sensor: opciones[(i + 1) % opciones.length] };
+          }
+          const copia = { ...n, body: reemplazar(n.body) };
+          if (n.type === "if" && n.sino) return { ...copia, sino: reemplazar(n.sino) } as NodoPrograma;
+          return copia as NodoPrograma;
+        });
+      editarPorId(id, reemplazar);
+      guardarYRepintar();
+    },
+    [e, editarPorId, guardarYRepintar],
   );
 
   const quitar = useCallback(
-    (id: string) => cambiarCampo((p) => quitarNodo(p, id)),
-    [cambiarCampo],
-  );
-
-  const mover = useCallback(
-    (id: string, destino: Destino) => cambiarCampo((p) => moverNodo(p, id, destino)),
-    [cambiarCampo],
+    (id: string) => {
+      editarPorId(id, (lista) => quitarNodo(lista, id));
+      guardarYRepintar();
+    },
+    [editarPorId, guardarYRepintar],
   );
 
   const desplazar = useCallback(
-    (id: string, delta: -1 | 1) => cambiarCampo((p) => desplazarNodo(p, id, delta)),
-    [cambiarCampo],
+    (id: string, delta: -1 | 1) => {
+      editarPorId(id, (lista) => desplazarNodo(lista, id, delta));
+      guardarYRepintar();
+    },
+    [editarPorId, guardarYRepintar],
   );
 
   /** Cicla la ranura numérica del nodo tocado: `Repetir.times`,
@@ -371,29 +500,29 @@ export function AutomatizacionPage() {
    *  inspeccionando el nodo, así las tres ranuras comparten un solo
    *  disparador sin agregar un tercer mecanismo de ciclado. */
   const cambiarVeces = useCallback(
-    (id: string) =>
-      cambiarCampo((p) => {
-        const reemplazar = (nodos: Programa): Programa =>
-          nodos.map((n) => {
-            if (n.id === id) {
-              if (n.type === "repeat") return { ...n, times: siguienteVeces(n.times, OPCIONES_VECES_REPETIR) };
-              if (n.type === "call" && n.veces !== undefined) {
-                return { ...n, veces: siguienteVeces(n.veces, OPCIONES_VECES_REPETIR) };
-              }
-              if (conSensor(n) && n.sensor.tipo === "contador") {
-                const valor = siguienteVeces(n.sensor.valor ?? AJUSTES.opcionesContador[0], OPCIONES_VECES_CONTADOR);
-                return { ...n, sensor: { ...n.sensor, valor } };
-              }
-              return n;
+    (id: string) => {
+      const reemplazar = (nodos: Programa): Programa =>
+        nodos.map((n) => {
+          if (n.id === id) {
+            if (n.type === "repeat") return { ...n, times: siguienteVeces(n.times, OPCIONES_VECES_REPETIR) };
+            if (n.type === "call" && n.veces !== undefined) {
+              return { ...n, veces: siguienteVeces(n.veces, OPCIONES_VECES_REPETIR) };
             }
-            if (!esContenedor(n)) return n;
-            const copia = { ...n, body: reemplazar(n.body) };
-            if (n.type === "if" && n.sino) return { ...copia, sino: reemplazar(n.sino) } as NodoPrograma;
-            return copia as NodoPrograma;
-          });
-        return reemplazar(p);
-      }),
-    [cambiarCampo],
+            if (conSensor(n) && n.sensor.tipo === "contador") {
+              const valor = siguienteVeces(n.sensor.valor ?? AJUSTES.opcionesContador[0], OPCIONES_VECES_CONTADOR);
+              return { ...n, sensor: { ...n.sensor, valor } };
+            }
+            return n;
+          }
+          if (!esContenedor(n)) return n;
+          const copia = { ...n, body: reemplazar(n.body) };
+          if (n.type === "if" && n.sino) return { ...copia, sino: reemplazar(n.sino) } as NodoPrograma;
+          return copia as NodoPrograma;
+        });
+      editarPorId(id, reemplazar);
+      guardarYRepintar();
+    },
+    [editarPorId, guardarYRepintar],
   );
 
   /* ---------------- compras ---------------- */
@@ -462,10 +591,8 @@ export function AutomatizacionPage() {
       </header>
 
       <EditorBloques
-        // PUENTE TEMPORAL (tarea 1.9, se borra en la tarea 2b.5): rutinas
-        // primero, cadena verde después — ver el comentario en
-        // `cambiarCampo` más arriba.
-        programa={[...e.rutinas, ...e.programa]}
+        programa={e.programa}
+        rutinas={e.rutinas}
         pilasSueltas={e.pilasSueltas}
         lienzo={e.lienzo}
         capacidad={capacidad(e)}
@@ -476,10 +603,12 @@ export function AutomatizacionPage() {
         nodoActivo={nodoActivo}
         onAgregar={agregar}
         onQuitar={quitar}
-        onMover={mover}
         onDesplazar={desplazar}
         onCambiarVeces={cambiarVeces}
         onCambiarSensor={cambiarSensor}
+        onMoverCadena={moverCadena}
+        onSoltarCadena={soltarCadena}
+        onSoltarNueva={soltarNueva}
       />
 
       <section className="auto-campo" aria-label="El campo">

@@ -81,14 +81,14 @@ boundary, never a retrofit.
 
 ## Phase 2b: Slice 2 — 2D snap + inversion (~325 lines)
 
-- [ ] 2b.1 `EditorBloques.tsx`: implement `calcularDestinoLienzo` (`DestinoLienzo`: `cadena`/`nueva`/`papelera`/`paleta`/`nocabe`) — connector proximity via `RADIO_ENCASTRE = 28`, deepest-first `data-nivel` sort, `cabeA(a.cadena, prof)` guard.
-- [ ] 2b.2 `EditorBloques.tsx` + `global.css`: `.auto-contorno` dashed ghost outline for the `{tipo:"nueva"}` landing preview, plus `prefers-reduced-motion` entry (`animation: none`).
-- [ ] 2b.3 `EditorBloques.tsx`: invert `alSoltar` — delete ONLY on `papelera`/`paleta`; `nocabe` is a no-op; `cadena` splices via `cortarEn`/`colocarCadena`; `nueva` places as a new loose stack (`onSoltarNueva`/`onSoltarCadena`). Remove the old `quitar(...)`-on-no-destination fallback entirely — this is the riskiest single change in the whole feature.
-- [ ] 2b.4 `EditorBloques.tsx` / `AutomatizacionPage.tsx`: thread `RefPila` through `onMoverCadena`, `onSoltarCadena`, `onSoltarNueva`, `onAgregar(pila, destino)`.
-- [ ] 2b.5 `AutomatizacionPage.tsx`: DELETE the Task 1.9 temporary bridge — `EditorBloques` now receives `rutinas`/`pilasSueltas`/`lienzo` natively, no re-splitting on every edit.
-- [ ] 2b.6 `scripts/probar-automatizacion.mjs`: add L13–L15 (cut-then-place round-trip identity; `def` can never enter `pilasSueltas`; drop-as-new-stack preserves node identity and total capacity).
-- [ ] 2b.7 Verify: `npm run build` passes; `node scripts/probar-automatizacion.mjs` → 86/86.
-- [ ] 2b.8 **Manual browser check (not harness-verifiable):** drag any stack to empty canvas space and confirm it becomes a loose stack, never deleted; drop on the bin/palette deletes the whole chain; a chain carrying a `Repetir[Si]` (height 2) is correctly rejected at nesting depth 1; connector snap into a cavity still works.
+- [x] 2b.1 `EditorBloques.tsx`: implement `calcularDestinoLienzo` (`DestinoLienzo`: `cadena`/`nueva`/`papelera`/`paleta`/`nocabe`) — connector proximity via `RADIO_ENCASTRE = 28`, deepest-first `data-nivel` sort, `cabeA(a.cadena, prof)` guard. Generalized across all three pila kinds (green chain, each `def` body, each loose stack) via a `RefPila`-tagged `data-pila` attribute and a distance-based candidate scan (nearest connector within `RADIO_ENCASTRE`), not just the green chain. `papelera`/`paleta` steps are wired per the type contract but structurally unreachable this slice (no `[data-papelera]` element and no palette rect check yet — those are tasks 3.1/3.2).
+- [x] 2b.2 `EditorBloques.tsx` + `global.css`: `.auto-contorno` dashed ghost outline for the `{tipo:"nueva"}` landing preview. No animation was added to `.auto-contorno`, so no `prefers-reduced-motion` override was needed (nothing to disable).
+- [x] 2b.3 `EditorBloques.tsx`: invert `alSoltar` — delete ONLY on `papelera`/`paleta` (structurally unreachable this slice, see 2b.1); `nocabe` is a no-op; `cadena` splices via `cortarEn`/`colocarCadena`; `nueva` places as a new loose stack (`onSoltarNueva`/`onSoltarCadena`). The old `quitar(...)`-on-no-destination fallback is removed entirely.
+- [x] 2b.4 `EditorBloques.tsx` / `AutomatizacionPage.tsx`: thread `RefPila` through `onMoverCadena`, `onSoltarCadena`, `onSoltarNueva`, `onAgregar(pieza, pila?, destino?)`. `onMover` (the old 1D-only callback) was removed as obsolete.
+- [x] 2b.5 `AutomatizacionPage.tsx`: DELETE the Task 1.9 temporary bridge — `EditorBloques` now receives `programa`/`rutinas`/`pilasSueltas`/`lienzo` natively, no re-splitting on every edit. The `esDefinicion`-based tap-to-add guard is gone with it (its reason — the green chain and `rutinas` no longer share one fused array — disappeared too).
+- [x] 2b.6 `scripts/probar-automatizacion.mjs`: add L13–L15 (cut-then-place round-trip identity; `def` can never enter `pilasSueltas`; drop-as-new-stack preserves node identity and total capacity).
+- [x] 2b.7 Verify: `npm run build` passes; `node scripts/probar-automatizacion.mjs` → 86/86.
+- [ ] 2b.8 **Manual browser check (not harness-verifiable):** drag any stack to empty canvas space and confirm it becomes a loose stack, never deleted; drop on the bin/palette deletes the whole chain; a chain carrying a `Repetir[Si]` (height 2) is correctly rejected at nesting depth 1; connector snap into a cavity still works. — NOT PERFORMED this run: no browser available in this execution environment; left for a human/manual verification pass before archive, along with `RADIO_ENCASTRE = 28`'s touch validation (open question, design.md).
 
 ## Phase 3: Slice 3 — el resto (~425 lines)
 
