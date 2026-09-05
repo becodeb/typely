@@ -40,7 +40,8 @@ import {
   ANCHO_CRISTAL,
   ANCHO_NAVE,
   ANCLA_PIEZA,
-  DESVIO_MUELLE,
+  AJUSTE_MODELO_NAVE,
+  SENTIDO_MODELO_NAVE,
   ESCALA_ESCENA,
   TINTE_VARIANTE,
   VISTAS_NAVE,
@@ -77,9 +78,16 @@ const PASO_VISTA = 360 / VISTAS_NAVE;
 const MS_GIRO = 380;
 
 /** Nombre de archivo de la vista más cercana a un ángulo. El nombre
- *  trunca los grados (22.5 → r022), igual que el render. */
+ *  trunca los grados (22.5 → r022), igual que el render.
+ *
+ *  El ángulo que entra es el RUMBO; el pliego arranca en otro lado y
+ *  recorre la vuelta al revés, así que se traduce justo acá, al elegir
+ *  el archivo. La animación del giro sigue interpolando el rumbo limpio
+ *  y no se entera: invertir el signo acá invierte el sentido que se VE,
+ *  que es lo que se quería. */
 function vistaDe(angulo: number): string {
-  const i = Math.round((((angulo % 360) + 360) % 360) / PASO_VISTA) % VISTAS_NAVE;
+  const corregido = AJUSTE_MODELO_NAVE + SENTIDO_MODELO_NAVE * angulo;
+  const i = Math.round((((corregido % 360) + 360) % 360) / PASO_VISTA) % VISTAS_NAVE;
   return `/assets/automatizacion/nave/nave-r${String(Math.floor(i * PASO_VISTA)).padStart(3, "0")}.webp`;
 }
 
@@ -148,11 +156,13 @@ export function CampoCristales({
   const naveB = baldosa(estado.nave.fila, estado.nave.col);
   const angulo = useAnguloNave(estado.nave.direccion);
 
-  /* Estacionada, la nave se corre del centro para no tapar la veta del
-     muelle; al arrancar, la transición de `left/top` la lleva al centro
-     y se la ve salir. */
-  const naveX = corriendo ? naveB.x : naveB.x + campo.pasoX * DESVIO_MUELLE.x;
-  const naveY = corriendo ? naveB.y : naveB.y + campo.pasoY * DESVIO_MUELLE.y;
+  /* La nave se para en el CENTRO de su baldosa, quieta o volando. Antes
+     se corría hacia el frente para no tapar la veta del muelle, y el
+     precio era peor que el problema: estacionada quedaba entre dos
+     baldosas y no se sabía de cuál iba a arrancar. Lo primero que un
+     chico tiene que poder leer del tablero es dónde está parado. */
+  const naveX = naveB.x;
+  const naveY = naveB.y;
 
   /* Cambios de etapa desde el último cuadro: para el "pop" de cada
      rebrote y el estallido al llegar a maduro. Se comparan contra lo
