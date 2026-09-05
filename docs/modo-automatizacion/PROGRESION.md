@@ -256,7 +256,7 @@ Cada corte deja el juego jugable y el examen en verde.
    **Hecho (2026-09-04).** `Plantar` llega con la era (3×3) en vez de
    comprarse, para que el prisma no quede atrás de una compra más.
 4. **Rutinas y contador** (§5 niveles 3–4): `Mi rutina`, `Hacer`, contador,
-   tamaño del campo, `Hacer con N`. **Pendiente.**
+   tamaño del campo, `Hacer con N`. **Hecho (2026-09-05).**
 5. **Escala** (§4 era 5): isla 5×5 ilustrada, segunda nave. **Pendiente.**
 
 ## 11. Criterios de aceptación (agregados a los del MVP)

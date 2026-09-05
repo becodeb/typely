@@ -15,9 +15,11 @@
 import { useState, type ReactElement } from "react";
 import {
   IcoCampo,
+  IcoContadorMas,
   IcoCrecimiento,
   IcoEsperar,
   IcoEvolucion,
+  IcoHacer,
   IcoMemoria,
   IcoMientras,
   IcoMineral,
@@ -78,6 +80,16 @@ const DIBUJO: Record<ClaveMejora, () => ReactElement> = {
     </IcoPieza>
   ),
   rutinas: () => <IcoPiezaRutinas />,
+  contador: () => (
+    <IcoPieza color="#22c7b8">
+      <IcoContadorMas />
+    </IcoPieza>
+  ),
+  hacer_con: () => (
+    <IcoPieza color="#5932d4">
+      <IcoHacer />
+    </IcoPieza>
+  ),
 };
 
 const NOMBRE: Record<ClaveMejora, string> = {
@@ -92,6 +104,8 @@ const NOMBRE: Record<ClaveMejora, string> = {
   mientras: "Bloque mientras",
   siempre: "Bloque por siempre",
   rutinas: "Mi rutina y Hacer",
+  contador: "El contador y el tamaño del campo",
+  hacer_con: "Bloque hacer con número",
 };
 
 /** Orden de aparición. Tierra primero: con el campo en 1×1 ninguna otra
@@ -110,6 +124,8 @@ const ORDEN: ClaveTienda[] = [
   "mientras",
   "siempre",
   "rutinas",
+  "contador",
+  "hacer_con",
   ...ORDEN_MINERALES.map((m) => `evo_${m}` as const),
 ];
 

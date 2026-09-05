@@ -172,6 +172,9 @@ export const AJUSTES = {
   maxProfundidad: 2,
   /** Valores de N que ofrece el contenedor. Pocos, elegibles a golpe de vista. */
   opcionesRepetir: [2, 3, 4] as const,
+  /** Valores que ofrece el sensor del contador (`contador es N`). Incluye
+   *  el 0: "el contador es 0" es justo la condición para arrancar. */
+  opcionesContador: [0, 1, 2, 3, 4] as const,
 
   /* --- producción reciente (IMPLEMENTACION.md §9) ------------------- */
   /** Ventana sobre la que se promedia la tasa. */
@@ -212,6 +215,12 @@ export const AJUSTES = {
     siempre: { moneda: "racimo" as Mineral, base: 60, multiplicador: 1, maxNivel: 1 },
     /* `Mi rutina A/B/C` + `Hacer A/B/C` (PROGRESION.md §5, era 3). */
     rutinas: { moneda: "prisma" as Mineral, base: 60, multiplicador: 1, maxNivel: 1 },
+    /* `Contador +1`, `Contador = 0`, sensor `contador es N` y sensor
+       `tamaño del campo` (era 4, PROGRESION.md §5): una ruta escrita
+       para la 3×3 se rompe en la 4×4, y esto es lo que la sostiene. */
+    contador: { moneda: "prisma" as Mineral, base: 100, multiplicador: 1, maxNivel: 1 },
+    /* `Hacer A con N` (era 4): "avanzar N" sin escribir N veces avanzar. */
+    hacer_con: { moneda: "estrella" as Mineral, base: 80, multiplicador: 1, maxNivel: 1 },
   },
 
   /* --- revelado progresivo (MVP.md §8, PROGRESION.md §7) -------------
@@ -243,6 +252,11 @@ export const AJUSTES = {
        de que la caja tenga sensores con qué sostener un `Si está listo`
        adentro de la rutina. */
     rutinas: { lado: 3, requiere: "mientras" },
+    /* Nivel 4 del currículum (PROGRESION.md §5): ambas piezas llegan con
+       la 4×4, nunca antes — es justo la era en la que una ruta escrita
+       para la 3×3 empieza a quedarse corta. */
+    contador: { lado: 4, requiere: "rutinas" },
+    hacer_con: { lado: 4, requiere: "contador" },
     evo_punta: { cosechado: ["punta", 12] as [Mineral, number] },
     evo_racimo: { cosechado: ["racimo", 5] as [Mineral, number] },
     evo_prisma: { cosechado: ["prisma", 4] as [Mineral, number] },

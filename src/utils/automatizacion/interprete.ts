@@ -28,11 +28,14 @@
  */
 
 import type { Mineral } from "../../data/automatizacion/balance";
+import { MAX_LLAMADAS_ANIDADAS } from "./limites";
 import { indice, type EstadoCampo } from "./motor";
 import {
+  esContador,
   esContenedor,
   esLlamada,
   listaDeRama,
+  resolverVeces,
   rutinasDe,
   type NodoCall,
   type NodoContenedor,
@@ -45,8 +48,9 @@ import {
 export interface Paso {
   /** El bloque que se ilumina. En un tic, es el contenedor que espera. */
   nodoId: string;
-  /** Una acción, o `tick`: una vuelta vacía de un bucle. */
-  tipo: TipoAccion | "tick";
+  /** Una acción, `tick` (una vuelta vacía de un bucle) o `counter`
+   *  (`Contador +1`/`Contador = 0`: nunca llega a `motor.ts`). */
+  tipo: TipoAccion | "tick" | "counter";
   mineral?: Mineral;
 }
 
@@ -55,17 +59,16 @@ export interface Paso {
  *  una detención normal, sin cartel. */
 export const MAX_PASOS_CORRIDA = 100_000;
 
-/** Tope de llamadas anidadas EN LA PILA (no de pasos ejecutados): la
- *  recursión está permitida, directa e indirecta, y lo único que la
- *  limita es esto. Pasado el tope la llamada se saltea en silencio — el
- *  marco que la contiene termina su vuelta sin acciones y tiquea, y la
- *  pila se desarma sola, un pulso visible por nivel, sin cartel de error.
- *  Es una cota de SEGURIDAD, no una perilla de juego: no vive en
- *  balance.ts, igual que `MAX_PASOS_CORRIDA`. */
-export const MAX_LLAMADAS_ANIDADAS = 32;
+/** Re-exportado por compatibilidad: quien ya importaba el tope de acá
+ *  (y `programa.ts`, que también lo usa) lo toman ahora de `limites.ts`
+ *  — ver ese archivo para el porqué del tercer módulo. */
+export { MAX_LLAMADAS_ANIDADAS };
 
-/** Un sensor, evaluado contra la baldosa donde está la nave. */
-export function evaluarSensor(sensor: Sensor, e: EstadoCampo): boolean {
+/** Un sensor, evaluado contra la baldosa donde está la nave.
+ *
+ *  El tercer parámetro es opcional y sólo lo usa el sensor `contador`:
+ *  las llamadas existentes (y el examen) siguen compilando sin tocarse. */
+export function evaluarSensor(sensor: Sensor, e: EstadoCampo, contador?: number): boolean {
   const celda = e.celdas[indice(e, e.nave.fila, e.nave.col)];
   let valor: boolean;
   switch (sensor.tipo) {
@@ -85,6 +88,13 @@ export function evaluarSensor(sensor: Sensor, e: EstadoCampo): boolean {
       else if (e.nave.direccion === "east") col += 1;
       else col -= 1;
       valor = fila < 0 || col < 0 || fila >= e.lado || col >= e.lado;
+      break;
+    }
+    case "contador": {
+      // Igualdad discreta, nunca `<`/`>=`: PROGRESION.md §5 "Qué NO entra".
+      // "lado" hace de esto mismo la forma booleana de "tamaño del campo".
+      const objetivo = sensor.valor === undefined ? 0 : resolverVeces(sensor.valor, e.lado);
+      valor = (contador ?? 0) === objetivo;
       break;
     }
   }
@@ -109,6 +119,9 @@ export interface Interprete {
   siguiente(): Paso | null;
   /** Cuántos pasos devolvió hasta ahora (acciones y tics). */
   pasos: number;
+  /** El contador: vive en la corrida, nunca en el campo, y arranca en
+   *  cero en cada corrida (PROGRESION.md §6). */
+  contador: number;
 }
 
 export function crearInterprete(programa: Programa, e: EstadoCampo): Interprete {
@@ -116,7 +129,7 @@ export function crearInterprete(programa: Programa, e: EstadoCampo): Interprete 
   // vuelve a buscar la definición en el árbol en cada paso.
   const rutinas = rutinasDe(programa);
   const pila: Marco[] = [{ lista: programa, i: 0, contenedor: null, vuelta: 0, acciones: 0 }];
-  const interprete: Interprete = { pasos: 0, siguiente };
+  const interprete: Interprete = { pasos: 0, contador: 0, siguiente };
 
   function entrar(c: NodoContenedor, rama: "body" | "sino" = "body"): void {
     pila.push({ lista: listaDeRama(c, rama), i: 0, contenedor: c, vuelta: 0, acciones: 0 });
@@ -173,7 +186,7 @@ export function crearInterprete(programa: Programa, e: EstadoCampo): Interprete 
 
         if (c.type === "repeat") {
           marco.vuelta += 1;
-          if (marco.vuelta < c.times) {
+          if (marco.vuelta < resolverVeces(c.times, e.lado)) {
             marco.i = 0;
             marco.acciones = 0;
             continue;
@@ -189,7 +202,7 @@ export function crearInterprete(programa: Programa, e: EstadoCampo): Interprete 
           continue;
         }
         if (c.type === "while") {
-          if (evaluarSensor(c.sensor, e)) {
+          if (evaluarSensor(c.sensor, e, interprete.contador)) {
             const vacia = marco.acciones === 0;
             marco.i = 0;
             marco.acciones = 0;
@@ -209,11 +222,30 @@ export function crearInterprete(programa: Programa, e: EstadoCampo): Interprete 
 
       if (nodo.type === "def") continue; // una definición no produce ningún paso
 
+      if (esContador(nodo)) {
+        // `Contador +1` / `Contador = 0`: nunca llegan a
+        // `motor.ts::ejecutarPaso` — se resuelven acá y listo, un turno
+        // entero como cualquier acción (PROGRESION.md §6).
+        if (nodo.type === "counter_add") interprete.contador += 1;
+        else interprete.contador = 0;
+        return devolver({ nodoId: nodo.id, tipo: "counter" });
+      }
+
       if (esLlamada(nodo)) {
         if (llamadasEnPila() >= MAX_LLAMADAS_ANIDADAS) continue; // se saltea en silencio, sin cartel
-        // Letra sin definir: cuerpo vacío, un no-op válido que igual
-        // tiquea al terminar su vuelta sin acciones.
-        entrarLlamada(nodo, rutinas.get(nodo.rutina) ?? []);
+        if (nodo.veces !== undefined) {
+          // `Hacer A con N` es azúcar de `Repetir N [Hacer A]`: se arma
+          // ESE árbol, nunca guardado —vive sólo en la pila— para que las
+          // N rondas compartan el mismo tope de anidamiento y el mismo
+          // tic por ronda vacía que cualquier otra llamada (design.md).
+          const veces = resolverVeces(nodo.veces, e.lado);
+          const llamadaSimple: NodoCall = { id: nodo.id, type: "call", rutina: nodo.rutina };
+          entrar({ id: nodo.id, type: "repeat", times: veces, body: [llamadaSimple] });
+        } else {
+          // Letra sin definir: cuerpo vacío, un no-op válido que igual
+          // tiquea al terminar su vuelta sin acciones.
+          entrarLlamada(nodo, rutinas.get(nodo.rutina) ?? []);
+        }
         continue;
       }
 
@@ -235,7 +267,7 @@ export function crearInterprete(programa: Programa, e: EstadoCampo): Interprete 
       }
 
       if (nodo.type === "while") {
-        if (!evaluarSensor(nodo.sensor, e)) continue;
+        if (!evaluarSensor(nodo.sensor, e, interprete.contador)) continue;
         if (nodo.body.length === 0) {
           // `Mientras` sin cuerpo: espera, un tic por vuelta, sin avanzar.
           marco.i -= 1;
@@ -246,7 +278,7 @@ export function crearInterprete(programa: Programa, e: EstadoCampo): Interprete 
       }
 
       // if
-      if (evaluarSensor(nodo.sensor, e)) {
+      if (evaluarSensor(nodo.sensor, e, interprete.contador)) {
         if (nodo.body.length > 0) entrar(nodo, "body");
       } else if (nodo.sino && nodo.sino.length > 0) {
         entrar(nodo, "sino");

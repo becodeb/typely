@@ -27,7 +27,7 @@ import { BarraMejoras, type ClaveTienda } from "../../components/automatizacion/
 import { CampoCristales, type EventoCampo } from "../../components/automatizacion/CampoCristales";
 import { EditorBloques, crearNodo, type Pieza } from "../../components/automatizacion/EditorBloques";
 import { crearInterprete } from "../../utils/automatizacion/interprete";
-import { IcoMineral, IcoProduccion } from "../../components/automatizacion/IconosAuto";
+import { IcoContadorMas, IcoMineral, IcoProduccion } from "../../components/automatizacion/IconosAuto";
 import {
   AJUSTES,
   MINERALES,
@@ -73,6 +73,7 @@ import {
   type NodoPrograma,
   type Programa,
   type Sensor,
+  type Veces,
 } from "../../utils/automatizacion/programa";
 
 /** Los sensores que se pueden elegir en una pastilla, en el orden en que
@@ -87,7 +88,27 @@ function sensoresDisponibles(e: EstadoCampo): Sensor[] {
   ];
   for (const m of ORDEN_MINERALES) if (mineralDisponible(e, m)) lista.push({ tipo: "es", mineral: m });
   lista.push({ tipo: "borde" }, { tipo: "borde", no: true });
+  /* `contador es N` es también la forma booleana de `tamaño del campo`
+     (design.md): el valor por defecto es 0 y se cicla después con la
+     ranura numérica del bloque, nunca con esta pastilla. */
+  if (piezasCompradas(e).contador) {
+    lista.push(
+      { tipo: "contador", valor: AJUSTES.opcionesContador[0] },
+      { tipo: "contador", valor: AJUSTES.opcionesContador[0], no: true },
+    );
+  }
   return lista;
+}
+
+/** Las dos listas de valores que puede ciclar una ranura numérica:
+ *  `[...opciones, "lado"]`. `tamaño del campo` se agrega siempre al
+ *  final, nunca un tercer mecanismo de ciclado (design.md). */
+const OPCIONES_VECES_REPETIR: readonly Veces[] = [...AJUSTES.opcionesRepetir, "lado"];
+const OPCIONES_VECES_CONTADOR: readonly Veces[] = [...AJUSTES.opcionesContador, "lado"];
+
+function siguienteVeces(actual: Veces, opciones: readonly Veces[]): Veces {
+  const i = opciones.findIndex((o) => o === actual);
+  return opciones[(i + 1) % opciones.length];
 }
 
 const mismoSensor = (a: Sensor, b: Sensor) =>
@@ -109,6 +130,10 @@ export function AutomatizacionPage() {
 
   const [corriendo, setCorriendo] = useState(false);
   const [nodoActivo, setNodoActivo] = useState<string | null>(null);
+  /* El contador de la corrida, sólo para el HUD: vive en el intérprete
+     (interprete.ts), nunca en `EstadoCampo` — arranca en null porque
+     fuera de una corrida no hay contador que mostrar. */
+  const [contadorActivo, setContadorActivo] = useState<number | null>(null);
   /* El último evento que vale la pena ANIMAR en el campo: una cosecha,
      una cosecha en vacío o un choque. Lleva un número de orden para que
      dos cosechas seguidas se dibujen las dos y no una sola. */
@@ -165,6 +190,7 @@ export function AutomatizacionPage() {
     temporizador.current = null;
     setCorriendo(false);
     setNodoActivo(null);
+    setContadorActivo(null);
     setEvento(null);
     volverAlOrigen(e);
     actualizarRecord(e);
@@ -178,6 +204,7 @@ export function AutomatizacionPage() {
     corridaRef.current += 1;
     const token = corridaRef.current;
     setCorriendo(true);
+    setContadorActivo(0);
     volverAlOrigen(e);
     repintar();
 
@@ -194,8 +221,16 @@ export function AutomatizacionPage() {
         return;
       }
       setNodoActivo(p.nodoId);
+      setContadorActivo(interprete.contador);
       if (p.tipo === "tick") {
         temporizador.current = setTimeout(siguiente, Math.max(80, Math.round(msPorAccion(e) / 4)));
+        return;
+      }
+      if (p.tipo === "counter") {
+        // `Contador +1` / `Contador = 0`: un turno entero, sin evento de
+        // campo — nunca llega a `ejecutarPaso` (PROGRESION.md §6).
+        repintar();
+        temporizador.current = setTimeout(siguiente, msPorAccion(e));
         return;
       }
       // La variedad se lee ANTES del paso: al cosechar, la veta vuelve a
@@ -302,17 +337,28 @@ export function AutomatizacionPage() {
     [cambiarPrograma],
   );
 
+  /** Cicla la ranura numérica del nodo tocado: `Repetir.times`,
+   *  `call.veces` (sólo si `Hacer A con N` ya lo tiene) o
+   *  `sensor.valor` del contador — la página elige el campo y la lista
+   *  inspeccionando el nodo, así las tres ranuras comparten un solo
+   *  disparador sin agregar un tercer mecanismo de ciclado. */
   const cambiarVeces = useCallback(
     (id: string) =>
       cambiarPrograma((p) => {
         const reemplazar = (nodos: Programa): Programa =>
           nodos.map((n) => {
-            if (!esContenedor(n)) return n;
-            if (n.id === id && n.type === "repeat") {
-              const ops = AJUSTES.opcionesRepetir;
-              const i = ops.indexOf(n.times as (typeof ops)[number]);
-              return { ...n, times: ops[(i + 1) % ops.length] };
+            if (n.id === id) {
+              if (n.type === "repeat") return { ...n, times: siguienteVeces(n.times, OPCIONES_VECES_REPETIR) };
+              if (n.type === "call" && n.veces !== undefined) {
+                return { ...n, veces: siguienteVeces(n.veces, OPCIONES_VECES_REPETIR) };
+              }
+              if (conSensor(n) && n.sensor.tipo === "contador") {
+                const valor = siguienteVeces(n.sensor.valor ?? AJUSTES.opcionesContador[0], OPCIONES_VECES_CONTADOR);
+                return { ...n, sensor: { ...n.sensor, valor } };
+              }
+              return n;
             }
+            if (!esContenedor(n)) return n;
             const copia = { ...n, body: reemplazar(n.body) };
             if (n.type === "if" && n.sino) return { ...copia, sino: reemplazar(n.sino) } as NodoPrograma;
             return copia as NodoPrograma;
@@ -378,6 +424,12 @@ export function AutomatizacionPage() {
               /min
             </small>
           </span>
+          {corriendo && contadorActivo !== null && (
+            <span className="auto-dato text-3xl" aria-label={`Contador: ${contadorActivo}`}>
+              <IcoContadorMas className="w-6 h-6" />
+              {contadorActivo}
+            </span>
+          )}
         </div>
       </header>
 

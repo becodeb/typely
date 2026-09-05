@@ -29,6 +29,7 @@
  */
 
 import { AJUSTES, MINERALES, type Mineral } from "../../data/automatizacion/balance";
+import { MAX_LLAMADAS_ANIDADAS } from "./limites";
 
 export type TipoAccion =
   | "move_forward"
@@ -47,20 +48,38 @@ export interface NodoAccion {
 }
 
 /** Lo que la nave puede mirar en la baldosa donde está parada. */
-export type TipoSensor = "listo" | "vacia" | "es" | "borde";
+export type TipoSensor = "listo" | "vacia" | "es" | "borde" | "contador";
 
 export interface Sensor {
   tipo: TipoSensor;
   /** Sólo `es`: qué mineral. */
   mineral?: Mineral;
+  /** Sólo `contador`: contra qué valor comparar. Incluye `"lado"`
+   *  (tamaño del campo): es la única igualdad discreta que involucra el
+   *  tamaño de la isla, y no hace falta ningún operador de comparación. */
+  valor?: Veces;
   /** Negado: "no está listo", "no está vacía"… */
   no?: boolean;
+}
+
+/** Un número de vueltas/valor, o `"lado"`: el tamaño actual del campo.
+ *  Un solo token para las tres cosas que antes hubieran sido tres
+ *  mecanismos (PROGRESION.md §5, "tamaño del campo"): el operando de
+ *  `Repetir [N]`, de `Hacer A con [N]`, y del sensor del contador. */
+export type Veces = number | "lado";
+
+/** Resuelve un valor de `Veces` contra el campo actual. `"lado"` se
+ *  resuelve UNA vez, cuando se apila el marco (interprete.ts) o cuando se
+ *  entra al contenedor (expandir): así una vuelta cuenta estable adentro
+ *  de una misma corrida aunque el campo crezca antes de la próxima. */
+export function resolverVeces(v: Veces, lado: number): number {
+  return v === "lado" ? lado : v;
 }
 
 export interface NodoRepetir {
   id: string;
   type: "repeat";
-  times: number;
+  times: Veces;
   body: NodoPrograma[];
 }
 
@@ -108,10 +127,24 @@ export interface NodoCall {
   id: string;
   type: "call";
   rutina: NombreRutina;
+  /** Sólo `Hacer A con N`: azúcar de `Repetir N [Hacer A]` (design.md).
+   *  Nada adentro del cuerpo de la rutina puede leer este número —no es
+   *  un parámetro, es sólo cuántas veces se repite la llamada entera. */
+  veces?: Veces;
+}
+
+/** `Contador +1` y `Contador = 0`: dos hojas, nunca llegan a
+ *  `motor.ts::ejecutarPaso` — el contador vive en el estado de la
+ *  corrida (interprete.ts), no en el campo. */
+export type TipoContador = "counter_add" | "counter_reset";
+
+export interface NodoContador {
+  id: string;
+  type: TipoContador;
 }
 
 export type NodoContenedor = NodoRepetir | NodoSiempre | NodoMientras | NodoSi | NodoDef;
-export type NodoPrograma = NodoAccion | NodoCall | NodoContenedor;
+export type NodoPrograma = NodoAccion | NodoCall | NodoContenedor | NodoContador;
 export type Programa = NodoPrograma[];
 
 const ACCIONES: readonly TipoAccion[] = [
@@ -123,8 +156,9 @@ const ACCIONES: readonly TipoAccion[] = [
   "plant",
   "wait",
 ];
-const SENSORES: readonly TipoSensor[] = ["listo", "vacia", "es", "borde"];
+const SENSORES: readonly TipoSensor[] = ["listo", "vacia", "es", "borde", "contador"];
 const CONTENEDORES = ["repeat", "forever", "while", "if", "def"] as const;
+const CONTADORES = ["counter_add", "counter_reset"] as const;
 
 export function esContenedor(n: NodoPrograma): n is NodoContenedor {
   return (CONTENEDORES as readonly string[]).includes(n.type);
@@ -140,6 +174,11 @@ export function esDefinicion(n: NodoPrograma): n is NodoDef {
 
 export function esLlamada(n: NodoPrograma): n is NodoCall {
   return n.type === "call";
+}
+
+/** `Contador +1` / `Contador = 0`: hojas, como cualquier acción. */
+export function esContador(n: NodoPrograma): n is NodoContador {
+  return (CONTADORES as readonly string[]).includes(n.type);
 }
 
 /** Cuerpo de cada rutina definida al nivel raíz. La PRIMERA definición de
@@ -229,6 +268,14 @@ export function alturaDe(nodo: NodoPrograma): number {
 /* Validación                                                          */
 /* ------------------------------------------------------------------ */
 
+/** `"lado"` o un miembro de `opciones`: el mismo tope que ya vale para
+ *  `Repetir` ahora también sostiene el operando del contador. */
+function validarVeces(valor: unknown, opciones: readonly number[]): Veces | null {
+  if (valor === "lado") return "lado";
+  if (typeof valor === "number" && Number.isInteger(valor) && opciones.includes(valor)) return valor;
+  return null;
+}
+
 function validarSensor(valor: unknown): Sensor | null {
   if (typeof valor !== "object" || valor === null) return null;
   const s = valor as Record<string, unknown>;
@@ -237,6 +284,11 @@ function validarSensor(valor: unknown): Sensor | null {
   if (s.tipo === "es") {
     if (typeof s.mineral !== "string" || !(s.mineral in MINERALES)) return null;
     sensor.mineral = s.mineral as Mineral;
+  }
+  if (s.tipo === "contador") {
+    const valorContador = validarVeces(s.valor, AJUSTES.opcionesContador);
+    if (valorContador === null) return null;
+    sensor.valor = valorContador;
   }
   if (s.no === true) sensor.no = true;
   return sensor;
@@ -272,13 +324,23 @@ function validarNodo(valor: unknown, profundidad: number, contador: { n: number 
     return { id: n.id, type: n.type as TipoAccion };
   }
 
+  if ((CONTADORES as readonly string[]).includes(n.type)) {
+    return { id: n.id, type: n.type as TipoContador };
+  }
+
   if (n.type === "call") {
     // Hoja: nunca se rechaza por profundidad ni por recursión (una
     // rutina puede llamarse a sí misma, directa o indirectamente). Una
     // letra sin `Mi rutina` definida es un no-op válido: se resuelve
     // recién al correr, nunca al guardar.
     if (typeof n.rutina !== "string" || !(RUTINAS as readonly string[]).includes(n.rutina)) return null;
-    return { id: n.id, type: "call", rutina: n.rutina as NombreRutina };
+    const llamada: NodoCall = { id: n.id, type: "call", rutina: n.rutina as NombreRutina };
+    if (n.veces !== undefined) {
+      const veces = validarVeces(n.veces, AJUSTES.opcionesRepetir);
+      if (veces === null) return null;
+      llamada.veces = veces;
+    }
+    return llamada;
   }
 
   if (!(CONTENEDORES as readonly string[]).includes(n.type)) return null;
@@ -300,9 +362,9 @@ function validarNodo(valor: unknown, profundidad: number, contador: { n: number 
   if (!body) return null;
 
   if (n.type === "repeat") {
-    if (typeof n.times !== "number" || !Number.isInteger(n.times)) return null;
-    if (!(AJUSTES.opcionesRepetir as readonly number[]).includes(n.times)) return null;
-    return { id: n.id, type: "repeat", times: n.times, body };
+    const times = validarVeces(n.times, AJUSTES.opcionesRepetir);
+    if (times === null) return null;
+    return { id: n.id, type: "repeat", times, body };
   }
   if (n.type === "forever") return { id: n.id, type: "forever", body };
 
@@ -356,14 +418,17 @@ export interface PasoExpandido {
  *  Si se alcanza el tope, la lista se corta y `completo` queda en false.
  *  Llegar al tope NO es un error: la corrida simplemente termina, igual
  *  que si hubiera terminado sola. */
-/** Tope de llamadas anidadas para este camino sin sensores. Mismo valor
- *  que `MAX_LLAMADAS_ANIDADAS` en interprete.ts (32) pero una constante
- *  PROPIA: importarla de ahí formaría un ciclo de módulos (interprete.ts
- *  ya importa de acá), y este camino —el examen, sin sensores— es un
- *  motor de ejecución completamente aparte del que corre el juego. */
-const TOPE_LLAMADAS_EXPANDIR = 32;
+/** Tope de llamadas anidadas para este camino sin sensores. Comparte el
+ *  valor con `MAX_LLAMADAS_ANIDADAS` (interprete.ts) vía `limites.ts`, un
+ *  tercer módulo sin dependencias: `interprete.ts` ya importa de acá, así
+ *  que importar directamente de ahí cerraría un ciclo. */
+const TOPE_LLAMADAS_EXPANDIR = MAX_LLAMADAS_ANIDADAS;
 
-export function expandir(programa: Programa, maxPasos = AJUSTES.maxPasosEjecucion): {
+export function expandir(
+  programa: Programa,
+  maxPasos = AJUSTES.maxPasosEjecucion,
+  lado = AJUSTES.ladoInicial,
+): {
   pasos: PasoExpandido[];
   completo: boolean;
 } {
@@ -375,7 +440,8 @@ export function expandir(programa: Programa, maxPasos = AJUSTES.maxPasosEjecucio
     for (const nodo of nodos) {
       if (!completo) return;
       if (nodo.type === "repeat") {
-        for (let v = 1; v <= nodo.times; v++) {
+        const veces = resolverVeces(nodo.times, lado);
+        for (let v = 1; v <= veces; v++) {
           recorrer(nodo.body, nodo.id, v, llamadas);
           if (!completo) return;
         }
@@ -394,15 +460,23 @@ export function expandir(programa: Programa, maxPasos = AJUSTES.maxPasosEjecucio
       if (nodo.type === "call") {
         // Una llamada inlinea el cuerpo resuelto, con su PROPIO contador
         // de anidamiento: pasado el tope, se corta como si se llegara al
-        // tope de pasos — nunca es un error.
+        // tope de pasos — nunca es un error. `Hacer A con N` es la misma
+        // llamada, resuelta N veces (azúcar de `Repetir N [Hacer A]`).
         if (llamadas >= TOPE_LLAMADAS_EXPANDIR) {
           completo = false;
           return;
         }
         const cuerpo = rutinas.get(nodo.rutina);
-        if (cuerpo && cuerpo.length > 0) recorrer(cuerpo, nodo.id, 1, llamadas + 1);
+        if (cuerpo && cuerpo.length > 0) {
+          const veces = resolverVeces(nodo.veces ?? 1, lado);
+          for (let v = 1; v <= veces; v++) {
+            recorrer(cuerpo, nodo.id, v, llamadas + 1);
+            if (!completo) return;
+          }
+        }
         continue;
       }
+      if (esContador(nodo)) continue; // inerte en este camino: sólo se observa por sensor
       if (esContenedor(nodo)) continue; // con sensor, o una definición: no se puede expandir a ciegas
       if (pasos.length >= maxPasos) {
         completo = false;

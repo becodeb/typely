@@ -169,7 +169,60 @@ export function IcoHacer({ className }: Props) {
   );
 }
 
+/** Contador +1: un dial con la flecha subiendo — el odómetro que suma
+ *  uno. Turquesa por `--auto-color` en el bloque, como cualquier hoja. */
+export function IcoContadorMas({ className }: Props) {
+  return (
+    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
+      <circle cx="17" cy="19" r="10.5" {...trazo} strokeWidth="4" />
+      <path d="M17 23v-9M13 17l4-4 4 4" {...trazo} strokeWidth="4" />
+    </svg>
+  );
+}
+
+/** Contador = 0: el mismo dial, con el centro marcado y una flecha que
+ *  vuelve — el reinicio, distinto de un vistazo del `+1`. */
+export function IcoContadorCero({ className }: Props) {
+  return (
+    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
+      <circle cx="17" cy="18" r="10.5" {...trazo} strokeWidth="4" />
+      <circle cx="17" cy="18" r="2.8" fill="currentColor" />
+      <path d="M17 7.5a10.5 10.5 0 0 1 9 5.1" {...trazo} strokeWidth="3.4" />
+      <path d="M29 8 26.4 13 21.8 10.4" {...trazo} strokeWidth="3.4" />
+    </svg>
+  );
+}
+
 /* --------------------------- sensores --------------------------- */
+
+/** El contador, como sensor: el mismo dial de las piezas, en la paleta
+ *  de colores planos que usan las demás pastillas (no `currentColor`:
+ *  la pastilla vive sobre fondo blanco). El valor elegido se muestra
+ *  aparte, en la ranura numérica — este dibujo no lleva número. */
+export function IcoSensorContador({ className }: Props) {
+  return (
+    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
+      <rect x="5" y="8" width="24" height="18" rx="6" fill="#ffe6a8" stroke="#e0a72a" strokeWidth="1.8" />
+      <circle cx="17" cy="17" r="5.2" fill="#fff" stroke="#e0a72a" strokeWidth="1.6" />
+      <path d="M17 13.5v3.8l2.6 1.8" fill="none" stroke="#e0a72a" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** `tamaño del campo`: la isla vista de arriba, en una grilla de cuatro.
+ *  Dibujado en `currentColor` porque vive DENTRO de una ranura numérica
+ *  —reemplaza al dígito, nunca lo acompaña— y tiene que heredar el color
+ *  del texto de ese botón (`.auto-repetir__veces`). */
+export function IcoTamanoCampo({ className }: Props) {
+  return (
+    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
+      <rect x="4" y="4" width="12" height="12" rx="2.4" fill="currentColor" />
+      <rect x="18" y="4" width="12" height="12" rx="2.4" fill="currentColor" opacity="0.55" />
+      <rect x="4" y="18" width="12" height="12" rx="2.4" fill="currentColor" opacity="0.55" />
+      <rect x="18" y="18" width="12" height="12" rx="2.4" fill="currentColor" opacity="0.85" />
+    </svg>
+  );
+}
 
 /** Está listo: el cristal con una tilde. */
 export function IcoSensorListo({ className }: Props) {

@@ -353,7 +353,9 @@ function correrVivo(e, programa, { tope = 200, dtMs = 0 } = {}) {
     const p = it.siguiente();
     if (!p) break;
     pasos.push(p);
-    if (p.tipo !== "tick") eventos.push(M.ejecutarPaso(e, p.nodoId, p.tipo, azar, p.mineral));
+    // `tick` y `counter` nunca llegan a `ejecutarPaso`: el segundo es la
+    // interceptación del contador (PROGRESION.md §6), no un evento de campo.
+    if (p.tipo !== "tick" && p.tipo !== "counter") eventos.push(M.ejecutarPaso(e, p.nodoId, p.tipo, azar, p.mineral));
     if (dtMs) M.avanzarMundo(e, dtMs);
   }
   return { pasos, eventos, terminado: it.siguiente() === null };
@@ -537,6 +539,130 @@ prueba("R8 · un campo guardado con def/call sobrevive validarCampo sin subir de
   cierto(e !== null, "el campo con rutinas se lee");
   igual(e.schemaVersion, 2, "sin bump de versión");
   igual(e.programa.map((n) => n.type), ["def", "call"]);
+});
+
+/* ================================================================== */
+console.log("\nCONTADOR Y TAMAÑO DEL CAMPO");
+
+const contadorMas = (id = "cm") => ({ id, type: "counter_add" });
+const contadorCero = (id = "cz") => ({ id, type: "counter_reset" });
+const llamarCon = (rutina, veces, id = "callCon" + rutina) => ({ id, type: "call", rutina, veces });
+
+prueba("C1 · Contador +1 no produce evento de campo y cuesta un turno entero", () => {
+  const e = campoDe(2);
+  const r = correrVivo(e, [contadorMas()]);
+  igual(r.pasos.map((p) => p.tipo), ["counter"]);
+  igual(r.eventos.length, 0, "counter_add nunca llega a ejecutarPaso");
+  cierto(r.terminado);
+});
+
+prueba("C2 · el contador arranca en 0 en cada corrida", () => {
+  const e = campoDe(2);
+  const it1 = I.crearInterprete([contadorMas()], e);
+  igual(it1.contador, 0, "arranca en 0");
+  it1.siguiente();
+  igual(it1.contador, 1, "sumó uno");
+  const it2 = I.crearInterprete([contadorMas()], e);
+  igual(it2.contador, 0, "una corrida nueva vuelve a arrancar en 0, no arrastra la anterior");
+});
+
+prueba("C3 · Contador = 0 reinicia el contador y no toca el campo", () => {
+  const e = campoDe(2);
+  const it = I.crearInterprete([contadorMas("a"), contadorMas("b"), contadorCero("z")], e);
+  it.siguiente();
+  it.siguiente();
+  igual(it.contador, 2);
+  const saldo = JSON.stringify(e.saldos);
+  const celdas = JSON.stringify(e.celdas);
+  it.siguiente();
+  igual(it.contador, 0, "vuelve a cero");
+  igual(JSON.stringify(e.saldos), saldo, "el saldo no se mueve");
+  igual(JSON.stringify(e.celdas), celdas, "el campo no se mueve");
+});
+
+prueba("C4 · el sensor `contador es N` es igualdad exacta, sin operadores de comparación", () => {
+  const e = campoDe(2);
+  cierto(!I.evaluarSensor({ tipo: "contador", valor: 3 }, e, 2), "2 no es 3");
+  cierto(I.evaluarSensor({ tipo: "contador", valor: 3 }, e, 3), "3 es 3");
+  cierto(!I.evaluarSensor({ tipo: "contador", valor: 3 }, e, 4), "4 no es 3");
+  cierto(I.evaluarSensor({ tipo: "contador", valor: 3, no: true }, e, 4), "negado: 4 no es 3, así que es verdadero");
+  cierto(P.validarPrograma([si({ tipo: "menorQue", valor: 1 }, [])]) === null, "no existe ningún sensor de comparación");
+});
+
+prueba("C5 · `contador es tamaño del campo` es verdadero al llegar al lado exacto", () => {
+  const e3 = campoDe(3);
+  cierto(!I.evaluarSensor({ tipo: "contador", valor: "lado" }, e3, 2), "2 en una isla 3x3: no");
+  cierto(I.evaluarSensor({ tipo: "contador", valor: "lado" }, e3, 3), "3 en una isla 3x3: sí");
+  const e4 = campoDe(4);
+  cierto(!I.evaluarSensor({ tipo: "contador", valor: "lado" }, e4, 3), "3 en una isla 4x4: no");
+  cierto(I.evaluarSensor({ tipo: "contador", valor: "lado" }, e4, 4), "4 en una isla 4x4: sí");
+});
+
+/** Recorre el borde inferior de un campo NxN con `tamaño del campo` como
+ *  tope: el criterio de aceptación de PROGRESION.md §11, "el mismo
+ *  programa con tamaño del campo recorre la 3×3 y la 4×4". */
+function programaTamanoDeCampo() {
+  return [
+    mientras(
+      { tipo: "contador", valor: "lado", no: true },
+      [acc("harvest", "cosechar"), acc("move_forward", "avanzar"), contadorMas("sumar")],
+      "recorrido",
+    ),
+  ];
+}
+
+prueba("C6 · CRITERIO DE ACEPTACIÓN: el mismo programa con tamaño del campo recorre la 3×3 y la 4×4", () => {
+  const e3 = campoDe(3);
+  for (const c of e3.celdas) c.etapa = 3;
+  const r3 = correrVivo(e3, programaTamanoDeCampo(), { tope: 200 });
+  igual(r3.eventos.filter((x) => x.tipo === "harvest").length, 3, "recorre las 3 baldosas de la 3×3");
+  cierto(r3.terminado, "se detiene sola en la 3×3");
+
+  const e4 = campoDe(4);
+  for (const c of e4.celdas) c.etapa = 3;
+  const r4 = correrVivo(e4, programaTamanoDeCampo(), { tope: 200 });
+  igual(r4.eventos.filter((x) => x.tipo === "harvest").length, 4, "el MISMO programa recorre las 4 baldosas de la 4×4");
+  cierto(r4.terminado, "se detiene sola en la 4×4");
+});
+
+prueba("C7 · Hacer A con N repite el cuerpo N veces y sigue costando 1 de memoria", () => {
+  const cuerpo = [acc("move_forward", "m")];
+  const prog = [def("A", cuerpo), llamarCon("A", 3, "raiz")];
+  igual(P.capacidadUsada(prog), 3, "1 (def) + 1 (cuerpo) + 1 (la llamada, con o sin N) = 3");
+  const e = campoDe(2);
+  const r = correrVivo(e, prog, { tope: 50 });
+  igual(r.pasos.filter((p) => p.tipo === "move_forward").length, 3, "corrió el cuerpo tres veces");
+  cierto(r.terminado);
+});
+
+prueba("C8 · fuera de rango se rechaza; times/veces/valor legados y case 19 siguen resolviendo", () => {
+  // Case 19, con el tipo Veces ya ensanchado: sigue rechazando 99 y aceptando 3.
+  igual(P.validarPrograma([rep(99, [acc("move_forward", "a")])]), null, "case 19 sigue rechazando times: 99");
+  cierto(P.validarPrograma([rep(3, [acc("move_forward", "a")])]) !== null, "case 19 sigue aceptando times: 3");
+
+  // `times`/`veces`/`sensor.valor` fuera de las opciones: rechazados.
+  igual(P.validarPrograma([{ id: "r", type: "repeat", times: 7, body: [] }]), null, "times fuera de opcionesRepetir");
+  igual(
+    P.validarPrograma([def("A", []), { id: "c", type: "call", rutina: "A", veces: 7 }]),
+    null,
+    "veces fuera de opcionesRepetir",
+  );
+  igual(
+    P.validarPrograma([si({ tipo: "contador", valor: 9 }, [])]),
+    null,
+    "sensor.valor fuera de opcionesContador",
+  );
+
+  // `"lado"` vale para los tres.
+  cierto(P.validarPrograma([{ id: "r", type: "repeat", times: "lado", body: [] }]) !== null, "times: lado, sí");
+  cierto(
+    P.validarPrograma([def("A", []), { id: "c", type: "call", rutina: "A", veces: "lado" }]) !== null,
+    "veces: lado, sí",
+  );
+  cierto(P.validarPrograma([si({ tipo: "contador", valor: "lado" }, [])]) !== null, "sensor.valor: lado, sí");
+
+  // Legado: un `call` sin `veces` sigue siendo válido (Hacer A liso).
+  cierto(P.validarPrograma([def("A", []), llamar("A", "x")]) !== null, "Hacer A sin número sigue siendo válido");
 });
 
 /* ================================================================== */

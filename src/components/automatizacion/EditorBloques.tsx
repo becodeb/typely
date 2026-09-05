@@ -47,6 +47,8 @@ import {
 import { createPortal } from "react-dom";
 import {
   IcoAvanzar,
+  IcoContadorCero,
+  IcoContadorMas,
   IcoEsperar,
   IcoRetroceder,
   IcoCosechar,
@@ -60,11 +62,13 @@ import {
   IcoRepetir,
   IcoRutina,
   IcoSensorBorde,
+  IcoSensorContador,
   IcoSensorListo,
   IcoSensorVacia,
   IcoSi,
   IcoSiempre,
   IcoSino,
+  IcoTamanoCampo,
 } from "./IconosAuto";
 import { AJUSTES, MINERALES, type Mineral } from "../../data/automatizacion/balance";
 import {
@@ -81,13 +85,19 @@ import {
   RUTINAS,
   type Destino,
   type NodoAccion,
+  type NodoCall,
   type NodoContenedor,
+  type NodoMientras,
   type NodoPrograma,
+  type NodoRepetir,
+  type NodoSi,
   type NombreRutina,
   type Programa,
   type Rama,
   type Sensor,
   type TipoAccion,
+  type TipoContador,
+  type Veces,
 } from "../../utils/automatizacion/programa";
 
 /* ------------------------------------------------------------------ */
@@ -130,6 +140,14 @@ const COLOR_LLAMADA: Record<NombreRutina, string> = {
   C: "#5932d4",
 };
 
+/** El contador: turquesa para sumar, azul eléctrico para reiniciar — la
+ *  misma familia que `IcoProduccion`, así se lee como parte del HUD de
+ *  números y no como una pieza de control más. */
+const COLOR_CONTADOR: Record<TipoContador, string> = {
+  counter_add: "#22c7b8",
+  counter_reset: "#3159e8",
+};
+
 const NOMBRE: Record<TipoAccion, string> = {
   move_forward: "Avanzar",
   move_back: "Retroceder",
@@ -140,14 +158,25 @@ const NOMBRE: Record<TipoAccion, string> = {
   wait: "Esperar",
 };
 
+/** Cómo se lee un valor de `Veces`: el número tal cual, o "el tamaño del
+ *  campo" cuando es `"lado"` — nunca un dígito para ese caso. */
+function nombreVeces(v: Veces): string {
+  return v === "lado" ? "el tamaño del campo" : String(v);
+}
+
 export function nombreDe(nodo: NodoPrograma): string {
   if (nodo.type === "plant" && nodo.mineral) return `Plantar ${MINERALES[nodo.mineral].nombre.toLowerCase()}`;
-  if (nodo.type === "repeat") return `Repetir ${nodo.times} veces`;
+  if (nodo.type === "repeat") return `Repetir ${nombreVeces(nodo.times)} veces`;
   if (nodo.type === "forever") return "Por siempre";
   if (nodo.type === "while") return `Mientras ${nombreSensor(nodo.sensor)}`;
   if (nodo.type === "if") return `Si ${nombreSensor(nodo.sensor)}${nodo.sino ? ", y si no" : ""}`;
   if (nodo.type === "def") return `Mi rutina ${nodo.rutina}`;
-  if (nodo.type === "call") return `Hacer ${nodo.rutina}`;
+  if (nodo.type === "call") {
+    if (nodo.veces === undefined) return `Hacer ${nodo.rutina}`;
+    return `Hacer ${nodo.rutina} con ${nombreVeces(nodo.veces)}${nodo.veces === "lado" ? "" : " veces"}`;
+  }
+  if (nodo.type === "counter_add") return "Contador +1";
+  if (nodo.type === "counter_reset") return "Contador = 0";
   return NOMBRE[nodo.type];
 }
 
@@ -159,7 +188,9 @@ export function nombreSensor(s: Sensor): string {
         ? "está vacía"
         : s.tipo === "borde"
           ? "hay borde adelante"
-          : `es ${s.mineral ? MINERALES[s.mineral].nombre.toLowerCase() : "…"}`;
+          : s.tipo === "contador"
+            ? `el contador es ${nombreVeces(s.valor ?? 0)}`
+            : `es ${s.mineral ? MINERALES[s.mineral].nombre.toLowerCase() : "…"}`;
   return s.no ? `no ${base}` : base;
 }
 
@@ -173,7 +204,9 @@ export type Pieza =
   | "if_else"
   | `plant:${Mineral}`
   | `def:${NombreRutina}`
-  | `call:${NombreRutina}`;
+  | `call:${NombreRutina}`
+  | `hacer_con:${NombreRutina}`
+  | TipoContador;
 
 /** Un nodo nuevo a partir de una pieza de la caja. */
 export function crearNodo(pieza: Pieza, id: string): NodoPrograma {
@@ -182,8 +215,11 @@ export function crearNodo(pieza: Pieza, id: string): NodoPrograma {
   if (pieza === "while") return { id, type: "while", sensor: { tipo: "listo", no: true }, body: [] };
   if (pieza === "if") return { id, type: "if", sensor: { tipo: "listo" }, body: [] };
   if (pieza === "if_else") return { id, type: "if", sensor: { tipo: "listo" }, body: [], sino: [] };
+  if (pieza === "counter_add" || pieza === "counter_reset") return { id, type: pieza };
   if (pieza.startsWith("plant:")) return { id, type: "plant", mineral: pieza.slice(6) as Mineral };
   if (pieza.startsWith("def:")) return { id, type: "def", rutina: pieza.slice(4) as NombreRutina, body: [] };
+  if (pieza.startsWith("hacer_con:"))
+    return { id, type: "call", rutina: pieza.slice(10) as NombreRutina, veces: AJUSTES.opcionesRepetir[0] };
   if (pieza.startsWith("call:")) return { id, type: "call", rutina: pieza.slice(5) as NombreRutina };
   return { id, type: pieza as TipoAccion };
 }
@@ -196,6 +232,10 @@ function Dibujo({ tipo }: { tipo: TipoAccion }) {
   if (tipo === "plant") return <IcoPlantar />;
   if (tipo === "wait") return <IcoEsperar />;
   return <IcoCosechar />;
+}
+
+function DibujoContador({ tipo }: { tipo: TipoContador }) {
+  return tipo === "counter_add" ? <IcoContadorMas /> : <IcoContadorCero />;
 }
 
 function DibujoContenedor({ tipo, className }: { tipo: NodoContenedor["type"]; className?: string }) {
@@ -213,6 +253,7 @@ function DibujoSensor({ sensor }: { sensor: Sensor }) {
       {sensor.tipo === "vacia" && <IcoSensorVacia />}
       {sensor.tipo === "borde" && <IcoSensorBorde />}
       {sensor.tipo === "es" && sensor.mineral && <IcoMineral mineral={sensor.mineral} />}
+      {sensor.tipo === "contador" && <IcoSensorContador />}
       {sensor.no && <IcoNo className="auto-sensor__no" />}
     </span>
   );
@@ -220,9 +261,16 @@ function DibujoSensor({ sensor }: { sensor: Sensor }) {
 
 function colorDe(nodo: NodoPrograma): string {
   if (nodo.type === "def" || nodo.type === "call") return COLOR_LLAMADA[nodo.rutina];
+  if (nodo.type === "counter_add" || nodo.type === "counter_reset") return COLOR_CONTADOR[nodo.type];
   if (esContenedor(nodo)) return COLOR_CONTENEDOR[nodo.type];
   if (nodo.type === "plant" && nodo.mineral) return COLOR_PLANTAR[nodo.mineral];
   return COLOR[nodo.type];
+}
+
+/** El valor de una ranura numérica, tal cual se muestra: el dígito, o el
+ *  glifo de `tamaño del campo` cuando es `"lado"` — nunca un dígito ahí. */
+function ContenidoVeces({ valor }: { valor: Veces }) {
+  return valor === "lado" ? <IcoTamanoCampo className="w-[22px] h-[22px]" /> : <>{valor}</>;
 }
 
 /** La pieza que se arrastra desde la caja todavía no existe en el
@@ -260,6 +308,8 @@ export interface PiezasDeControl {
   mientras: boolean;
   siempre: boolean;
   rutinas: boolean;
+  contador: boolean;
+  hacerCon: boolean;
 }
 
 interface Props {
@@ -602,6 +652,33 @@ export function EditorBloques(props: Props) {
     return salida;
   }
 
+  /** El botón que muestra y cicla un valor de `Veces`: el número de
+   *  `Repetir`, el de `Hacer A con N`, o el del sensor del contador. Las
+   *  tres ranuras numéricas de la libreta pasan por ACÁ y disparan el
+   *  mismo `onCambiarVeces(id)` — la página decide qué campo y qué lista
+   *  le toca a cada una inspeccionando el nodo (design.md: "los dos
+   *  mecanismos de ciclado existentes se quedan en dos"). */
+  function RanuraNumero(nodo: NodoRepetir | NodoCall | NodoMientras | NodoSi): ReactNode {
+    const valor: Veces =
+      nodo.type === "repeat"
+        ? nodo.times
+        : nodo.type === "call"
+          ? (nodo.veces ?? AJUSTES.opcionesRepetir[0])
+          : (nodo.sensor.valor ?? AJUSTES.opcionesContador[0]);
+    return (
+      <button
+        type="button"
+        className="auto-repetir__veces"
+        disabled={corriendo}
+        onClick={alClick(() => onCambiarVeces(nodo.id))}
+        onKeyDown={teclas(nodo.id)}
+        aria-label={`${nombreDe(nodo)}. Tocar para cambiar; flechas para mover el bloque`}
+      >
+        <ContenidoVeces valor={valor} />
+      </button>
+    );
+  }
+
   function dibujarCavidad(nodo: NodoContenedor, rama: Rama, nivel: number, estatico: boolean): ReactNode {
     const lista = listaDeRama(nodo, rama);
     return (
@@ -641,18 +718,11 @@ export function EditorBloques(props: Props) {
             )}
             {esRepetir(nodo) &&
               (estatico ? (
-                <span className="auto-repetir__veces">{nodo.times}</span>
+                <span className="auto-repetir__veces">
+                  <ContenidoVeces valor={nodo.times} />
+                </span>
               ) : (
-                <button
-                  type="button"
-                  className="auto-repetir__veces"
-                  disabled={corriendo}
-                  onClick={alClick(() => onCambiarVeces(nodo.id))}
-                  onKeyDown={teclas(nodo.id)}
-                  aria-label={`Repetir ${nodo.times} veces. Tocar para cambiar; flechas para mover el bloque`}
-                >
-                  {nodo.times}
-                </button>
+                RanuraNumero(nodo)
               ))}
             {(nodo.type === "while" || nodo.type === "if") &&
               (estatico ? (
@@ -670,6 +740,14 @@ export function EditorBloques(props: Props) {
                 >
                   <DibujoSensor sensor={nodo.sensor} />
                 </button>
+              ))}
+            {(nodo.type === "while" || nodo.type === "if") && nodo.sensor.tipo === "contador" &&
+              (estatico ? (
+                <span className="auto-repetir__veces">
+                  <ContenidoVeces valor={nodo.sensor.valor ?? AJUSTES.opcionesContador[0]} />
+                </span>
+              ) : (
+                RanuraNumero(nodo)
               ))}
             {nodo.type === "forever" && !estatico && (
               <button
@@ -726,6 +804,68 @@ export function EditorBloques(props: Props) {
         return (
           <div key={nodo.id} className={clase} style={estilo}>
             <IcoHacer />
+            {nodo.veces !== undefined && (
+              <span className="auto-repetir__veces">
+                <ContenidoVeces valor={nodo.veces} />
+              </span>
+            )}
+          </div>
+        );
+      }
+      if (nodo.veces === undefined) {
+        return (
+          <button
+            key={nodo.id}
+            type="button"
+            className={clase}
+            style={estilo}
+            data-nodo={nodo.id}
+            data-clase="accion"
+            disabled={corriendo}
+            onPointerDown={(ev) => agarrar(ev, { desde: "libreta", id: nodo.id })}
+            onClick={alClick(() => onQuitar(nodo.id))}
+            onKeyDown={teclas(nodo.id)}
+            aria-label={`${nombreDe(nodo)}. Tocar para quitar; flechas para mover`}
+          >
+            <IcoHacer />
+          </button>
+        );
+      }
+      // `Hacer A con N`: lleva una ranura numérica, así que el asa no
+      // puede ser el propio botón (anidaría botones) — vive en un `div`,
+      // igual que el lomo de un contenedor, con el número y la cruz de
+      // quitar como sus dos únicos hijos interactivos.
+      return (
+        <div
+          key={nodo.id}
+          className={clase}
+          style={estilo}
+          data-nodo={nodo.id}
+          data-clase="accion"
+          onPointerDown={(ev) => agarrar(ev, { desde: "libreta", id: nodo.id })}
+        >
+          <IcoHacer />
+          {RanuraNumero(nodo)}
+          <button
+            type="button"
+            className="auto-repetir__quitar"
+            disabled={corriendo}
+            onClick={alClick(() => onQuitar(nodo.id))}
+            aria-label={`Quitar el bloque ${nombreDe(nodo).toLowerCase()}`}
+          >
+            ×
+          </button>
+        </div>
+      );
+    }
+
+    if (nodo.type === "counter_add" || nodo.type === "counter_reset") {
+      const clase = `auto-bloque${activo ? " auto-bloque--activo" : ""}${levantado ? " auto-bloque--levantado" : ""}`;
+      const estilo = { "--auto-color": colorDe(nodo) } as CSSProperties;
+      if (estatico) {
+        return (
+          <div key={nodo.id} className={clase} style={estilo}>
+            <DibujoContador tipo={nodo.type} />
           </div>
         );
       }
@@ -743,7 +883,7 @@ export function EditorBloques(props: Props) {
           onKeyDown={teclas(nodo.id)}
           aria-label={`${nombreDe(nodo)}. Tocar para quitar; flechas para mover`}
         >
-          <IcoHacer />
+          <DibujoContador tipo={nodo.type} />
         </button>
       );
     }
@@ -792,8 +932,13 @@ export function EditorBloques(props: Props) {
     ...(compradas.mientras ? (["while"] as const) : []),
     ...(compradas.siempre ? (["forever"] as const) : []),
     ...(compradas.rutinas
-      ? RUTINAS.flatMap((r) => (rutinasDefinidas.has(r) ? [`call:${r}` as const] : [`def:${r}` as const]))
+      ? RUTINAS.flatMap((r) =>
+          rutinasDefinidas.has(r)
+            ? [`call:${r}` as const, ...(compradas.hacerCon ? [`hacer_con:${r}` as const] : [])]
+            : [`def:${r}` as const],
+        )
       : []),
+    ...(compradas.contador ? (["counter_add", "counter_reset"] as const) : []),
   ];
 
   const huecoFinal = usada < capacidad && !(destinoVisible?.tipo === "final");
@@ -823,6 +968,8 @@ export function EditorBloques(props: Props) {
                 </>
               ) : muestra.type === "call" ? (
                 <IcoHacer />
+              ) : muestra.type === "counter_add" || muestra.type === "counter_reset" ? (
+                <DibujoContador tipo={muestra.type} />
               ) : (
                 <Dibujo tipo={muestra.type} />
               )}
