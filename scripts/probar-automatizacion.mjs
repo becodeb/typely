@@ -445,6 +445,101 @@ prueba("I7 · un programa con sensores sobrevive al guardado (validación) y el 
 });
 
 /* ================================================================== */
+console.log("\nRUTINAS");
+
+const def = (rutina, body, id = "def" + rutina) => ({ id, type: "def", rutina, body });
+const llamar = (rutina, id = "call" + rutina) => ({ id, type: "call", rutina });
+
+prueba("R1 · una definición sola no produce ningún paso", () => {
+  igual(P.expandir([def("A", [acc("move_forward", "m"), acc("harvest", "h")])]).pasos.length, 0);
+});
+
+prueba("R2 · Hacer A ejecuta el cuerpo de A, y el intérprete coincide con expandir en los nodoId", () => {
+  const cuerpo = [acc("move_forward", "m"), acc("harvest", "h")];
+  const prog = [def("A", cuerpo), llamar("A", "raiz")];
+  igual(P.expandir(prog).pasos.map((p) => p.nodoId), ["m", "h"], "expandir inlinea el cuerpo resuelto");
+  const e = campoDe(2);
+  for (const c of e.celdas) c.etapa = 3;
+  const r = correrVivo(e, prog);
+  igual(r.pasos.map((p) => p.nodoId), ["m", "h"], "el intérprete corre el mismo cuerpo");
+});
+
+prueba("R3 · una rutina llamada tres veces ocupa menos memoria que las tres copias", () => {
+  const cuerpo = [acc("move_forward", "a"), acc("harvest", "b"), acc("wait", "c")]; // b = 3
+  const conRutina = [def("A", cuerpo), llamar("A", "l1"), llamar("A", "l2"), llamar("A", "l3")];
+  igual(P.capacidadUsada(conRutina), 7, "1 (def) + 3 (cuerpo) + 3 (llamadas) = 7, como en design.md");
+  const copiasInline = [...cuerpo, ...cuerpo, ...cuerpo];
+  igual(P.capacidadUsada(copiasInline), 9, "tres copias sueltas = 9");
+  cierto(P.capacidadUsada(conRutina) < P.capacidadUsada(copiasInline), "la rutina pesa menos que las copias");
+});
+
+prueba("R4 · la recursión directa corre, nunca cuelga, y termina sola en el tope de profundidad", () => {
+  const prog = [def("A", [acc("move_forward", "m"), llamar("A", "otra")]), llamar("A", "raiz")];
+  const e = campoDe(2);
+  for (const c of e.celdas) c.etapa = 3;
+  const r = correrVivo(e, prog, { tope: 200 });
+  igual(r.pasos.length, 32, "el tope de llamadas anidadas corta a las 32 acciones");
+  cierto(r.pasos.every((p) => p.tipo === "move_forward"), "todas fueron la acción del cuerpo, nunca un cuelgue");
+  cierto(r.terminado, "la corrida se desarma sola");
+});
+
+prueba("R5 · la recursión indirecta A→B→A también corre y termina sola", () => {
+  const prog = [
+    def("A", [acc("move_forward", "ma"), llamar("B", "aLlamaB")]),
+    def("B", [acc("harvest", "hb"), llamar("A", "bLlamaA")]),
+    llamar("A", "raiz"),
+  ];
+  const e = campoDe(2);
+  for (const c of e.celdas) c.etapa = 3;
+  const r = correrVivo(e, prog, { tope: 200 });
+  igual(r.pasos.length, 32, "el tope de llamadas anidadas es el mismo, sin importar cuántas rutinas se turnan");
+  cierto(r.terminado);
+});
+
+prueba("R6 · Mi rutina A = [Hacer A] sólo da tics, nunca una acción, y se desarma sola", () => {
+  const prog = [def("A", [llamar("A", "otra")]), llamar("A", "raiz")];
+  const e = campoDe(2);
+  const r = correrVivo(e, prog, { tope: 200 });
+  igual(r.pasos.length, 32, "32 llamadas apiladas, 32 tics al desarmarse");
+  cierto(r.pasos.every((p) => p.tipo === "tick"), "ninguna acción: la llamada vacía cuesta un tic, no cuelga");
+  cierto(r.terminado);
+});
+
+prueba("R7 · `def` sólo va en la raíz, llamar a una letra sin definir es un no-op válido, y cada rutina tiene su propio tope de anidamiento", () => {
+  cierto(P.validarPrograma([llamar("A", "x")]) !== null, "Hacer A sin ninguna Mi rutina A definida sigue siendo válido");
+  cierto(P.validarPrograma([{ id: "y", type: "call", rutina: "Z" }]) === null, "una letra que no sea A/B/C no vale");
+
+  const e = campoDe(2);
+  const r = correrVivo(e, [llamar("A", "x")], { tope: 5 });
+  igual(r.pasos.map((p) => p.tipo), ["tick"], "llamar a una letra sin definir: un tic, y listo");
+  cierto(r.terminado);
+
+  cierto(
+    P.validarPrograma([def("A", [si({ tipo: "listo" }, [rep(3, [llamar("B", "hb")], "r")])])]) !== null,
+    "Si [Repetir [Hacer B]] adentro de una rutina: dos niveles, sí",
+  );
+  cierto(
+    P.validarPrograma([
+      def("A", [si({ tipo: "listo" }, [rep(3, [si({ tipo: "listo" }, [acc("move_forward", "m")], undefined, "si2")], "r")])]),
+    ]) === null,
+    "un tercer nivel adentro de una rutina, no",
+  );
+  cierto(P.validarPrograma([rep(2, [def("A", [])], "r")]) === null, "Mi rutina adentro de otro bloque no vale: sólo en la raíz");
+});
+
+prueba("R8 · un campo guardado con def/call sobrevive validarCampo sin subir de versión", () => {
+  const prog = [def("A", [acc("move_forward", "m")]), llamar("A", "raiz")];
+  const base = M.estadoInicial(azar);
+  const { nave: _nave, ...guardado } = base;
+  guardado.schemaVersion = 2;
+  guardado.programa = JSON.parse(JSON.stringify(prog));
+  const e = A.validarCampo(guardado);
+  cierto(e !== null, "el campo con rutinas se lee");
+  igual(e.schemaVersion, 2, "sin bump de versión");
+  igual(e.programa.map((n) => n.type), ["def", "call"]);
+});
+
+/* ================================================================== */
 console.log("\nEL CAMPO QUE CRECE");
 
 prueba("E1 · comprar tierra agranda el campo un lado", () => {

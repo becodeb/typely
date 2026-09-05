@@ -210,6 +210,8 @@ export const AJUSTES = {
     sino: { moneda: "racimo" as Mineral, base: 30, multiplicador: 1, maxNivel: 1 },
     mientras: { moneda: "racimo" as Mineral, base: 40, multiplicador: 1, maxNivel: 1 },
     siempre: { moneda: "racimo" as Mineral, base: 60, multiplicador: 1, maxNivel: 1 },
+    /* `Mi rutina A/B/C` + `Hacer A/B/C` (PROGRESION.md §5, era 3). */
+    rutinas: { moneda: "prisma" as Mineral, base: 60, multiplicador: 1, maxNivel: 1 },
   },
 
   /* --- revelado progresivo (MVP.md §8, PROGRESION.md §7) -------------
@@ -236,6 +238,11 @@ export const AJUSTES = {
     sino: { requiere: "si" },
     mientras: { requiere: "si" },
     siempre: { requiere: "mientras" },
+    /* Prisma existe desde la 3×3 (§2): la era ya lo cubre `lado: 3`, pero
+       se deja también `requiere: "mientras"` para que no aparezca antes
+       de que la caja tenga sensores con qué sostener un `Si está listo`
+       adentro de la rutina. */
+    rutinas: { lado: 3, requiere: "mientras" },
     evo_punta: { cosechado: ["punta", 12] as [Mineral, number] },
     evo_racimo: { cosechado: ["racimo", 5] as [Mineral, number] },
     evo_prisma: { cosechado: ["prisma", 4] as [Mineral, number] },

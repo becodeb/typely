@@ -23,6 +23,7 @@ import {
   IcoMineral,
   IcoPieza,
   IcoPiezaRepetir,
+  IcoPiezaRutinas,
   IcoSi,
   IcoSiempre,
   IcoSino,
@@ -76,6 +77,7 @@ const DIBUJO: Record<ClaveMejora, () => ReactElement> = {
       <IcoSiempre />
     </IcoPieza>
   ),
+  rutinas: () => <IcoPiezaRutinas />,
 };
 
 const NOMBRE: Record<ClaveMejora, string> = {
@@ -89,6 +91,7 @@ const NOMBRE: Record<ClaveMejora, string> = {
   sino: "Bloque si y si no",
   mientras: "Bloque mientras",
   siempre: "Bloque por siempre",
+  rutinas: "Mi rutina y Hacer",
 };
 
 /** Orden de aparición. Tierra primero: con el campo en 1×1 ninguna otra
@@ -106,6 +109,7 @@ const ORDEN: ClaveTienda[] = [
   "sino",
   "mientras",
   "siempre",
+  "rutinas",
   ...ORDEN_MINERALES.map((m) => `evo_${m}` as const),
 ];
 

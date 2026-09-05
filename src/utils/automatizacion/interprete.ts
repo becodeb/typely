@@ -16,6 +16,12 @@
  *     listo → (nada)` es una espera visible, con el contenedor latiendo,
  *     y no un bucle que cuelga la pestaña.
  *   - `Esperar` es una acción que no hace nada: cuesta un turno entero.
+ *   - `Hacer A` apila un marco para el cuerpo de `Mi rutina A` —nunca lo
+ *     copia—, así que se permite recursión, directa e indirecta. La
+ *     misma regla del tic la vuelve segura: una llamada cuya vuelta no
+ *     produjo ninguna acción también tiquea, y la pila de llamadas está
+ *     acotada (`MAX_LLAMADAS_ANIDADAS`); pasado el tope se saltea en
+ *     silencio y la corrida se desarma sola, un pulso por nivel.
  *
  * Es lógica pura, como el motor: no sabe de React ni de relojes. Quien
  * lo llama decide cuánto esperar entre paso y paso.
@@ -25,7 +31,10 @@ import type { Mineral } from "../../data/automatizacion/balance";
 import { indice, type EstadoCampo } from "./motor";
 import {
   esContenedor,
+  esLlamada,
   listaDeRama,
+  rutinasDe,
+  type NodoCall,
   type NodoContenedor,
   type NodoPrograma,
   type Programa,
@@ -45,6 +54,15 @@ export interface Paso {
  *  nadie lo detenga es un bucle sin sentido. Alcanzarlo se trata como
  *  una detención normal, sin cartel. */
 export const MAX_PASOS_CORRIDA = 100_000;
+
+/** Tope de llamadas anidadas EN LA PILA (no de pasos ejecutados): la
+ *  recursión está permitida, directa e indirecta, y lo único que la
+ *  limita es esto. Pasado el tope la llamada se saltea en silencio — el
+ *  marco que la contiene termina su vuelta sin acciones y tiquea, y la
+ *  pila se desarma sola, un pulso visible por nivel, sin cartel de error.
+ *  Es una cota de SEGURIDAD, no una perilla de juego: no vive en
+ *  balance.ts, igual que `MAX_PASOS_CORRIDA`. */
+export const MAX_LLAMADAS_ANIDADAS = 32;
 
 /** Un sensor, evaluado contra la baldosa donde está la nave. */
 export function evaluarSensor(sensor: Sensor, e: EstadoCampo): boolean {
@@ -76,7 +94,10 @@ export function evaluarSensor(sensor: Sensor, e: EstadoCampo): boolean {
 interface Marco {
   lista: NodoPrograma[];
   i: number;
-  contenedor: NodoContenedor | null;
+  /** El contenedor que abrió este marco, o la llamada (`Hacer A`) que lo
+   *  apiló — una llamada nunca copia su cuerpo, así que el marco de una
+   *  rutina se distingue igual que el de cualquier otro bloque. */
+  contenedor: NodoContenedor | NodoCall | null;
   /** Vueltas hechas (para `Repetir`). */
   vuelta: number;
   /** Cuántas acciones devolvió esta vuelta: cero = vuelta vacía = tic. */
@@ -91,11 +112,29 @@ export interface Interprete {
 }
 
 export function crearInterprete(programa: Programa, e: EstadoCampo): Interprete {
+  // Un mapa letra→cuerpo, construido UNA vez por corrida: llamar no
+  // vuelve a buscar la definición en el árbol en cada paso.
+  const rutinas = rutinasDe(programa);
   const pila: Marco[] = [{ lista: programa, i: 0, contenedor: null, vuelta: 0, acciones: 0 }];
   const interprete: Interprete = { pasos: 0, siguiente };
 
   function entrar(c: NodoContenedor, rama: "body" | "sino" = "body"): void {
     pila.push({ lista: listaDeRama(c, rama), i: 0, contenedor: c, vuelta: 0, acciones: 0 });
+  }
+
+  /** Apila un marco para el cuerpo de la rutina llamada — nunca lo
+   *  copia. Corre UNA vez (no vuelve a entrar como `Repetir`); si su
+   *  vuelta termina sin acciones, tiquea igual que cualquier otra. */
+  function entrarLlamada(c: NodoCall, cuerpo: NodoPrograma[]): void {
+    pila.push({ lista: cuerpo, i: 0, contenedor: c, vuelta: 0, acciones: 0 });
+  }
+
+  /** Cuántas llamadas (`Hacer`) hay hoy en la pila — no cuántos marcos en
+   *  total: un `Repetir` o un `Si` adentro de una rutina no cuentan. */
+  function llamadasEnPila(): number {
+    let n = 0;
+    for (const m of pila) if (m.contenedor && esLlamada(m.contenedor)) n += 1;
+    return n;
   }
 
   function devolver(p: Paso): Paso {
@@ -104,7 +143,7 @@ export function crearInterprete(programa: Programa, e: EstadoCampo): Interprete 
     return p;
   }
 
-  function tic(c: NodoContenedor): Paso {
+  function tic(c: NodoContenedor | NodoCall): Paso {
     interprete.pasos += 1;
     return { nodoId: c.id, tipo: "tick" };
   }
@@ -120,6 +159,17 @@ export function crearInterprete(programa: Programa, e: EstadoCampo): Interprete 
       if (marco.i >= marco.lista.length) {
         const c = marco.contenedor;
         if (!c) return null; // fin de la libreta
+
+        if (esLlamada(c)) {
+          // Una llamada corre su cuerpo una sola vuelta: si no produjo
+          // ninguna acción, igual cuesta un tic —lo mismo que `Mientras`
+          // o `Por siempre`— y es lo que vuelve segura la recursión:
+          // nunca hay progreso de tiempo cero.
+          const vacia = marco.acciones === 0;
+          pila.pop();
+          if (vacia) return tic(c);
+          continue;
+        }
 
         if (c.type === "repeat") {
           marco.vuelta += 1;
@@ -156,6 +206,16 @@ export function crearInterprete(programa: Programa, e: EstadoCampo): Interprete 
 
       const nodo = marco.lista[marco.i];
       marco.i += 1;
+
+      if (nodo.type === "def") continue; // una definición no produce ningún paso
+
+      if (esLlamada(nodo)) {
+        if (llamadasEnPila() >= MAX_LLAMADAS_ANIDADAS) continue; // se saltea en silencio, sin cartel
+        // Letra sin definir: cuerpo vacío, un no-op válido que igual
+        // tiquea al terminar su vuelta sin acciones.
+        entrarLlamada(nodo, rutinas.get(nodo.rutina) ?? []);
+        continue;
+      }
 
       if (!esContenedor(nodo)) {
         return devolver({ nodoId: nodo.id, tipo: nodo.type, mineral: nodo.mineral });

@@ -147,6 +147,28 @@ export function IcoMientras({ className }: Props) {
   );
 }
 
+/** Mi rutina: una libreta más chica adentro de la libreta grande — la
+ *  definición que se puede llamar más de una vez sin volver a escribirla. */
+export function IcoRutina({ className }: Props) {
+  return (
+    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
+      <path d="M8 5h14a3 3 0 0 1 3 3v18l-4-3-4 3-4-3-4 3-4-3V8a3 3 0 0 1 3-3z" {...trazo} strokeWidth="3.4" />
+      <path d="M11 13h12M11 18h8" {...trazo} strokeWidth="3" />
+    </svg>
+  );
+}
+
+/** Hacer: la flecha que salta a leer esa libreta chica y vuelve. */
+export function IcoHacer({ className }: Props) {
+  return (
+    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
+      <path d="M6 17h14" {...trazo} strokeWidth="4.6" />
+      <path d="M14 9l8 8-8 8" {...trazo} strokeWidth="4.6" />
+      <path d="M24 8v18" {...trazo} strokeWidth="4.2" />
+    </svg>
+  );
+}
+
 /* --------------------------- sensores --------------------------- */
 
 /** Está listo: el cristal con una tilde. */
@@ -405,6 +427,33 @@ export function IcoPiezaRepetir({ className }: Props) {
         textAnchor="middle"
       >
         3
+      </text>
+    </svg>
+  );
+}
+
+/** El bloque `Mi rutina`/`Hacer` tal como se ve en la tienda: una ficha
+ *  violeta con la libreta chica y las tres letras que se pueden nombrar. */
+export function IcoPiezaRutinas({ className }: Props) {
+  return (
+    <svg viewBox="0 0 36 36" className={className} aria-hidden="true">
+      <path
+        d="M5 8h5l2.5 3h7L22 8h9a2 2 0 0 1 2 2v18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z"
+        fill="#7c71ff"
+      />
+      <path
+        d="M11 14h14a2 2 0 0 1 2 2v12l-3-2.2-3 2.2-3-2.2-3 2.2-3-2.2-3 2.2V16a2 2 0 0 1 2-2z"
+        fill="#fff"
+        opacity="0.92"
+      />
+      <text
+        x="18"
+        y="24"
+        style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 8.5 }}
+        fill="#7c71ff"
+        textAnchor="middle"
+      >
+        A B C
       </text>
     </svg>
   );

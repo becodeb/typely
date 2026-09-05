@@ -52,11 +52,13 @@ import {
   IcoCosechar,
   IcoGirarDer,
   IcoGirarIzq,
+  IcoHacer,
   IcoMientras,
   IcoMineral,
   IcoNo,
   IcoPlantar,
   IcoRepetir,
+  IcoRutina,
   IcoSensorBorde,
   IcoSensorListo,
   IcoSensorVacia,
@@ -75,10 +77,13 @@ import {
   esRepetir,
   listaDeRama,
   ramas,
+  rutinasDe,
+  RUTINAS,
   type Destino,
   type NodoAccion,
   type NodoContenedor,
   type NodoPrograma,
+  type NombreRutina,
   type Programa,
   type Rama,
   type Sensor,
@@ -105,12 +110,24 @@ const COLOR_PLANTAR: Record<Mineral, string> = {
   prisma: "#ff6fb5",
   estrella: "#f0b429",
 };
-/** Los contenedores: los bucles en rosas, las decisiones en verdes. */
+/** Los contenedores: los bucles en rosas, las decisiones en verdes.
+ *  `def` usa el violeta de la rutina A como respaldo — `colorDe` lo pisa
+ *  con el color de la letra que le toque a cada bloque en concreto. */
 const COLOR_CONTENEDOR: Record<NodoContenedor["type"], string> = {
   repeat: "#ff8fc0",
   forever: "#f06aa8",
   while: "#2fb389",
   if: "#3fc79b",
+  def: "#7c71ff",
+};
+
+/** Cada rutina tiene su propio violeta (CLAUDE.md §5, familia
+ *  eléctrico/violeta): la letra la nombra, el color la hace reconocible
+ *  de un vistazo entre `Mi rutina` y su `Hacer` correspondiente. */
+const COLOR_LLAMADA: Record<NombreRutina, string> = {
+  A: "#7c71ff",
+  B: "#9b7cff",
+  C: "#5932d4",
 };
 
 const NOMBRE: Record<TipoAccion, string> = {
@@ -129,6 +146,8 @@ export function nombreDe(nodo: NodoPrograma): string {
   if (nodo.type === "forever") return "Por siempre";
   if (nodo.type === "while") return `Mientras ${nombreSensor(nodo.sensor)}`;
   if (nodo.type === "if") return `Si ${nombreSensor(nodo.sensor)}${nodo.sino ? ", y si no" : ""}`;
+  if (nodo.type === "def") return `Mi rutina ${nodo.rutina}`;
+  if (nodo.type === "call") return `Hacer ${nodo.rutina}`;
   return NOMBRE[nodo.type];
 }
 
@@ -152,7 +171,9 @@ export type Pieza =
   | "while"
   | "if"
   | "if_else"
-  | `plant:${Mineral}`;
+  | `plant:${Mineral}`
+  | `def:${NombreRutina}`
+  | `call:${NombreRutina}`;
 
 /** Un nodo nuevo a partir de una pieza de la caja. */
 export function crearNodo(pieza: Pieza, id: string): NodoPrograma {
@@ -162,6 +183,8 @@ export function crearNodo(pieza: Pieza, id: string): NodoPrograma {
   if (pieza === "if") return { id, type: "if", sensor: { tipo: "listo" }, body: [] };
   if (pieza === "if_else") return { id, type: "if", sensor: { tipo: "listo" }, body: [], sino: [] };
   if (pieza.startsWith("plant:")) return { id, type: "plant", mineral: pieza.slice(6) as Mineral };
+  if (pieza.startsWith("def:")) return { id, type: "def", rutina: pieza.slice(4) as NombreRutina, body: [] };
+  if (pieza.startsWith("call:")) return { id, type: "call", rutina: pieza.slice(5) as NombreRutina };
   return { id, type: pieza as TipoAccion };
 }
 
@@ -179,6 +202,7 @@ function DibujoContenedor({ tipo, className }: { tipo: NodoContenedor["type"]; c
   if (tipo === "repeat") return <IcoRepetir className={className} />;
   if (tipo === "forever") return <IcoSiempre className={className} />;
   if (tipo === "while") return <IcoMientras className={className} />;
+  if (tipo === "def") return <IcoRutina className={className} />;
   return <IcoSi className={className} />;
 }
 
@@ -195,6 +219,7 @@ function DibujoSensor({ sensor }: { sensor: Sensor }) {
 }
 
 function colorDe(nodo: NodoPrograma): string {
+  if (nodo.type === "def" || nodo.type === "call") return COLOR_LLAMADA[nodo.rutina];
   if (esContenedor(nodo)) return COLOR_CONTENEDOR[nodo.type];
   if (nodo.type === "plant" && nodo.mineral) return COLOR_PLANTAR[nodo.mineral];
   return COLOR[nodo.type];
@@ -234,6 +259,7 @@ export interface PiezasDeControl {
   sino: boolean;
   mientras: boolean;
   siempre: boolean;
+  rutinas: boolean;
 }
 
 interface Props {
@@ -274,6 +300,10 @@ export function EditorBloques(props: Props) {
     onCambiarSensor,
   } = props;
   const usada = capacidadUsada(programa);
+  /* Qué letras ya tienen `Mi rutina` definida: mientras no la tengan se
+     ofrece definirla, y una vez definida se ofrece llamarla — nunca las
+     dos piezas juntas para la misma letra. */
+  const rutinasDefinidas = rutinasDe(programa);
 
   /* Los oyentes del arrastre viven en `window` y se registran una sola
      vez por gesto, así que leen las props por una referencia y no por
@@ -597,7 +627,7 @@ export function EditorBloques(props: Props) {
         <div
           key={nodo.id}
           className={`auto-repetir${levantado ? " auto-repetir--levantado" : ""}${activo ? " auto-repetir--activo" : ""}`}
-          style={{ "--auto-tono": COLOR_CONTENEDOR[nodo.type] } as CSSProperties}
+          style={{ "--auto-tono": nodo.type === "def" ? COLOR_LLAMADA[nodo.rutina] : COLOR_CONTENEDOR[nodo.type] } as CSSProperties}
           data-nodo={estatico ? undefined : nodo.id}
           data-clase={estatico ? undefined : "contenedor"}
           data-nivel={nivel}
@@ -652,6 +682,13 @@ export function EditorBloques(props: Props) {
                 <IcoSiempre className="w-[26px] h-[26px]" />
               </button>
             )}
+            {nodo.type === "def" && (
+              // La letra no se toca —es la identidad de la rutina, no una
+              // perilla— así que va suelta, nunca en un botón.
+              <span className="auto-repetir__veces" aria-hidden="true">
+                {nodo.rutina}
+              </span>
+            )}
             {!estatico && (
               <button
                 type="button"
@@ -677,6 +714,37 @@ export function EditorBloques(props: Props) {
             <DibujoContenedor tipo={nodo.type} className="w-[18px] h-[18px] opacity-80" />
           </div>
         </div>
+      );
+    }
+
+    if (nodo.type === "call") {
+      // Hoja como `Plantar`: se distingue de sus hermanas por el color de
+      // su letra, no por un dibujo distinto (COLOR_LLAMADA en colorDe).
+      const clase = `auto-bloque${activo ? " auto-bloque--activo" : ""}${levantado ? " auto-bloque--levantado" : ""}`;
+      const estilo = { "--auto-color": colorDe(nodo) } as CSSProperties;
+      if (estatico) {
+        return (
+          <div key={nodo.id} className={clase} style={estilo}>
+            <IcoHacer />
+          </div>
+        );
+      }
+      return (
+        <button
+          key={nodo.id}
+          type="button"
+          className={clase}
+          style={estilo}
+          data-nodo={nodo.id}
+          data-clase="accion"
+          disabled={corriendo}
+          onPointerDown={(ev) => agarrar(ev, { desde: "libreta", id: nodo.id })}
+          onClick={alClick(() => onQuitar(nodo.id))}
+          onKeyDown={teclas(nodo.id)}
+          aria-label={`${nombreDe(nodo)}. Tocar para quitar; flechas para mover`}
+        >
+          <IcoHacer />
+        </button>
       );
     }
 
@@ -723,6 +791,9 @@ export function EditorBloques(props: Props) {
     ...(compradas.sino ? (["if_else"] as const) : []),
     ...(compradas.mientras ? (["while"] as const) : []),
     ...(compradas.siempre ? (["forever"] as const) : []),
+    ...(compradas.rutinas
+      ? RUTINAS.flatMap((r) => (rutinasDefinidas.has(r) ? [`call:${r}` as const] : [`def:${r}` as const]))
+      : []),
   ];
 
   const huecoFinal = usada < capacidad && !(destinoVisible?.tipo === "final");
@@ -750,6 +821,8 @@ export function EditorBloques(props: Props) {
                   <DibujoContenedor tipo={muestra.type} />
                   {muestra.type === "if" && muestra.sino && <IcoSino className="auto-bloque__extra" />}
                 </>
+              ) : muestra.type === "call" ? (
+                <IcoHacer />
               ) : (
                 <Dibujo tipo={muestra.type} />
               )}

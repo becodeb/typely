@@ -86,8 +86,32 @@ export interface NodoSi {
   sino?: NodoPrograma[];
 }
 
-export type NodoContenedor = NodoRepetir | NodoSiempre | NodoMientras | NodoSi;
-export type NodoPrograma = NodoAccion | NodoContenedor;
+/** Las tres rutinas que se pueden definir (PROGRESION.md §5). Alcanza y
+ *  sobra para lo que un chico de primaria nombra de memoria. */
+export type NombreRutina = "A" | "B" | "C";
+export const RUTINAS: readonly NombreRutina[] = ["A", "B", "C"];
+
+/** `Mi rutina A/B/C`: una definición al nivel raíz. Se apila un marco al
+ *  llamarla —nunca se copia su cuerpo— así que cuesta memoria una sola
+ *  vez sin importar cuántas veces se la llame. */
+export interface NodoDef {
+  id: string;
+  type: "def";
+  rutina: NombreRutina;
+  body: NodoPrograma[];
+}
+
+/** `Hacer A/B/C`: una hoja. Nunca se rechaza por profundidad ni por
+ *  recursión; llamar a una letra sin definir es un no-op válido, se
+ *  resuelve recién al correr (interprete.ts). */
+export interface NodoCall {
+  id: string;
+  type: "call";
+  rutina: NombreRutina;
+}
+
+export type NodoContenedor = NodoRepetir | NodoSiempre | NodoMientras | NodoSi | NodoDef;
+export type NodoPrograma = NodoAccion | NodoCall | NodoContenedor;
 export type Programa = NodoPrograma[];
 
 const ACCIONES: readonly TipoAccion[] = [
@@ -100,7 +124,7 @@ const ACCIONES: readonly TipoAccion[] = [
   "wait",
 ];
 const SENSORES: readonly TipoSensor[] = ["listo", "vacia", "es", "borde"];
-const CONTENEDORES = ["repeat", "forever", "while", "if"] as const;
+const CONTENEDORES = ["repeat", "forever", "while", "if", "def"] as const;
 
 export function esContenedor(n: NodoPrograma): n is NodoContenedor {
   return (CONTENEDORES as readonly string[]).includes(n.type);
@@ -108,6 +132,25 @@ export function esContenedor(n: NodoPrograma): n is NodoContenedor {
 
 export function esRepetir(n: NodoPrograma): n is NodoRepetir {
   return n.type === "repeat";
+}
+
+export function esDefinicion(n: NodoPrograma): n is NodoDef {
+  return n.type === "def";
+}
+
+export function esLlamada(n: NodoPrograma): n is NodoCall {
+  return n.type === "call";
+}
+
+/** Cuerpo de cada rutina definida al nivel raíz. La PRIMERA definición de
+ *  una letra gana: un snapshot editado a mano no puede volver la corrida
+ *  ambigua. Sólo mira la raíz —`def` no puede vivir en otro lado. */
+export function rutinasDe(programa: Programa): Map<NombreRutina, NodoPrograma[]> {
+  const mapa = new Map<NombreRutina, NodoPrograma[]>();
+  for (const nodo of programa) {
+    if (esDefinicion(nodo) && !mapa.has(nodo.rutina)) mapa.set(nodo.rutina, nodo.body);
+  }
+  return mapa;
 }
 
 /** ¿Tiene sensor? `Mientras` y `Si`. */
@@ -172,6 +215,10 @@ export function costoDeNodo(nodo: NodoPrograma): number {
  *  un `Si` adentro 2. Es lo que se suma a la profundidad del lugar
  *  donde se suelta para saber si cabe. */
 export function alturaDe(nodo: NodoPrograma): number {
+  // Una rutina siempre cae al nivel raíz (nunca adentro de nada), así que
+  // no le suma altura a donde se la suelta: la valida su PROPIO tope, no
+  // el de quien la contiene.
+  if (nodo.type === "def") return 0;
   if (!esContenedor(nodo)) return 0;
   let max = 0;
   for (const r of ramas(nodo)) for (const h of listaDeRama(nodo, r)) max = Math.max(max, alturaDe(h));
@@ -225,11 +272,29 @@ function validarNodo(valor: unknown, profundidad: number, contador: { n: number 
     return { id: n.id, type: n.type as TipoAccion };
   }
 
+  if (n.type === "call") {
+    // Hoja: nunca se rechaza por profundidad ni por recursión (una
+    // rutina puede llamarse a sí misma, directa o indirectamente). Una
+    // letra sin `Mi rutina` definida es un no-op válido: se resuelve
+    // recién al correr, nunca al guardar.
+    if (typeof n.rutina !== "string" || !(RUTINAS as readonly string[]).includes(n.rutina)) return null;
+    return { id: n.id, type: "call", rutina: n.rutina as NombreRutina };
+  }
+
   if (!(CONTENEDORES as readonly string[]).includes(n.type)) return null;
   if (profundidad >= AJUSTES.maxProfundidad) return null;
-  // `Por siempre` sólo al nivel de la libreta: adentro de otro bucle no
-  // significa nada que un chico pueda leer.
-  if (n.type === "forever" && profundidad > 0) return null;
+  // `Por siempre` y `Mi rutina` sólo al nivel de la libreta: adentro de
+  // otro bloque no significan nada que un chico pueda leer.
+  if ((n.type === "forever" || n.type === "def") && profundidad > 0) return null;
+
+  if (n.type === "def") {
+    if (typeof n.rutina !== "string" || !(RUTINAS as readonly string[]).includes(n.rutina)) return null;
+    // Cada rutina tiene su PROPIO presupuesto de anidamiento, empezando
+    // en 0: llamarla no le suma profundidad estructural a quien llama.
+    const body = validarLista(n.body, 0, contador);
+    if (!body) return null;
+    return { id: n.id, type: "def", rutina: n.rutina as NombreRutina, body };
+  }
 
   const body = validarLista(n.body, profundidad + 1, contador);
   if (!body) return null;
@@ -291,19 +356,27 @@ export interface PasoExpandido {
  *  Si se alcanza el tope, la lista se corta y `completo` queda en false.
  *  Llegar al tope NO es un error: la corrida simplemente termina, igual
  *  que si hubiera terminado sola. */
+/** Tope de llamadas anidadas para este camino sin sensores. Mismo valor
+ *  que `MAX_LLAMADAS_ANIDADAS` en interprete.ts (32) pero una constante
+ *  PROPIA: importarla de ahí formaría un ciclo de módulos (interprete.ts
+ *  ya importa de acá), y este camino —el examen, sin sensores— es un
+ *  motor de ejecución completamente aparte del que corre el juego. */
+const TOPE_LLAMADAS_EXPANDIR = 32;
+
 export function expandir(programa: Programa, maxPasos = AJUSTES.maxPasosEjecucion): {
   pasos: PasoExpandido[];
   completo: boolean;
 } {
   const pasos: PasoExpandido[] = [];
   let completo = true;
+  const rutinas = rutinasDe(programa);
 
-  const recorrer = (nodos: Programa, contenedorId?: string, vuelta?: number): void => {
+  const recorrer = (nodos: Programa, contenedorId?: string, vuelta?: number, llamadas = 0): void => {
     for (const nodo of nodos) {
       if (!completo) return;
       if (nodo.type === "repeat") {
         for (let v = 1; v <= nodo.times; v++) {
-          recorrer(nodo.body, nodo.id, v);
+          recorrer(nodo.body, nodo.id, v, llamadas);
           if (!completo) return;
         }
         continue;
@@ -314,11 +387,23 @@ export function expandir(programa: Programa, maxPasos = AJUSTES.maxPasosEjecucio
             completo = false;
             return;
           }
-          recorrer(nodo.body, nodo.id, v);
+          recorrer(nodo.body, nodo.id, v, llamadas);
         }
         return;
       }
-      if (esContenedor(nodo)) continue; // con sensor: no se puede expandir a ciegas
+      if (nodo.type === "call") {
+        // Una llamada inlinea el cuerpo resuelto, con su PROPIO contador
+        // de anidamiento: pasado el tope, se corta como si se llegara al
+        // tope de pasos — nunca es un error.
+        if (llamadas >= TOPE_LLAMADAS_EXPANDIR) {
+          completo = false;
+          return;
+        }
+        const cuerpo = rutinas.get(nodo.rutina);
+        if (cuerpo && cuerpo.length > 0) recorrer(cuerpo, nodo.id, 1, llamadas + 1);
+        continue;
+      }
+      if (esContenedor(nodo)) continue; // con sensor, o una definición: no se puede expandir a ciegas
       if (pasos.length >= maxPasos) {
         completo = false;
         return;
@@ -379,8 +464,11 @@ export function profundidadDe(programa: Programa, id: string, nivel = 0): number
   for (const nodo of programa) {
     if (nodo.id === id) return nivel;
     if (esContenedor(nodo)) {
+      // Adentro de una rutina el contador arranca de nuevo en 0: es su
+      // propio presupuesto de anidamiento, no el de quien la contiene.
+      const siguienteNivel = nodo.type === "def" ? 0 : nivel + 1;
       for (const r of ramas(nodo)) {
-        const p = profundidadDe(listaDeRama(nodo, r), id, nivel + 1);
+        const p = profundidadDe(listaDeRama(nodo, r), id, siguienteNivel);
         if (p !== null) return p;
       }
     }
@@ -393,6 +481,7 @@ export function profundidadDe(programa: Programa, id: string, nivel = 0): number
  *  sólo va en la libreta. */
 export function cabeA(nodo: NodoPrograma, profundidad: number): boolean {
   if (nodo.type === "forever" && profundidad > 0) return false;
+  if (nodo.type === "def" && profundidad > 0) return false;
   return profundidad + alturaDe(nodo) <= AJUSTES.maxProfundidad;
 }
 

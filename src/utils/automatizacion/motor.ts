@@ -229,13 +229,16 @@ export function tieneRepetir(e: EstadoCampo): boolean {
 }
 
 /** Qué piezas de control ya se compraron. */
-export function piezasCompradas(e: EstadoCampo): { esperar: boolean; si: boolean; sino: boolean; mientras: boolean; siempre: boolean } {
+export function piezasCompradas(
+  e: EstadoCampo,
+): { esperar: boolean; si: boolean; sino: boolean; mientras: boolean; siempre: boolean; rutinas: boolean } {
   return {
     esperar: nivel(e, "esperar") > 0,
     si: nivel(e, "si") > 0,
     sino: nivel(e, "sino") > 0,
     mientras: nivel(e, "mientras") > 0,
     siempre: nivel(e, "siempre") > 0,
+    rutinas: nivel(e, "rutinas") > 0,
   };
 }
 

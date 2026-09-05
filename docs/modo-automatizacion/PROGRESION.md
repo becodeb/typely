@@ -165,8 +165,15 @@ Se agrega `src/utils/automatizacion/interprete.ts`, puro como el motor:
   protege de un bucle sin sentido, y llegar a él se trata como detención
   normal, sin cartel.
 - Las **rutinas** son definiciones al nivel raíz (`Mi rutina A`) que la
-  llamada expande en su lugar; sin recursión (una rutina no puede llamarse
-  a sí misma: el bloque `Hacer A` no se acepta adentro de `Mi rutina A`).
+  llamada NO expande: el intérprete apila un marco y ejecuta el cuerpo ahí
+  mismo, así una rutina se guarda una sola vez por más veces que se la
+  llame. **La recursión se permite**, directa (`Hacer A` adentro de
+  `Mi rutina A`) e indirecta (A llama a B y B llama a A): no es distinta de
+  un `Repetir`, siempre puede pausarse y cada paso cuesta tiempo. Dos reglas
+  la sostienen: una llamada que no ejecutó ninguna acción cuesta un **tic**,
+  igual que una vuelta vacía de `Mientras`, y la pila de llamadas está
+  acotada (32 niveles); pasado el tope la llamada se saltea y la corrida se
+  desarma sola, como cualquier detención normal, sin cartel.
 - El **contador** vive en el estado de la corrida, no en el campo, y arranca
   en cero en cada corrida.
 
