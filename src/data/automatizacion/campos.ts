@@ -1,0 +1,107 @@
+/* GENERADO por scripts/medir-grilla-islas.mjs — no editar a mano.
+ *
+ * Un campo es una ilustración más la posición de sus baldosas, medida
+ * sobre esa misma ilustración. Para cambiar el arte: reemplazar el PNG
+ * en Images/automatizacion/islas/, correr el importador del verde y
+ * después este script. Las posiciones se actualizan con la imagen.
+ */
+
+export interface Baldosa {
+  fila: number;
+  col: number;
+  /** Centro de la baldosa, en % del ancho de la imagen. */
+  x: number;
+  /** Centro de la baldosa, en % del alto, desde arriba. */
+  y: number;
+}
+
+export interface Campo {
+  lado: number;
+  imagen: string;
+  ancho: number;
+  alto: number;
+  /** Medio paso de la grilla, en % del lienzo. Con esto se escalan los
+   *  cristales y la nave sin que nadie elija un tamaño a ojo. */
+  pasoX: number;
+  pasoY: number;
+  baldosas: Baldosa[];
+}
+
+export const CAMPOS: Record<number, Campo> = {
+  1: {
+    lado: 1,
+    imagen: "/assets/automatizacion/campo/campo-1x1.webp",
+    ancho: 915,
+    alto: 783,
+    pasoX: 36.6,
+    pasoY: 23,
+    baldosas: [
+      { fila: 0, col: 0, x: 50.8, y: 30.7 },
+    ],
+  },
+  2: {
+    lado: 2,
+    imagen: "/assets/automatizacion/campo/campo-2x2.webp",
+    ancho: 923,
+    alto: 826,
+    pasoX: 21.45,
+    pasoY: 14.53,
+    baldosas: [
+      { fila: 0, col: 0, x: 49.84, y: 18.16 },
+      { fila: 0, col: 1, x: 71.29, y: 32.69 },
+      { fila: 1, col: 0, x: 28.39, y: 32.69 },
+      { fila: 1, col: 1, x: 49.84, y: 47.22 },
+    ],
+  },
+  3: {
+    lado: 3,
+    imagen: "/assets/automatizacion/campo/campo-3x3.webp",
+    ancho: 1098,
+    alto: 917,
+    pasoX: 17.6753,
+    pasoY: 11.0675,
+    baldosas: [
+      { fila: 0, col: 0, x: 49.884, y: 16.512 },
+      { fila: 0, col: 1, x: 67.559, y: 27.579 },
+      { fila: 0, col: 2, x: 85.234, y: 38.647 },
+      { fila: 1, col: 0, x: 32.208, y: 27.579 },
+      { fila: 1, col: 1, x: 49.884, y: 38.647 },
+      { fila: 1, col: 2, x: 67.559, y: 49.714 },
+      { fila: 2, col: 0, x: 14.533, y: 38.647 },
+      { fila: 2, col: 1, x: 32.208, y: 49.714 },
+      { fila: 2, col: 2, x: 49.884, y: 60.782 },
+    ],
+  },
+  4: {
+    lado: 4,
+    imagen: "/assets/automatizacion/campo/campo-4x4.webp",
+    ancho: 1137,
+    alto: 957,
+    pasoX: 12.9631,
+    pasoY: 10.0979,
+    baldosas: [
+      { fila: 0, col: 0, x: 48.752, y: 11.1 },
+      { fila: 0, col: 1, x: 61.715, y: 21.198 },
+      { fila: 0, col: 2, x: 74.678, y: 31.296 },
+      { fila: 0, col: 3, x: 87.641, y: 41.394 },
+      { fila: 1, col: 0, x: 35.789, y: 21.198 },
+      { fila: 1, col: 1, x: 48.752, y: 31.296 },
+      { fila: 1, col: 2, x: 61.715, y: 41.394 },
+      { fila: 1, col: 3, x: 74.678, y: 51.491 },
+      { fila: 2, col: 0, x: 22.826, y: 31.296 },
+      { fila: 2, col: 1, x: 35.789, y: 41.394 },
+      { fila: 2, col: 2, x: 48.752, y: 51.491 },
+      { fila: 2, col: 3, x: 61.715, y: 61.589 },
+      { fila: 3, col: 0, x: 9.862, y: 41.394 },
+      { fila: 3, col: 1, x: 22.826, y: 51.491 },
+      { fila: 3, col: 2, x: 35.789, y: 61.589 },
+      { fila: 3, col: 3, x: 48.752, y: 71.687 },
+    ],
+  },
+};
+
+export const LADO_MAXIMO = 4;
+
+export function campoDe(lado: number): Campo {
+  return CAMPOS[Math.min(Math.max(lado, 1), LADO_MAXIMO)] ?? CAMPOS[1];
+}

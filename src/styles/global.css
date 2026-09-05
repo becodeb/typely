@@ -1699,6 +1699,882 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   MODO AUTOMATIZACIÓN — prefijo .auto-*
+   Nada de acá toca `glass-surface` ni el borde de gradiente de la
+   consigna: ese sigue siendo exclusivo de los niveles (CLAUDE.md §15).
+   ════════════════════════════════════════════════════════════════════ */
+
+.auto-pantalla {
+  position: relative;
+  height: 100dvh;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1.32fr) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 10px 18px;
+  padding: 12px 18px 14px;
+  background-size: cover;
+  background-position: center;
+}
+
+/* Texto suelto con halo — nunca una barra opaca sobre el cielo. */
+.auto-dato {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: #17355f;
+  text-shadow:
+    0 2px 0 rgba(255, 255, 255, 0.95),
+    0 0 14px rgba(255, 255, 255, 0.9),
+    0 0 30px rgba(255, 255, 255, 0.7);
+}
+
+.auto-vidrio {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 24px 60px rgba(54, 86, 134, 0.22);
+  border-radius: 28px;
+}
+
+/* ---------------- el taller de programación ---------------- */
+.auto-taller {
+  grid-column: 1;
+  grid-row: 2;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px;
+}
+
+.auto-caja {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 10px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.55);
+  overflow-y: auto;
+}
+
+.auto-lienzo {
+  position: relative;
+  min-height: 0;
+  border-radius: 20px;
+  padding: 14px 16px;
+  overflow: auto;
+  background-color: rgba(255, 255, 255, 0.34);
+  background-image: radial-gradient(rgba(83, 107, 255, 0.22) 1.4px, transparent 1.4px);
+  background-size: 22px 22px;
+}
+
+/* La memoria: una hilera de luces dentro de una pastilla lila, en la
+   esquina de la libreta. Es EXACTAMENTE el dibujo de la mejora "más
+   memoria" (IcoMemoria), para que el chico ligue las dos cosas. Antes
+   eran tres puntos grises sueltos y centrados, que se leían como un
+   "cargando…". */
+.auto-memoria {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #e9e1ff;
+  border: 1.5px solid #c3b1ee;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+.auto-luz {
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1.5px #c3b1ee;
+}
+.auto-luz--on {
+  background: linear-gradient(160deg, #7ff3dc, #25c8df);
+  box-shadow: 0 0 9px rgba(37, 200, 223, 0.75);
+}
+/* Sin memoria para una pieza más: las luces se sacuden y no pasa nada
+   más. Ni modal ni cartel (MVP.md §7). */
+.auto-memoria--llena { animation: auto-corto 0.42s ease; }
+
+.auto-pila { display: flex; flex-direction: column; align-items: flex-start; }
+.auto-lienzo__pista { margin-top: 12px; font-size: 14px; font-weight: 600; color: #6b7bab; }
+/* Mientras hay una pieza en el aire, la libreta se ilumina apenas: es
+   el lugar donde se puede soltar. */
+.auto-lienzo--recibiendo {
+  background-color: rgba(255, 255, 255, 0.44);
+  box-shadow: inset 0 0 0 2px rgba(84, 232, 198, 0.6);
+}
+
+/* ---------------- los bloques ----------------
+   La forma es de Scratch: muesca arriba, lengüeta abajo, cerca del
+   borde izquierdo, y encastran sin espacio. Es lo único que separa "un
+   bloque de programación" de "un botón lindo". */
+.auto-bloque {
+  --auto-tab: 11px;
+  --auto-color: #4aa8f0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 172px;
+  min-height: 60px;
+  padding: 0 14px var(--auto-tab);
+  margin-bottom: calc(var(--auto-tab) * -1);
+  border: 0;
+  cursor: pointer;
+  color: #fff;
+
+  /* Volumen. Un color plano se lee como una calcomanía; lo que hace que
+     una pieza parezca un objeto es el degradado vertical (luz arriba,
+     sombra abajo) más el filo claro del canto superior. */
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--auto-color) 78%, #fff) 0%,
+      var(--auto-color) 46%,
+      color-mix(in srgb, var(--auto-color) 86%, #000) 100%
+    );
+
+  /* El relieve va por `drop-shadow` y NO por `box-shadow`: `clip-path`
+     recorta la caja, y con ella cualquier sombra exterior. La primera
+     sombra sólida es el espesor de la pieza —lo que la hace parecer una
+     ficha con canto—, la segunda es la sombra blanda sobre el lienzo. */
+  filter:
+    drop-shadow(0 4px 0 color-mix(in srgb, var(--auto-color) 62%, #000))
+    drop-shadow(0 9px 12px rgba(54, 86, 134, 0.28));
+
+  /* Muesca arriba, lengüeta abajo, y esquinas achaflanadas: el chaflán
+     es lo que saca el aire de "recorte con tijera" que deja un polígono
+     de esquinas vivas. */
+  clip-path: polygon(
+    7px 0, 17px 0, 25px var(--auto-tab), 41px var(--auto-tab), 49px 0, calc(100% - 7px) 0,
+    100% 7px,
+    100% calc(100% - var(--auto-tab) - 7px), calc(100% - 7px) calc(100% - var(--auto-tab)),
+    49px calc(100% - var(--auto-tab)), 41px 100%, 25px 100%, 17px calc(100% - var(--auto-tab)),
+    7px calc(100% - var(--auto-tab)), 0 calc(100% - var(--auto-tab) - 7px),
+    0 7px
+  );
+  transition: filter 0.16s ease, transform 0.16s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.auto-bloque::after {
+  /* Brillo del canto superior: una banda muy tenue, no un reflejo. */
+  content: "";
+  position: absolute;
+  inset: 2px 8px auto 8px;
+  height: 38%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.4), transparent);
+  pointer-events: none;
+}
+.auto-bloque:hover {
+  transform: translateY(-2px);
+  filter:
+    drop-shadow(0 6px 0 color-mix(in srgb, var(--auto-color) 62%, #000))
+    drop-shadow(0 12px 16px rgba(54, 86, 134, 0.3))
+    brightness(1.05);
+}
+/* Al apretar, la pieza se hunde y el espesor se achica: el gesto se
+   siente porque la sombra acompaña, no sólo porque baja. */
+.auto-bloque:active {
+  transform: translateY(3px);
+  filter:
+    drop-shadow(0 1px 0 color-mix(in srgb, var(--auto-color) 62%, #000))
+    drop-shadow(0 4px 6px rgba(54, 86, 134, 0.26));
+}
+.auto-bloque:disabled { cursor: default; }
+.auto-bloque svg { width: 31px; height: 31px; flex: none; position: relative; }
+
+/* ---------------- agarrar y soltar ----------------
+   Las piezas se arrastran con Pointer Events, y para que el dedo no
+   desplace la página en vez de la pieza hay que apagar `touch-action`
+   en las asas. La caja y la libreta siguen desplazándose por el aire
+   que hay entre piezas. */
+.auto-bloque,
+.auto-repetir__lomo,
+.auto-repetir__brazo {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+}
+.auto-caja .auto-bloque,
+.auto-pila .auto-bloque,
+.auto-repetir__lomo,
+.auto-repetir__brazo { cursor: grab; }
+.auto-caja .auto-bloque:active,
+.auto-pila .auto-bloque:active { cursor: grabbing; }
+
+/* La pieza que se levantó deja su sombra en el lugar de donde salió. */
+.auto-bloque--levantado,
+.auto-repetir--levantado { opacity: 0.28; filter: saturate(0.4); }
+
+/* El hueco que se abre donde la pieza va a caer: la silueta exacta de
+   un bloque, del color de la pieza, latiendo. Es lo que hace que el
+   arrastre se entienda antes de soltar. */
+.auto-bloque--marca {
+  background: color-mix(in srgb, var(--auto-color) 42%, #fff);
+  filter: none;
+  pointer-events: none;
+  animation: auto-marca 0.9s ease-in-out infinite;
+}
+.auto-bloque--marca::after { display: none; }
+.auto-bloque--marca-ancha { width: 220px; }
+@keyframes auto-marca {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.95; }
+}
+
+/* El fantasma: la pieza en el aire, apenas inclinada y con una sombra
+   más larga, como algo que se despegó de la mesa. */
+.auto-fantasma {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  transform: rotate(-3deg) scale(1.05);
+  transform-origin: 30% 40%;
+}
+.auto-fantasma > .auto-bloque { width: 100%; margin: 0; }
+.auto-fantasma .auto-bloque {
+  filter:
+    drop-shadow(0 6px 0 color-mix(in srgb, var(--auto-color) 62%, #000))
+    drop-shadow(0 22px 26px rgba(54, 86, 134, 0.42));
+}
+.auto-fantasma .auto-repetir { margin: 0; filter: drop-shadow(0 22px 26px rgba(54, 86, 134, 0.42)); }
+
+/* El bloque que la nave está ejecutando ahora mismo. */
+.auto-bloque--activo {
+  animation: auto-late 0.6s ease-in-out infinite;
+}
+@keyframes auto-late {
+  0%, 100% {
+    transform: scale(1);
+    filter:
+      drop-shadow(0 4px 0 color-mix(in srgb, var(--auto-color) 62%, #000))
+      drop-shadow(0 9px 12px rgba(54, 86, 134, 0.28));
+  }
+  50% {
+    transform: scale(1.05);
+    filter:
+      drop-shadow(0 5px 0 color-mix(in srgb, var(--auto-color) 62%, #000))
+      drop-shadow(0 12px 20px rgba(84, 232, 198, 0.55))
+      brightness(1.16);
+  }
+}
+
+.auto-hueco {
+  width: 168px;
+  height: 48px;
+  border-radius: 12px;
+  border: 2px dashed rgba(83, 107, 255, 0.38);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* En la caja de piezas no encastran: se ven sueltas y separadas. */
+.auto-caja .auto-bloque {
+  width: 128px;
+  min-height: 52px;
+  margin-bottom: 4px;
+}
+/* Con muchas piezas, dos columnas de bloques más angostos: se ven todas. */
+.auto-caja--doble {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 6px;
+  align-content: start;
+}
+.auto-caja--doble .auto-bloque { width: 96px; min-height: 48px; padding-left: 8px; padding-right: 8px; }
+.auto-caja--doble .auto-bloque svg { width: 27px; height: 27px; }
+
+/* ---------------- el contenedor Repetir ---------------- */
+.auto-repetir {
+  --auto-tab: 10px;
+  width: max-content;
+  margin-bottom: calc(var(--auto-tab) * -1);
+  color: #fff;
+}
+.auto-repetir__lomo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 200px;
+  min-height: 54px;
+  padding: 0 16px;
+  background: var(--auto-tono, #ff8fc0);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.35);
+  clip-path: polygon(
+    0 0, 16px 0, 24px var(--auto-tab), 40px var(--auto-tab), 48px 0, 100% 0, 100% 100%, 0 100%
+  );
+}
+.auto-repetir__veces {
+  min-width: 46px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: #fff;
+  color: #17355f;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 22px;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+  border: 0;
+}
+.auto-repetir__quitar {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 24px;
+  line-height: 1;
+  padding: 0 4px;
+}
+.auto-hueco--cavidad { width: 150px; }
+/* Un asidero de teclado para los contenedores sin número ni sensor: se
+   ve como el dibujo del lomo, pero recibe el foco. */
+.auto-repetir__asidero {
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  cursor: grab;
+}
+.auto-repetir__asidero:focus-visible { outline: 3px solid #fff; outline-offset: 2px; border-radius: 8px; }
+
+/* La pastilla del sensor: el dibujo de lo que la nave mira, y una barra
+   roja encima cuando está negado. Se toca para cambiar. */
+.auto-sensor {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 46px;
+  height: 38px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 0;
+  background: #fff;
+  cursor: pointer;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.08);
+}
+.auto-sensor__dibujo { position: relative; display: inline-flex; width: 30px; height: 30px; }
+.auto-sensor__dibujo > svg { width: 100%; height: 100%; }
+.auto-sensor__no { position: absolute; inset: 0; }
+
+/* El brazo del medio de un Si/sino: divide las dos cavidades. */
+.auto-repetir__brazo--medio {
+  clip-path: none;
+  min-height: 30px;
+  padding: 0 14px;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.12), inset 0 3px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* El contenedor cuyo bucle está esperando (un tic por vuelta vacía). */
+.auto-repetir--activo .auto-repetir__lomo { animation: auto-latir-lomo 0.7s ease-in-out infinite; }
+@keyframes auto-latir-lomo {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.18); }
+}
+
+/* En la caja, los contenedores llevan dos dibujos chicos si son dobles. */
+.auto-bloque__extra { width: 22px !important; height: 22px !important; opacity: 0.85; }
+
+/* Una pieza dibujada como ficha, para la tienda. */
+.auto-ficha {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 44px;
+  height: 34px;
+  flex: none;
+  border-radius: 9px;
+  color: #fff;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--auto-color) 78%, #fff), var(--auto-color) 60%);
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--auto-color) 62%, #000);
+}
+.auto-ficha svg { width: 24px; height: 24px; }
+.auto-repetir__cuerpo { display: flex; }
+.auto-repetir__espina {
+  width: 20px;
+  flex: none;
+  background: var(--auto-tono, #ff8fc0);
+}
+.auto-repetir__cavidad {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 172px;
+  min-height: 54px;
+  padding: 8px 8px 8px 0;
+}
+.auto-repetir__brazo {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 34px;
+  padding: 0 14px var(--auto-tab);
+  background: var(--auto-tono, #ff8fc0);
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.14);
+  clip-path: polygon(
+    0 0, 100% 0, 100% calc(100% - var(--auto-tab)), 48px calc(100% - var(--auto-tab)),
+    40px 100%, 24px 100%, 16px calc(100% - var(--auto-tab)), 0 calc(100% - var(--auto-tab))
+  );
+}
+
+/* ---------------- el campo ---------------- */
+.auto-campo {
+  grid-column: 2;
+  grid-row: 2;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 8px;
+  place-items: center;
+}
+/* El visor contiene y la escena se contiene: la misma fórmula que
+   .island-stage (CLAUDE.md §6.1). La escena entra SIEMPRE entera, así
+   que una baldosa nunca queda fuera de pantalla. */
+.auto-visor {
+  container-type: size;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+}
+/* La isla es un tablero visto desde arriba, no un primer plano: ocupa
+   una parte del visor (`--auto-escala`, de escena.ts) y queda un poco
+   por debajo del centro, dejando arriba el aire para los cristales que
+   sobresalen. */
+.auto-escena {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  width: calc(min(100cqw, 100cqh) * var(--auto-escala, 1));
+  margin-top: calc(min(100cqw, 100cqh) * (1 - var(--auto-escala, 1)) * 0.35);
+}
+.auto-isla { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/* Cada pieza son capas anidadas, y la separación es necesaria:
+   `.auto-ancla` apoya la pieza sobre su zócalo con `translate` y anima
+   el traslado entre baldosas; `.auto-cuerpo` despega e inclina la nave
+   con `translate`/`rotate`; `.auto-flota` hace el vaivén con `transform`.
+   En un solo elemento, una propiedad pisaría a la otra y la nave
+   aterrizaría de golpe en la esquina del lienzo. */
+.auto-ancla {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+  translate: -50% -75%;
+  transition: left 0.42s cubic-bezier(0.45, 0, 0.2, 1), top 0.42s cubic-bezier(0.45, 0, 0.2, 1);
+}
+.auto-ancla img { position: static; display: block; width: 100%; }
+
+.auto-flota { animation: auto-flotar 3.1s ease-in-out infinite; }
+.auto-flota--lento { animation-duration: 4.4s; }
+
+/* Sombra de contacto de un cristal: una elipse blanda EN EL ANCLA (el
+   centro de la baldosa), que es lo que lo apoya en el anillo en vez de
+   dejarlo pegado encima de la ilustración. */
+.auto-apoyo {
+  position: absolute;
+  left: 50%;
+  top: 75%;
+  aspect-ratio: 2.4 / 1;
+  translate: -50% -50%;
+  border-radius: 999px;
+  background: radial-gradient(ellipse at center, rgba(70, 40, 120, 0.42), rgba(70, 40, 120, 0.18) 45%, transparent 72%);
+}
+
+/* Cada cambio de etapa entra con un pop elástico desde el apoyo: se ve
+   crecer, no aparecer. */
+.auto-brota {
+  transform-origin: 50% 75%;
+  animation: auto-brotar 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes auto-brotar {
+  0% { scale: 0.55 1.0; opacity: 0.4; }
+  100% { scale: 1 1; opacity: 1; }
+}
+
+/* Llegar a maduro: un aro de luz que se abre y unos destellos que suben.
+   Pasa una vez, en el momento, y se apaga. */
+.auto-estallido {
+  position: absolute;
+  left: 50%;
+  top: 75%;
+  width: 90%;
+  aspect-ratio: 1.6 / 1;
+  translate: -50% -50%;
+  border-radius: 999px;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 30% 20%, #fff 0 4%, transparent 5%),
+    radial-gradient(circle at 72% 12%, #fff 0 3%, transparent 4%),
+    radial-gradient(circle at 85% 55%, #fff 0 3.5%, transparent 4.5%),
+    radial-gradient(circle at 14% 62%, #fff 0 3%, transparent 4%),
+    radial-gradient(ellipse at center, color-mix(in srgb, var(--auto-tinte, #fff) 70%, #fff), transparent 62%);
+  animation: auto-estallar 0.85s ease-out forwards;
+}
+@keyframes auto-estallar {
+  0% { opacity: 0; transform: scale(0.3) translateY(0); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.35) translateY(-30%); }
+}
+
+/* El resplandor del cristal MADURO: luz interior que sale por la base y
+   late despacio. Va detrás de la pieza, centrado en su apoyo, del color
+   del mineral (`--auto-tinte`). Es la señal de "listo" que no depende
+   del color: el brote y el creciendo no lo tienen. */
+.auto-brillo {
+  position: absolute;
+  left: 50%;
+  top: 75%;
+  width: 78%;
+  aspect-ratio: 1.9 / 1;
+  translate: -50% -50%;
+  border-radius: 999px;
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, var(--auto-tinte, #fff) 85%, #fff) 0%,
+    color-mix(in srgb, var(--auto-tinte, #fff) 55%, transparent) 38%,
+    transparent 70%
+  );
+  filter: blur(2px);
+  animation: auto-brillar 2.6s ease-in-out infinite;
+}
+@keyframes auto-brillar {
+  0%, 100% { opacity: 0.55; transform: scale(0.92); }
+  50% { opacity: 0.95; transform: scale(1.08); }
+}
+@keyframes auto-flotar {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3.5%); }
+}
+
+/* La sombra de la nave queda FUERA del elemento que flota y EN EL ANCLA
+   (el centro de la baldosa): si subiera con la nave el efecto sería un
+   salto, y si se dibujara más abajo la nave se leería delante de la
+   isla entera, que es lo que pasaba. Quieta ahí dice en qué baldosa
+   está parada. Volando, la sombra se achica y se aclara: la nave está
+   más lejos del piso. */
+.auto-sombra {
+  position: absolute;
+  left: 50%;
+  top: 75%;
+  width: 52%;
+  aspect-ratio: 2.4 / 1;
+  translate: -50% -50%;
+  border-radius: 999px;
+  background: radial-gradient(ellipse at center, rgba(60, 40, 110, 0.45), rgba(60, 40, 110, 0.2) 45%, transparent 72%);
+  transition: scale 0.45s ease, opacity 0.45s ease;
+}
+.auto-ancla--volando .auto-sombra { scale: 0.78; opacity: 0.65; }
+
+/* El cuerpo de la nave: estacionado apoya sobre su sombra; volando sube
+   un poco y se inclina apenas hacia adelante, como algo que empuja. */
+.auto-cuerpo {
+  display: block;
+  position: relative;
+  transition: translate 0.45s cubic-bezier(0.34, 1.3, 0.64, 1), rotate 0.45s ease;
+}
+.auto-ancla--volando .auto-cuerpo { translate: 0 -7%; rotate: -2.5deg; }
+
+/* El motor: un resplandor turquesa bajo el casco. Parado, apenas late;
+   volando, se enciende de verdad. */
+.auto-motor {
+  position: absolute;
+  left: 50%;
+  top: 70%;
+  width: 46%;
+  aspect-ratio: 2.2 / 1;
+  translate: -50% -50%;
+  border-radius: 999px;
+  background: radial-gradient(ellipse at center, rgba(160, 255, 240, 0.85), rgba(84, 232, 198, 0.4) 40%, transparent 70%);
+  filter: blur(2px);
+  opacity: 0.25;
+  animation: auto-motor 1.6s ease-in-out infinite;
+  transition: opacity 0.4s ease;
+}
+.auto-ancla--volando .auto-motor { opacity: 0.9; animation-duration: 0.7s; }
+@keyframes auto-motor {
+  0%, 100% { transform: scale(0.9); }
+  50% { transform: scale(1.1); }
+}
+
+/* ---------------- lo que pasa cuando la nave actúa ----------------
+   Cosechar: el cristal sube hacia la nave achicándose, con un fogonazo
+   en el zócalo y un +1 que flota. Cosechar en vacío: un anillo punteado
+   que se disipa. Chocar: la nave se sacude. Todas son animaciones de
+   una sola pasada (`forwards`): comunican y se apagan. */
+.auto-efecto { pointer-events: none; }
+.auto-absorbido {
+  transform-origin: 50% 75%;
+  animation: auto-absorber 0.62s cubic-bezier(0.5, 0, 0.75, 0.3) forwards;
+}
+@keyframes auto-absorber {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  55% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-36%) scale(0.2); }
+}
+.auto-fogonazo {
+  position: absolute;
+  left: 50%;
+  top: 75%;
+  width: 72%;
+  aspect-ratio: 2 / 1;
+  translate: -50% -50%;
+  border-radius: 999px;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 255, 255, 0.98),
+    color-mix(in srgb, var(--auto-tinte, #7ff3dc) 70%, #fff) 40%,
+    transparent 70%
+  );
+  animation: auto-fogonazo 0.55s ease-out forwards;
+}
+@keyframes auto-fogonazo {
+  0% { opacity: 0; transform: scale(0.4); }
+  30% { opacity: 1; transform: scale(1.1); }
+  100% { opacity: 0; transform: scale(1.5); }
+}
+.auto-mas {
+  position: absolute;
+  translate: -50% -50%;
+  pointer-events: none;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(18px, 7cqw, 40px);
+  color: #ffd552;
+  paint-order: stroke fill;
+  -webkit-text-stroke: 0.09em #fff;
+  text-shadow: 0 2px 0 #fff, 0 0 14px rgba(255, 255, 255, 0.9), 0 6px 18px rgba(54, 86, 134, 0.35);
+  animation: auto-subir 1.05s ease-out forwards;
+}
+@keyframes auto-subir {
+  0% { opacity: 0; transform: translateY(0) scale(0.6); }
+  20% { opacity: 1; transform: translateY(-30%) scale(1.15); }
+  100% { opacity: 0; transform: translateY(-190%) scale(1); }
+}
+.auto-nada {
+  position: absolute;
+  translate: -50% -50%;
+  pointer-events: none;
+  aspect-ratio: 2 / 1;
+  border-radius: 999px;
+  border: 3px dashed rgba(23, 53, 95, 0.38);
+  animation: auto-nada 0.65s ease-out forwards;
+}
+@keyframes auto-nada {
+  0% { opacity: 0; transform: scale(0.5); }
+  30% { opacity: 0.9; }
+  100% { opacity: 0; transform: scale(1.35); }
+}
+/* Cosechar verde: el cristal se agrieta, pierde el color y se hunde. Es
+   el precio de no mirar antes de cosechar, y tiene que doler un poco. */
+.auto-roto {
+  transform-origin: 50% 75%;
+  animation: auto-romper 0.7s ease-in forwards;
+}
+@keyframes auto-romper {
+  0% { opacity: 1; transform: translateX(0) scale(1); filter: saturate(1) brightness(1); }
+  15% { transform: translateX(-4%) rotate(-3deg); filter: saturate(0.4) brightness(1.4); }
+  30% { transform: translateX(4%) rotate(3deg); }
+  45% { transform: translateX(-2%) rotate(-1deg); filter: saturate(0.2) brightness(0.9); }
+  100% { opacity: 0; transform: translateY(12%) scale(0.7); filter: saturate(0) brightness(0.6); }
+}
+.auto-esquirlas {
+  position: absolute;
+  left: 50%;
+  top: 60%;
+  width: 70%;
+  aspect-ratio: 1.4 / 1;
+  translate: -50% -50%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 20% 40%, rgba(90, 60, 130, 0.85) 0 5%, transparent 6%),
+    radial-gradient(circle at 78% 30%, rgba(90, 60, 130, 0.85) 0 4%, transparent 5%),
+    radial-gradient(circle at 50% 80%, rgba(90, 60, 130, 0.85) 0 4.5%, transparent 5.5%),
+    radial-gradient(circle at 88% 70%, rgba(90, 60, 130, 0.85) 0 3.5%, transparent 4.5%);
+  animation: auto-esquirlar 0.7s ease-out forwards;
+}
+@keyframes auto-esquirlar {
+  0% { opacity: 0; transform: scale(0.4); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.6) translateY(20%); }
+}
+.auto-golpe { display: block; animation: auto-golpear 0.42s ease; }
+@keyframes auto-golpear {
+  0%, 100% { translate: 0 0; rotate: 0deg; }
+  25% { translate: -4% 1%; rotate: -5deg; }
+  60% { translate: 3% 0; rotate: 3deg; }
+}
+
+/* Zócalo vacío: la ilustración ya trae el destello grabado, así que acá
+   sólo se le suma el latido de luz. */
+.auto-semilla {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+  aspect-ratio: 2.1 / 1;
+  translate: -50% -50%;
+  border-radius: 999px;
+  background: radial-gradient(ellipse at center, rgba(150, 255, 240, 0.75), rgba(84, 232, 198, 0) 68%);
+  animation: auto-semilla 2.8s ease-in-out infinite;
+}
+@keyframes auto-semilla {
+  0%, 100% { opacity: 0.32; transform: scale(0.9); }
+  50% { opacity: 0.78; transform: scale(1.08); }
+}
+
+/* ---------------- botón principal ---------------- */
+.auto-empezar {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  height: 64px;
+  padding: 0 34px;
+  border: 0;
+  border-radius: 22px;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 22px;
+  color: #0d3b46;
+  background: linear-gradient(135deg, #7bf0c2, #35d6a4 55%, #25c8df);
+  box-shadow: 0 14px 30px rgba(35, 190, 180, 0.4), inset 0 -4px 0 rgba(0, 0, 0, 0.12);
+  transition: transform 0.14s ease, filter 0.14s ease;
+}
+.auto-empezar:hover { transform: translateY(-2px); filter: brightness(1.04); }
+.auto-empezar:active { transform: scale(0.98); }
+.auto-empezar:disabled { opacity: 0.5; cursor: default; transform: none; }
+/* Detener es ROJO por control inmediato, no por error, y ocupa la misma
+   posición y el mismo tamaño: el chico no tiene que buscarlo. */
+.auto-empezar--detener {
+  color: #fff;
+  background: linear-gradient(135deg, #ff8a8a, #f2545b 60%, #e0344a);
+  box-shadow: 0 14px 30px rgba(230, 60, 80, 0.38), inset 0 -4px 0 rgba(0, 0, 0, 0.14);
+}
+
+/* ---------------- franja de mejoras ---------------- */
+.auto-mejoras {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  overflow-x: auto;
+}
+.auto-mejora {
+  flex: 1 0 150px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 60px;
+  padding: 0 14px;
+  border: 1px solid rgba(130, 140, 190, 0.2);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 5px 14px rgba(54, 86, 134, 0.12);
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 19px;
+  color: #17355f;
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+.auto-mejora:hover { transform: translateY(-2px); }
+.auto-mejora > svg { width: 32px; height: 32px; flex: none; }
+.auto-mejora__precio { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+/* Un precio son cristales: el ícono del mineral y el número, tantas
+   veces como minerales pida. */
+.auto-precio { display: inline-flex; align-items: center; gap: 10px; }
+.auto-precio__parte { display: inline-flex; align-items: center; gap: 4px; }
+/* La evolución muestra el cristal mismo, con su flecha y sus luces de nivel. */
+.auto-mejora__evo { position: relative; display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.auto-mejora__cristal { width: 40px; height: 40px; object-fit: contain; display: block; }
+.auto-mejora__flecha { position: absolute; left: 26px; top: -4px; width: 17px; height: 17px; }
+.auto-nivel { display: inline-flex; flex-direction: column; gap: 3px; }
+.auto-nivel__luz {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1.4px #c3b1ee;
+}
+.auto-nivel__luz--on { background: linear-gradient(160deg, #7ff3dc, #25c8df); box-shadow: 0 0 6px rgba(37, 200, 223, 0.7); }
+
+/* Los contadores de la cabecera: uno por mineral, del color de su cristal. */
+.auto-saldos { display: flex; align-items: center; gap: 22px; }
+.auto-saldos .auto-dato { gap: 6px; }
+.auto-mejora--nueva {
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.94), rgba(214, 246, 255, 0.8));
+  border-color: rgba(84, 232, 198, 0.75);
+  box-shadow: 0 0 0 2px rgba(84, 232, 198, 0.35), 0 8px 20px rgba(37, 200, 223, 0.3);
+}
+.auto-mejora:disabled { cursor: default; }
+/* Lugar reservado para una categoría que todavía no se reveló. */
+.auto-mejora--hueco {
+  background: transparent;
+  border: 2px dashed rgba(130, 140, 190, 0.26);
+  box-shadow: none;
+  cursor: default;
+}
+/* Saldo insuficiente: un pulso que conecta el precio con el contador.
+   Nunca un modal (MVP.md §8). */
+.auto-mejora--corto { animation: auto-corto 0.42s ease; }
+@keyframes auto-corto {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.auto-cabecera {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auto-bloque--activo,
+  .auto-bloque--marca,
+  .auto-memoria--llena,
+  .auto-semilla,
+  .auto-flota,
+  .auto-sombra,
+  .auto-mejora--corto { animation: none; }
+  .auto-bloque--marca { opacity: 0.85; }
+  .auto-brillo { animation: none; opacity: 0.85; }
+  .auto-brota, .auto-estallido, .auto-motor { animation: none; }
+  .auto-ancla, .auto-cuerpo, .auto-sombra { transition: none; }
+  .auto-pieza { transition: none; }
+  /* Con menos movimiento, los efectos sólo aparecen y se desvanecen. */
+  .auto-absorbido, .auto-fogonazo, .auto-nada, .auto-mas, .auto-golpe, .auto-roto, .auto-esquirlas {
+    animation: auto-desvanecer 0.9s ease-out forwards;
+  }
+}
+@keyframes auto-desvanecer {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+
+/* ════════════════════════════════════════════════════════════════════
    COMPACT-HEIGHT PASS — ventana SIN pantalla completa (la barra del
    navegador roba ~120px). El gameplay es una columna flex de altura fija:
    acá achicamos lo flexible (teclas, paddings) para que la consigna, el

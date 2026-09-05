@@ -53,6 +53,18 @@ screenshots/
 # Pliego de contacto de los iconos de Órbita (scripts/preview-orbita-iconos.mjs)
 .preview-orbita/
 
+# Bundles del examen del motor de Automatización (scripts/probar-automatizacion.mjs)
+.preview-automatizacion/
+
+# Fuentes 3D del modo Automatización: los .glb y .blend pesan decenas de MB
+# y git guarda cada versión para siempre. Se renderizan a PNG y ESO se
+# versiona; el modelo vive fuera del repo (ver Images/automatizacion/LEEME.md).
+Images/**/*.glb
+Images/**/*.gltf
+Images/**/*.blend
+Images/**/*.blend1
+Images/**/*.fbx
+
 # Borradores de diseno del canvas (scripts/prompt-fondo.mjs y /design)
 .design-isla1/
 .design-gestion/
