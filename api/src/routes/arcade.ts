@@ -10,10 +10,13 @@
  *    no se le enseña qué chequeo lo atrapó.
  *
  *  - LOS CRISTALES LOS ACUÑA EL SERVIDOR. El cliente informa lo que mostró
- *    (palabras + extra de cosecha + bono de rango) y acá se recomputa el
- *    tope teórico; se acredita el menor de los dos. El HUD nunca puede
- *    prometer más de lo que el servidor va a pagar… salvo trampa, y en ese
- *    caso paga cero.
+ *    (palabras TIPEADAS + bono de rango) y acá se recomputa el tope
+ *    teórico; se acredita el menor de los dos. El HUD nunca puede prometer
+ *    más de lo que el servidor va a pagar… salvo trampa, y en ese caso paga
+ *    cero. Desde las mejoras permanentes (migración 0004) una partida trae
+ *    además su nivel y su build: la bala extra y el golpe crítico destruyen
+ *    palabras que nadie tipeó, y sin saberlo el escéptico las marcaría como
+ *    imposibles.
  *
  *  - ALIAS, NUNCA NOMBRE REAL, hacia afuera. El top global cruza escuelas y
  *    son menores. El nombre real solo aparece para un actor cuyo alcance ya
@@ -47,6 +50,12 @@ const BONO_RANGO: Record<string, number> = {
   leyenda: 45,
 };
 const RANGOS_VALIDOS = Object.keys(BONO_RANGO);
+
+/* Las trece mejoras — ESPEJO de `MejoraId` en src/utils/orbita/motor.ts. */
+const MEJORAS_IDS = [
+  "bala", "segunda", "vida", "regeneracion", "escudo", "critico",
+  "viento", "foco", "onda", "congelar", "iman", "racha", "teclas",
+] as const;
 
 /* Catálogo del hangar — ESPEJO de src/data/orbitaCosmeticos.ts. El precio
    que vale es ESTE: el cliente muestra el suyo, el servidor cobra el suyo. */
@@ -128,8 +137,21 @@ const runItemSchema = z.object({
   charsTyped: z.number().int().min(0),
   errors: z.number().int().min(0),
   crystalsClaimed: z.number().int().min(0),
+  /* Mejoras permanentes por nivel (2026-09-05, migración 0004). Las tres
+     son OPCIONALES a propósito: una cola guardada en el navegador antes de
+     este deploy llega sin ellas y tiene que seguir entrando. */
+  wordsTyped: z.number().int().min(0).optional(),
+  level: z.number().int().min(0).max(40).default(0),
+  upgrades: z
+    .array(z.object({ id: z.enum(MEJORAS_IDS), level: z.number().int().min(1).max(9) }))
+    .max(40)
+    .default([]),
 });
 type RunItem = z.infer<typeof runItemSchema>;
+
+function nivelDe(it: RunItem, id: (typeof MEJORAS_IDS)[number]): number {
+  return it.upgrades.find((u) => u.id === id)?.level ?? 0;
+}
 
 const runSchema = z.union([
   runItemSchema.transform((item) => ({ items: [item] })),
@@ -140,20 +162,38 @@ const runSchema = z.union([
  *  arbitra el récord mundial, se filtra al que abrió la consola. */
 function validarCoherencia(it: RunItem): boolean {
   if (!RANGOS_VALIDOS.includes(it.rankId)) return false;
-  if (it.durationMs < 15_000 || it.durationMs > 320_000) return false;
+  /* El motor corta a los 225 s (el techo del híbrido de mejoras); 240 deja
+     aire para el redondeo del cliente. */
+  if (it.durationMs < 15_000 || it.durationMs > 240_000) return false;
   if (it.wpmPeak > 250 || it.wpmAvg > 200) return false;
   const segundos = it.durationMs / 1000;
   if (it.charsTyped > segundos * 25) return false; // 25 pulsaciones/s sostenidas: no
-  if (it.wordsDestroyed > it.charsTyped) return false;
+  /* Lo TIPEADO necesita teclas; lo destruido incluye lo tipeado. */
+  const tipeadas = it.wordsTyped ?? it.wordsDestroyed;
+  if (tipeadas > it.charsTyped) return false;
+  if (tipeadas > it.wordsDestroyed) return false;
+  /* Lo que cayó sin tipearse solo puede venir de la bala extra (cada
+     palabra tipeada arrastra hasta tantas como balas extra tenga) o del
+     golpe crítico (una más). Sin esas mejoras, destruido == tipeado. */
+  const arrastre = nivelDe(it, "bala") + (nivelDe(it, "critico") > 0 ? 1 : 0);
+  if (it.wordsDestroyed > tipeadas * (1 + arrastre)) return false;
+  /* Cada nivel es una carta elegida: el nivel no puede superar la suma de
+     los niveles de la build (más uno, si la partida terminó con las cartas
+     todavía en pantalla). */
+  const nivelesBuild = it.upgrades.reduce((a, u) => a + u.level, 0);
+  if (it.level > nivelesBuild + 1) return false;
   /* Tope teórico de puntos por palabra: la más larga (22), banda 10, amenaza
-     100, racha máxima — redondeado hacia arriba con aire. */
-  if (it.score > it.wordsDestroyed * 3200 + 100) return false;
+     100, racha máxima y Teclas difíciles ×2,5 — 7.644, redondeado con aire. */
+  if (it.score > it.wordsDestroyed * 8000 + 100) return false;
   return true;
 }
 
 function cristalesMaximos(it: RunItem): number {
-  /* palabras + extra de cosecha (nunca más que todas) + bono de rango. */
-  return it.wordsDestroyed * 2 + (BONO_RANGO[it.rankId] ?? 0);
+  const bono = BONO_RANGO[it.rankId] ?? 0;
+  /* Formato anterior a las mejoras (sin wordsTyped): palabras + extra de
+     cosecha, como pagaba entonces. Con mejoras, solo lo tipeado + el bono. */
+  if (it.wordsTyped === undefined) return it.wordsDestroyed * 2 + bono;
+  return it.wordsTyped + bono;
 }
 
 /* ------------------------------------------------------------------ */
@@ -266,6 +306,9 @@ export async function arcadeRoutes(app: FastifyInstance) {
         crystalsEarned: cristales,
         weekKey: claveSemana(new Date(it.endedAt)),
         ranked: ok,
+        wordsTyped: it.wordsTyped ?? it.wordsDestroyed,
+        level: it.level,
+        upgrades: JSON.stringify(it.upgrades),
       });
       if (ok) {
         algunaRankeada = true;

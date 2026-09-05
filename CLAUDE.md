@@ -845,8 +845,9 @@ con `SoloEnComputadora` igual que los niveles), `/orbita/ranking`,
 `src/utils/orbita/motor.ts` no toca DOM: un controlador de lazo cerrado mide
 PPM×precisión^1.7 en ventana de 10 s, estima el techo del jugador (R̂, solo
 sube) y exige `R̂ × (1 + margen(t))` con un margen que va de **−15 % al
-arrancar a +35 % a los 120 s** — la partida dura ~2:00 ± 0:30 PARA CUALQUIERA
-por construcción. Los primeros 4-10 s son un **vuelo de prueba**: llueven
+arrancar a +35 % a los 120 s** y sigue creciendo (exponente 2) — la partida
+BASE dura ~2:00 PARA CUALQUIERA por construcción; las mejoras permanentes
+(más abajo) la estiran, con un corte duro a los 3:45. Los primeros 4-10 s son un **vuelo de prueba**: llueven
 palabras cada vez más rápido (tres en pantalla, sin asomo de banda, intervalo
 ≤ 2,5 s) y nada lastima. El vuelo corta cuando el tope de tres queda lleno
 1,5 s seguidos, cuando una palabra casi impacta, cuando el chico lleva 2,5 s
@@ -860,19 +861,53 @@ del vuelo reciben 40 % más de viaje. En la partida, si el chico vacía la
 pantalla y espera más del 15 % del intervalo entre palabras, R̂ **empuja**
 (25 %/s; 30 %/s en el vuelo): la adaptación es por lo que hacés, no por
 reloj. Tres frenos a ese empuje, y los tres fueron trinquetes reales: no
-cuenta mientras un *lento*, un *pulso* o un *rayo* vacían la pantalla; nunca
+cuenta mientras una *bala*, un *crítico* o una *onda* vacían la pantalla; nunca
 lleva R̂ más allá de 1,35 × la demanda; y la cadencia se mide contra el largo
 REAL de la última palabra, no contra el largo medio de la banda (un "@" de la
 banda de símbolos dejaba la pantalla vacía todo su intervalo y R̂ pasaba de
 50 a 102 en cinco segundos). Dos exámenes, y hay que correr los dos después
 de tocar cualquier valor de `AJUSTES`: `node scripts/simular-tormenta.mjs`
-(seis tipeadores sintéticos de 8 a 85 PPM; los seis tienen que caer en
-90–150 s de mediana) y `node scripts/jugar-tormenta.mjs` (diez jugadores
-guionados — el que arranca mal y termina brillante, el que se distrae, el
-que no toca nada — con métricas de sensación: huecos, ahogo, en qué segundo
-se pierde cada corazón, amenaza en el tiempo, poderes verificados,
-invariantes). Los dos aceptan `--ajuste clave=valor` para probar una perilla
+(seis tipeadores sintéticos de 8 a 85 PPM que eligen cartas al azar; los
+seis tienen que caer en 90–180 s de mediana y NINGUNA partida pasa de 225 s)
+y `node scripts/jugar-tormenta.mjs` (trece jugadores guionados — el que
+arranca mal y termina brillante, el que se distrae, el que no toca nada, y
+tres builds fijas: defensiva, ofensiva y cazador de balas — con métricas de
+sensación: huecos, ahogo, en qué segundo se pierde cada corazón, amenaza en
+el tiempo, niveles y build, invariantes del sorteo). Los dos aceptan `--ajuste clave=valor` para probar una perilla
 sin editar el motor. No dar por buena una calibración que no pase los dos.
+
+**Mejoras permanentes por nivel** (2026-09-05, diseño en el artefacto
+"Mejoras de Tormenta"; reemplazaron a los siete poderes que caían al azar).
+El puntaje cruza umbrales geométricos (`nivelUmbral0: 250` × `nivelRazon:
+1.5`ⁿ, el primero a los ~20 s); en cada uno el motor se PAUSA (`eligiendo`),
+sortea tres cartas por rareza (común 65 · rara 28 · épica 7) y espera
+`elegir()`, que rechaza lo que no ofreció. Se elige con las teclas 1-2-3 o
+tocando, sin cuenta regresiva ni "volver a tirar". Trece mejoras
+(`MEJORAS` en el motor, `MejoraId`), cada una con su tabla por nivel en
+`AJUSTES`: bala extra (el rayo se bifurca y cae también la más urgente —
+mitad de puntos, sin racha), segunda oportunidad, +1 vida (tope blando 5),
+regeneración (30/20/12 s), escudo latente (20/12/8 s sin daño), golpe
+crítico (15/30/45 % con palabra limpia), viento a favor (8/15/20 % más
+lento), foco (la más urgente marcada y apuntada sola), onda de choque (al
+subir de nivel y cada 12/8 palabras), congelar al errar (0,5/0,8/1,2 s con
+cooldown FIJO de 12 s: si mejorara el cooldown, errar a propósito sería
+estrategia), imán, racha blindada (perdones que se renuevan por nivel) y
+teclas difíciles (×1,5/2/2,5 por mayúsculas, tildes y símbolos). Topes
+duros salen del sorteo; los blandos (bala, vida) quedan con peso chico —
+con suerte pueden tocar igual. Se fue el impuesto por poder
+(`margenPorAuxilio`): las mejoras VALEN, y el techo lo ponen la curva del
+margen y `duracionTopeSegundos: 225` — la amenaza está topeada en 100, así
+que un tipeador perfecto con Viento e Imán la sostenía indefinidamente. Los
+cristales se acuñan sobre lo TIPEADO (`palabrasTipeadas`), nunca sobre lo
+que cayó por bala o crítico; el servidor recibe nivel y build (migración
+`0004`, columnas `words_typed`, `level`, `upgrades`) y `validarCoherencia`
+sabe cuántas palabras puede arrastrar cada bala. Las gemas de las mejoras
+son las mismas gemas redondas de los poderes (cuatro reusadas: lento →
+viento, mira → foco, escudo, pulso → onda; reparación → +1 vida) más ocho
+nuevas (`ORBITA.md` §7.6); la rareza va en el marco de la carta (CSS),
+nunca en la gema. Al subir de nivel hay que ELEGIR también en los exámenes:
+los jugadores guionados leen `motor.eligiendo` después de cada tick y de
+cada tecla, porque el nivel sube dentro de `tecla()`.
 
 **Reglas que no se negocian:**
 
@@ -930,7 +965,7 @@ siendo texto suelto con halo, nunca tarjetas. Las palabras que vuelan nacen a
 cercanía y latido coral pasado el 72 % del viaje; las mayúsculas van doradas
 y un 30 % más grandes; y el texto va SIEMPRE derecho — es un juego de tipeo,
 nada rota salvo las letras de una palabra que ya murió. Lo que se ve grande (insignia
-del resultado y del podio, gema del poder que llega a la nave, cristal del
+del resultado y del podio, gemas de las cartas y de la build, cristal del
 saldo) son objetos 3D generados en `public/assets/orbita/{insignias,gemas}/`
 que `InsigniaRango tamano="grande"` y `Gema` cargan con respaldo SVG; el
 horizonte de las islas (`fondo/horizonte.webp`) y la estación del hub

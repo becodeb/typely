@@ -1273,6 +1273,128 @@ a { color: inherit; text-decoration: none; }
 .orb-carta__puntos i.prox { background: #ffd552; box-shadow: 0 0 8px rgba(255, 213, 82, 0.8); }
 @media (max-width: 720px) { .orb-cartas { grid-template-columns: 1fr; } }
 
+/* ---- La build en el HUD y en el resultado ----
+   Gemas chicas en fila con puntitos de nivel debajo. En el HUD va abajo a
+   la izquierda, texto suelto sin tarjeta como todo el HUD; en la tarjeta
+   de resultado se centra. Congelar lleva su cooldown como un anillo
+   cónico que se va completando (--orb-cd, 0deg → 360deg). */
+.orb-build {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none;
+}
+.orb-build--resultado {
+  position: static;
+  justify-content: center;
+  align-items: center;
+  gap: 8px 10px;
+  margin-top: 4px;
+}
+.orb-build__nivel {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #c98a00;
+  margin-right: 4px;
+}
+.orb-build__gema {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  animation: orbGemaEntra 420ms cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+@keyframes orbGemaEntra { from { scale: 0.3; opacity: 0; } to { scale: 1; opacity: 1; } }
+.orb-build__gema .orb-gema img { filter: drop-shadow(0 4px 10px rgba(5, 11, 30, 0.45)); }
+.orb-build__puntos { display: flex; gap: 3px; }
+.orb-build__puntos i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #5be8ba;
+  box-shadow: 0 0 6px rgba(91, 232, 186, 0.7);
+}
+.orb-build--resultado .orb-build__puntos i { background: #1fa88f; box-shadow: none; }
+/* El anillo del cooldown se dibuja detrás de la gema: gris lo que falta,
+   celeste lo que ya pasó. */
+.orb-build__gema--cooldown .orb-gema { filter: saturate(0.4) brightness(0.8); }
+.orb-build__gema--cooldown::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  translate: -50% 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: conic-gradient(rgba(207, 238, 255, 0.95) var(--orb-cd, 0deg), rgba(207, 238, 255, 0.18) 0);
+  mask: radial-gradient(circle, transparent 17px, #000 18px);
+  -webkit-mask: radial-gradient(circle, transparent 17px, #000 18px);
+}
+
+/* Barra de nivel bajo el puntaje: cuánto falta para la próxima carta. */
+.orb-nivel {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  margin-top: 4px;
+}
+.orb-nivel__rotulo { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #ffd552; }
+.orb-nivel__riel {
+  display: block;
+  width: 120px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.orb-nivel__riel i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ffd552, #ff9fca);
+  box-shadow: 0 0 10px rgba(255, 213, 82, 0.6);
+  transition: width 300ms ease-out;
+}
+
+/* Congelar al errar: escarcha sobre la escena mientras nada avanza. */
+.orb-escena--congelada::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(80% 60% at 50% 50%, transparent 55%, rgba(207, 238, 255, 0.28)),
+    linear-gradient(180deg, rgba(207, 238, 255, 0.1), rgba(207, 238, 255, 0.02));
+  animation: orbEscarcha 220ms ease-out both;
+}
+@keyframes orbEscarcha { from { opacity: 0; } to { opacity: 1; } }
+
+/* Onda de choque: un anillo que sale de la nave y empuja todo. */
+.orb-escena--onda::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 84%;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid rgba(37, 200, 223, 0.9);
+  box-shadow: 0 0 24px rgba(37, 200, 223, 0.6), inset 0 0 24px rgba(37, 200, 223, 0.3);
+  translate: -50% -50%;
+  pointer-events: none;
+  animation: orbOnda 900ms ease-out both;
+}
+@keyframes orbOnda {
+  from { scale: 0.2; opacity: 1; }
+  to   { scale: 40; opacity: 0; }
+}
+
 /* Palabra que trae un PODER escondido: estela de cometa iridiscente — la
    misma para todos los poderes, a propósito: es una sorpresa, y cuál era
    se sabe recién cuando llega a la nave. */
@@ -1933,6 +2055,14 @@ a { color: inherit; text-decoration: none; }
   }
   .orb-palabra--poder .orb-palabra__cuerpo { text-shadow: 0 0 6px rgba(5,11,30,.95), 0 0 14px #9b7cff, 0 0 28px rgba(155,124,255,.6); }
   .orb-cadaver i { animation-duration: 160ms; animation-delay: 0ms; }
+  /* Las mejoras: la tarjeta y las gemas aparecen sin animar; la onda y la
+     escarcha se muestran quietas un instante — siguen siendo información. */
+  .orb-eleccion, .orb-eleccion__tarjeta, .orb-build__gema, .orb-carta--epica::after,
+  .orb-escena--onda::before, .orb-escena--congelada::after {
+    animation: none;
+  }
+  .orb-escena--onda::before { scale: 12; opacity: 0.35; }
+  .orb-nivel__riel i { transition: none; }
   /* El viaje y la revelación se acortan a un destello, no se anulan: son
      información (qué poder llegó), no decoración. */
   .orb-viaje { animation-duration: 120ms; }
