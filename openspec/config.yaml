@@ -1,0 +1,72 @@
+schema: spec-driven
+
+sdd_session:
+  execution_mode: auto
+  artifact_store: openspec
+  delivery_strategy: auto-chain
+  review_budget_lines: 800
+
+context: |
+  Stack: Vite 7 + React 19 + TypeScript + Tailwind 4 SPA (package.json name
+  "edutic", product name TYPELY); Fastify + Drizzle ORM + Postgres 16 API
+  under api/. Two Docker containers (frontend/Nginx, API) behind a Coolify
+  reverse proxy, plus a Coolify-managed Postgres. UI reads/writes localStorage
+  for the hot path; the API is the sole source of truth for cross-device
+  progress — there is no localStorage auth fallback.
+  Branching: work happens on `dev`; `production` is what is deployed and only
+  receives finished changes via PR from `dev`. Never commit to `production`
+  directly. Current checkout branch: docs/modo-automatizacion-mvp (docs-only).
+  Testing: no test runner is configured in package.json (verified — no
+  vitest/jest/playwright/cypress dependency in either package.json). The
+  de-facto verification is `npm run build` (`tsc --noEmit && vite build`) plus
+  the bespoke harness `node scripts/probar-automatizacion.mjs`, which esbuild-
+  bundles src/utils/automatizacion/{motor,programa,almacenamiento}.ts and
+  src/data/automatizacion/balance.ts on the fly and runs 14 manual cases plus
+  economy invariants from docs/modo-automatizacion/IMPLEMENTACION.md §14.
+  Style: Spanish-first UI copy (correct tildes, ñ, inverted ¿ ¡ required); no
+  linter or formatter is configured. CLAUDE.md at repo root is the single
+  source of truth for architecture, RBAC, assets, and workflow — AGENTS.md and
+  .cursor/rules/project.mdc are stubs that point back to it.
+  Active feature: "Modo Automatización" (a block-programming sandbox mode,
+  crystal-themed) is spec'd under docs/modo-automatizacion/ (README.md,
+  MVP.md, IMPLEMENTACION.md, PROGRESION.md) and is already playable on branch
+  docs/modo-automatizacion-mvp. Implemented in src/pages/automatizacion/,
+  src/components/automatizacion/, src/utils/automatizacion/ (motor, interprete,
+  programa, almacenamiento) and src/data/automatizacion/ (balance, campos,
+  escena). PROGRESION.md §10 tracks the cuts: 1 (escena), 2 (minerales y
+  evolución) and 3 (intérprete y bloques de control) are done; cut 4 (rutinas y
+  contador) and cut 5 (escala 5x5, segunda nave) are pending, plus the deferred
+  CSS for crystal evolution levels (§3).
+
+rules:
+  proposal:
+    - Include a rollback plan for anything touching auth/RBAC, migrations, or the deploy pipeline
+    - State which branch the change targets (dev, never production directly)
+    - Note when a change affects Spanish-facing copy (tildes, ñ, ¿¡ must stay correct)
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+    - Reference the relevant CLAUDE.md section number when a requirement encodes an existing project rule
+  design:
+    - Include sequence diagrams for flows crossing the Nginx / Fastify API / Postgres boundary
+    - Document rationale for anything touching RBAC (CLAUDE.md §4) or the localStorage-to-API sync queue
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+    - Flag any task that touches `Images/` originals, `api/migrations/`, or `VITE_*` env exposure as high-risk
+  apply:
+    guidelines:
+      - Follow existing code patterns in src/ and api/src/
+      - Never modify original art in Images/ or Images-new/ — regenerate web copies via the Python/Node scripts under scripts/
+      - Never put secrets in VITE_* — JWT_SECRET and DATABASE_URL stay server-side only
+      - Preserve internal edutic_*/islandN identifiers; only user-facing strings say "TYPELY"
+      - Run npm run build (tsc --noEmit && vite build) before claiming a task done
+    tdd: false            # no test runner exists in this repo; do not assert one
+    test_command: "node scripts/probar-automatizacion.mjs"   # only meaningful for src/utils/automatizacion and src/data/automatizacion changes
+  verify:
+    test_command: "node scripts/probar-automatizacion.mjs"   # scope: Modo Automatización engine/balance only
+    build_command: "npm run build"
+    coverage_threshold: 0   # no coverage tooling configured
+  archive:
+    - Warn before merging destructive deltas
+    - Never archive a change that skipped npm run build verification
