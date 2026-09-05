@@ -135,6 +135,12 @@ muestran el cristal mismo, no una palabra. Un solo nivel de anidamiento
 sigue valiendo para `Repetir` dentro de `Por siempre`; `Si` puede ir adentro
 de cualquiera. Profundidad máxima 2.
 
+La profundidad máxima 2 no cambia con el lienzo, pero ahora la mide la
+CADENA: agarrar un bloque se lleva todo lo que cuelga debajo, y lo que decide
+si entra es el eslabón MÁS ALTO, no el primero. Una cadena que lleve un `Por
+siempre` o una `Mi rutina` sólo puede caer al nivel del lienzo, nunca dentro
+de una cavidad.
+
 ### Qué NO entra
 
 Listas, diccionarios, texto, números negativos, operadores aritméticos
@@ -257,7 +263,11 @@ Cada corte deja el juego jugable y el examen en verde.
    comprarse, para que el prisma no quede atrás de una compra más.
 4. **Rutinas y contador** (§5 niveles 3–4): `Mi rutina`, `Hacer`, contador,
    tamaño del campo, `Hacer con N`. **Hecho (2026-09-05).**
-5. **Escala** (§4 era 5): isla 5×5 ilustrada, segunda nave. **Pendiente.**
+5. **Lienzo libre** (§5, §11): el editor deja de ser una lista y pasa a ser un
+   lienzo 2D con un bloque verde de arranque; agarrar se lleva la cadena
+   entera; lo suelto no se ejecuta pero ocupa memoria; el tachito y la paleta
+   borran; `schemaVersion` 3 con migración. **Hecho (2026-09-05).**
+6. **Escala** (§4 era 5): isla 5×5 ilustrada, segunda nave. **Pendiente.**
 
 ## 11. Criterios de aceptación (agregados a los del MVP)
 

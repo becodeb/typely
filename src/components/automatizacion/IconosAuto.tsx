@@ -539,6 +539,20 @@ export function IcoRecentrar({ className }: Props) {
   );
 }
 
+/** El tachito: la papelera del lienzo (tarea 3.1). Tapa con asa y tres
+ *  costillas adentro del cuerpo, la misma silueta de siempre para que se
+ *  lea como "basura" sin necesidad de texto. */
+export function IcoTachito({ className }: Props) {
+  return (
+    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
+      <path d="M9 11h16l-1.5 16.4a2 2 0 0 1-2 1.85H12.5a2 2 0 0 1-2-1.85L9 11z" fill="currentColor" />
+      <path d="M6 11h22" {...trazo} strokeWidth="3.4" />
+      <path d="M13 8.2c0-1.5 1.4-2.7 3.1-2.7h1.6c1.7 0 3.1 1.2 3.1 2.7" {...trazo} strokeWidth="3" />
+      <path d="M14 15.5v9M17 15.5v9M20 15.5v9" stroke="#fff" strokeWidth="2" strokeLinecap="round" opacity="0.85" />
+    </svg>
+  );
+}
+
 /** El destello de cuatro puntas del mundo: marca el zócalo vacío donde
  *  todavía no brotó nada. */
 export function Destello({ className, style }: Props) {

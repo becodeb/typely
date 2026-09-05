@@ -2582,7 +2582,10 @@ a { color: inherit; text-decoration: none; }
   .auto-semilla,
   .auto-flota,
   .auto-sombra,
-  .auto-mejora--corto { animation: none; }
+  .auto-mejora--corto,
+  .auto-caja--llena .auto-bloque { animation: none; }
+  .auto-caja--llena .auto-bloque { opacity: 0.85; }
+  .auto-papelera--activa { transform: none; }
   .auto-bloque--marca { opacity: 0.85; }
   .auto-brillo { animation: none; opacity: 0.85; }
   .auto-brota, .auto-estallido, .auto-motor { animation: none; }
@@ -2677,10 +2680,12 @@ a { color: inherit; text-decoration: none; }
 /* Recentrar: 44 px, piso táctil (CLAUDE.md §6.5). Vive DENTRO del
    envoltorio del HUD, que ya es `position: fixed` calcado al viewport del
    lienzo — por eso este botón es `absolute`, no `fixed`: el portal entero
-   se mueve con un solo `getBoundingClientRect()`. */
+   se mueve con un solo `getBoundingClientRect()`. Abajo a la DERECHA
+   (tarea 3.1): el tachito se queda con la esquina izquierda, así las dos
+   esquinas de abajo tienen cada una su propio botón, sin pisarse. */
 .auto-recentrar {
   position: absolute;
-  left: 12px;
+  right: 12px;
   bottom: 12px;
   width: 44px;
   height: 44px;
@@ -2695,6 +2700,77 @@ a { color: inherit; text-decoration: none; }
 }
 .auto-recentrar:hover { transform: translateY(-2px); }
 .auto-recentrar:active { transform: scale(0.94); }
+
+/* El tachito (tarea 3.1): abajo a la IZQUIERDA del lienzo, 56 px — por
+   encima del piso táctil de 44 (CLAUDE.md §6.5) — y nunca bajo el
+   «Volver», que vive en `.auto-cabecera` (fila 1 de la grilla) y nunca
+   sobre el lienzo: distintas filas de la grilla no pueden superponerse a
+   ninguna altura. Blanco quieto hasta que la cadena agarrada pasa por
+   encima; ahí se enciende igual que `.auto-caja--recibe`. */
+.auto-papelera {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 2px solid rgba(130, 140, 190, 0.28);
+  color: #52658f;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 10px 22px rgba(54, 86, 134, 0.22);
+}
+.auto-papelera--activa {
+  background: linear-gradient(150deg, #ff9fca, #f0466f);
+  color: #fff;
+  transform: scale(1.12);
+  box-shadow: 0 0 0 6px rgba(240, 70, 111, 0.22);
+}
+/* Soltar sobre la paleta también borra (tarea 3.2): el mismo aviso que el
+   tachito, pero en la caja de piezas — un marco interior, no un cambio de
+   tamaño, que ahí adentro competiría con las fichas. */
+.auto-caja--recibe { box-shadow: inset 0 0 0 3px rgba(240, 70, 111, 0.55); }
+
+/* Memoria al tope (tarea 3.3): la paleta se apaga y los puntos ENCENDIDOS
+   se ponen rojos. Es un gris de humo, NO el gris de "bloqueado" del mapa
+   de mundos (CLAUDE.md §6.4/§12): ahí un nivel bloqueado pierde mitad de
+   opacidad y lleva un candado; ACÁ el dibujo se queda a plena opacidad,
+   sin candado, y encima lleva DOS señales que el mapa de mundos no usa —
+   el ícono de prohibido sobre cada ficha y un pulso lento— para que
+   "no hay lugar ahora" nunca se lea como "esto no es tuyo". El mensaje lo
+   termina de dar la fila de puntos en rojo (`.auto-luz--llena`). */
+.auto-caja--llena .auto-bloque {
+  --auto-color: #9aa6bf;
+  filter: grayscale(1) drop-shadow(0 3px 0 #6f7c96);
+  cursor: not-allowed;
+  animation: auto-tope-pulso 1.8s ease-in-out infinite;
+}
+.auto-caja--llena .auto-bloque:hover {
+  transform: none;
+  filter: grayscale(1) drop-shadow(0 3px 0 #6f7c96);
+}
+@keyframes auto-tope-pulso {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+/* El "prohibido" sobre cada ficha apagada: mismo dibujo que ya usan los
+   sensores negados, en una esquina, sin robarle lectura al dibujo del
+   bloque. */
+.auto-bloque__tope {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  filter: none;
+  animation: none;
+}
+.auto-luz--llena {
+  background: linear-gradient(160deg, #ff9fca, #f0466f);
+  box-shadow: 0 0 9px rgba(240, 70, 111, 0.75);
+}
+.auto-memoria--tope { background: #ffe4ec; border-color: #f0466f; }
 
 /* El contorno fantasma (tarea 2b.2): "acá va a caer como pila nueva".
    Vive ADENTRO de `.auto-lienzo__capa`, en coordenadas de lienzo, así

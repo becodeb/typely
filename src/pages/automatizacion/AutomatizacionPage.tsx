@@ -439,6 +439,25 @@ export function AutomatizacionPage() {
     [corriendo, e, listaDeRef, fijarListaDeRef, guardarYRepintar],
   );
 
+  /** Borra la cadena de `id` en `origen` ENTERA: el tachito y la paleta
+   *  (tareas 3.1/3.2) son los dos únicos actos de borrado del lienzo.
+   *  `cortarEn` ya se lleva el bloque y todo lo que cuelga debajo —la
+   *  misma cadena que agarraría un arrastre— y acá simplemente se
+   *  descarta ese pedazo en vez de volver a colocarlo en algún lado.
+   *  `fijarListaDeRef` ya tira sola una pila suelta que quedó vacía, así
+   *  que la memoria liberada es automática: `capacidadUsadaCampo` la lee
+   *  de `e` en cada repintado, nunca de un contador aparte. */
+  const borrarCadena = useCallback(
+    (origen: RefPila, id: string) => {
+      if (corriendo) return;
+      const corte = cortarEn(listaDeRef(origen), id);
+      if (!corte) return;
+      fijarListaDeRef(origen, corte.restante);
+      guardarYRepintar();
+    },
+    [corriendo, listaDeRef, fijarListaDeRef, guardarYRepintar],
+  );
+
   /** Una pieza nueva de la caja, soltada en el vacío del lienzo: nace
    *  como pila suelta de un solo bloque en (x, y) — salvo que sea una
    *  `Mi rutina`, que jamás es pila suelta (L14). */
@@ -609,6 +628,7 @@ export function AutomatizacionPage() {
         onMoverCadena={moverCadena}
         onSoltarCadena={soltarCadena}
         onSoltarNueva={soltarNueva}
+        onBorrarCadena={borrarCadena}
       />
 
       <section className="auto-campo" aria-label="El campo">

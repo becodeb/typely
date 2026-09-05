@@ -76,6 +76,7 @@ import {
   IcoSi,
   IcoSiempre,
   IcoSino,
+  IcoTachito,
   IcoTamanoCampo,
 } from "./IconosAuto";
 import { AJUSTES, MINERALES, type Mineral } from "../../data/automatizacion/balance";
@@ -320,8 +321,8 @@ const mismaClave = (a: RefPila, b: RefPila) => claveDePila(a) === claveDePila(b)
 type DestinoLienzo =
   | { tipo: "cadena"; pila: RefPila; destino: Destino } // encastra en un conector
   | { tipo: "nueva"; x: number; y: number } // cae como pila suelta nueva
-  | { tipo: "papelera" } // Fase 3 (tarea 3.1): hoy nada produce este destino
-  | { tipo: "paleta" } // Fase 3 (tarea 3.2): ídem
+  | { tipo: "papelera" } // soltó sobre el tachito (tarea 3.1)
+  | { tipo: "paleta" } // soltó sobre la caja de piezas (tarea 3.2)
   | { tipo: "nocabe" }; // hay conector cerca, pero el anidamiento no entra
 
 /** Umbral en píxeles antes de que un toque se convierta en arrastre. */
@@ -400,6 +401,11 @@ interface Props {
   /** Una pieza nueva de la caja, soltada en el vacío: nace como pila
    *  suelta de un solo bloque en (x, y). */
   onSoltarNueva: (pieza: Pieza, x: number, y: number) => void;
+  /** Borra la cadena de `id` en `origen` entera: el tachito y la paleta
+   *  (tareas 3.1/3.2) son los dos únicos actos de borrado del lienzo. Si
+   *  la cadena venía de la caja (nunca llegó a existir en el lienzo) esta
+   *  función ni se llama — ver `alSoltar`. */
+  onBorrarCadena: (origen: RefPila, id: string) => void;
 }
 
 /** Tamaño del ancla verde: la cadena cuelga justo debajo, pegada. */
@@ -429,6 +435,11 @@ export function EditorBloques(props: Props) {
      las rutinas y las pilas sueltas — las tres nativas desde que se borró
      el puente temporal (tarea 2b.5). */
   const usada = capacidadDeLienzo(programa, rutinas, pilasSueltas);
+  /* Memoria al tope (tarea 3.3): la paleta se apaga en gris y los puntos
+   *  se ponen rojos. La condición es la misma que ya frena `agarrar`
+   *  desde la caja (`entra`), acá sólo se hace VISIBLE antes de que el
+   *  chico intente tomar un bloque y lo sacuda contra la pared. */
+  const lleno = usada >= capacidad;
   /* Qué letras ya tienen `Mi rutina` definida: mientras no la tengan se
      ofrece definirla, y una vez definida se ofrece llamarla — nunca las
      dos piezas juntas para la misma letra. */
@@ -632,6 +643,64 @@ export function EditorBloques(props: Props) {
     return capacidadDeLienzo(p.programa, p.rutinas, p.pilasSueltas) + costo <= p.capacidad;
   }, []);
 
+  /* ---------------- teclado cruzado entre pilas (tarea 3.4) ----------------
+     Reordenar DENTRO de una pila sigue siendo `onDesplazar` (sin tocar).
+     Esto es lo nuevo: mover la cadena agarrada A OTRA pila entera, sin
+     soltar nada con el dedo. */
+
+  /** Orden fijo de las pilas del lienzo: la cadena verde, después cada
+   *  `Mi rutina` en el orden en que se definieron, después cada pila
+   *  suelta en el orden en que se soltaron — el mismo orden en que este
+   *  componente las dibuja más abajo. "Anterior"/"siguiente" se leen de
+   *  ESTE orden, no de una posición en pantalla. */
+  const ordenPilas = useCallback((): RefPila[] => {
+    const p = propsRef.current;
+    return [
+      { donde: "verde" } as RefPila,
+      ...p.rutinas.map((r) => ({ donde: "rutina", id: r.id }) as RefPila),
+      ...p.pilasSueltas.map((pi) => ({ donde: "suelta", id: pi.id }) as RefPila),
+    ];
+  }, []);
+
+  /** La pila anterior/siguiente a `actual`, o `null` en el borde: no hay
+   *  "anterior" antes del verde ni "siguiente" después de la última pila
+   *  suelta — ahí `Alt+↑/↓` simplemente no hace nada. */
+  const pilaVecina = useCallback(
+    (actual: RefPila, delta: -1 | 1): RefPila | null => {
+      const orden = ordenPilas();
+      const i = orden.findIndex((r) => mismaClave(r, actual));
+      if (i < 0) return null;
+      return orden[i + delta] ?? null;
+    },
+    [ordenPilas],
+  );
+
+  /** `Alt+↑/↓`: agarra la cadena de `id` —y todo lo que cuelga debajo,
+   *  igual que arrastrar (`cortarEn`)— y la encastra al FINAL de la pila
+   *  anterior o siguiente. Mismo camino que ya usa el arrastre
+   *  (`onMoverCadena`): sólo cambia quién elige el destino. */
+  const moverEntrePilas = useCallback(
+    (origen: RefPila, id: string, delta: -1 | 1) => {
+      const destinoPila = pilaVecina(origen, delta);
+      if (!destinoPila) return;
+      propsRef.current.onMoverCadena(origen, id, destinoPila, { tipo: "final" });
+    },
+    [pilaVecina],
+  );
+
+  /** `Alt+Shift+↓`: desprende la cadena de `id` como pila suelta nueva,
+   *  justo donde ya se veía dibujada — se lee la posición del propio
+   *  bloque en pantalla y se convierte a coordenadas de lienzo, el mismo
+   *  camino que `alSoltar` usa con el punto donde se soltó el puntero. */
+  const desprenderComoSuelta = useCallback(
+    (origen: RefPila, id: string, elemento: Element | null) => {
+      const r = elemento?.getBoundingClientRect();
+      const punto = r ? aLienzo(r.left, r.top) : null;
+      propsRef.current.onSoltarCadena(origen, id, Math.round(punto?.x ?? 0), Math.round(punto?.y ?? 0));
+    },
+    [aLienzo],
+  );
+
   /* ---------------- el arrastre ---------------- */
 
   /** ¿`id` está en la cadena agarrada, o adentro de una de sus cavidades?
@@ -657,13 +726,17 @@ export function EditorBloques(props: Props) {
       const lienzo = lienzoRef.current;
       if (!lienzo) return { tipo: "nueva", x: 0, y: 0 };
 
-      // 1 · papelera (tarea 3.1): sin `[data-papelera]` en el DOM todavía
-      // este paso nunca encuentra nada — queda listo, no activo.
+      // 1 · papelera (tarea 3.1): un rect fijo, chico — se resuelve antes
+      // que nada más, incluso antes que un conector cercano: si el chico
+      // apuntó al tachito, apuntó a borrar, no a encastrar.
       const papelera = document.querySelector("[data-papelera]");
       if (papelera && dentroDe(papelera.getBoundingClientRect(), cx, cy)) return { tipo: "papelera" };
-      // 2 · paleta (tarea 3.2): el hit-test contra `.auto-caja` llega en
-      // Fase 3; hoy soltar ahí simplemente no encuentra conector y cae en
-      // el paso 4 como pila nueva.
+      // 2 · paleta (tarea 3.2): hit-test INTENCIONAL contra el rect de
+      // `.auto-caja` — NO el viejo efecto-secundario "afuera de la
+      // libreta" que la 2b sacó a propósito. Soltar sobre la paleta borra
+      // la cadena entera, agarrada de la caja o del lienzo.
+      const caja = document.querySelector(".auto-caja");
+      if (caja && dentroDe(caja.getBoundingClientRect(), cx, cy)) return { tipo: "paleta" };
 
       // Sobre el hueco que ya se abrió, el destino no cambia: abrir el
       // hueco corre los bloques de abajo, y sin esta regla el puntero
@@ -801,11 +874,10 @@ export function EditorBloques(props: Props) {
        justamente el gesto normal —dejarla en un lugar vacío— y hubiera
        hecho desaparecer la cadena entera sin que nadie la mandara ahí. */
     if (d.tipo === "papelera" || d.tipo === "paleta") {
-      // El tachito y el borrado por paleta llegan en la Fase 3 (tareas
-      // 3.1/3.2): hoy ningún elemento del DOM produce este destino, así
-      // que esta rama nunca se alcanza — queda lista para no repetir el
-      // `if` cuando se conecte `onBorrarCadena`. Mientras tanto, NADA se
-      // borra soltando en el lienzo.
+      // El tachito y la paleta borran la cadena AGARRADA entera (tareas
+      // 3.1/3.2). Si salió de la caja nunca llegó a existir en el lienzo:
+      // no hay nada que borrar, y soltarla ahí simplemente no hace nada.
+      if (a.origen.desde === "lienzo") api.onBorrarCadena(a.origen.ref, a.origen.id);
     } else if (d.tipo === "nocabe") {
       // Donde no cabe no pasa nada: la cadena vuelve a donde estaba.
     } else if (d.tipo === "cadena") {
@@ -876,15 +948,39 @@ export function EditorBloques(props: Props) {
     props.onAgregar(pieza);
   };
 
-  const teclas = (id: string) => (ev: KeyboardEvent) => {
-    if (corriendo) return;
-    if (ev.key === "ArrowUp" || ev.key === "ArrowDown") {
-      ev.preventDefault();
-      props.onDesplazar(id, ev.key === "ArrowUp" ? -1 : 1);
-    } else if (ev.key === "Delete" || ev.key === "Backspace") {
-      ev.preventDefault();
-      onQuitar(id);
+  /** Flechas: sube/baja el bloque DENTRO de su propia pila
+   *  (`onDesplazar`, sin tocar). `Alt+↑/↓` lo cruza a la pila anterior o
+   *  siguiente entera (tarea 3.4); `Alt+Shift+↓` lo desprende como pila
+   *  suelta. El `preventDefault` de la combinación con Alt va ANTES de
+   *  mirar si el editor corre o si hay pila vecina: `Alt+←` es el Back
+   *  del navegador, la misma trampa que `LevelPositionEditor` ya
+   *  documenta (CLAUDE.md §6.1) — frenar el evento no puede depender de
+   *  si la acción termina haciendo algo. */
+  const teclas = (id: string, refPila: RefPila | null) => (ev: KeyboardEvent) => {
+    if (ev.key !== "ArrowUp" && ev.key !== "ArrowDown") {
+      if (corriendo) return;
+      if (ev.key === "Delete" || ev.key === "Backspace") {
+        ev.preventDefault();
+        onQuitar(id);
+      }
+      return;
     }
+    if (ev.altKey) {
+      ev.preventDefault();
+      if (corriendo || !refPila) return;
+      if (ev.shiftKey) {
+        if (ev.key === "ArrowDown") {
+          const elemento = ev.target instanceof Element ? ev.target.closest("[data-nodo]") : null;
+          desprenderComoSuelta(refPila, id, elemento);
+        }
+        return;
+      }
+      moverEntrePilas(refPila, id, ev.key === "ArrowUp" ? -1 : 1);
+      return;
+    }
+    if (corriendo) return;
+    ev.preventDefault();
+    props.onDesplazar(id, ev.key === "ArrowUp" ? -1 : 1);
   };
 
   /* ---------------- dónde se abre el hueco ---------------- */
@@ -956,7 +1052,7 @@ export function EditorBloques(props: Props) {
    *  mismo `onCambiarVeces(id)` — la página decide qué campo y qué lista
    *  le toca a cada una inspeccionando el nodo (design.md: "los dos
    *  mecanismos de ciclado existentes se quedan en dos"). */
-  function RanuraNumero(nodo: NodoRepetir | NodoCall | NodoMientras | NodoSi): ReactNode {
+  function RanuraNumero(nodo: NodoRepetir | NodoCall | NodoMientras | NodoSi, refPila: RefPila | null): ReactNode {
     const valor: Veces =
       nodo.type === "repeat"
         ? nodo.times
@@ -969,7 +1065,7 @@ export function EditorBloques(props: Props) {
         className="auto-repetir__veces"
         disabled={corriendo}
         onClick={alClick(() => onCambiarVeces(nodo.id))}
-        onKeyDown={teclas(nodo.id)}
+        onKeyDown={teclas(nodo.id, refPila)}
         aria-label={`${nombreDe(nodo)}. Tocar para cambiar; flechas para mover el bloque`}
       >
         <ContenidoVeces valor={valor} />
@@ -1037,7 +1133,7 @@ export function EditorBloques(props: Props) {
                   <ContenidoVeces valor={nodo.times} />
                 </span>
               ) : (
-                RanuraNumero(nodo)
+                RanuraNumero(nodo, refPila)
               ))}
             {(nodo.type === "while" || nodo.type === "if") &&
               (estatico ? (
@@ -1050,7 +1146,7 @@ export function EditorBloques(props: Props) {
                   className="auto-sensor"
                   disabled={corriendo}
                   onClick={alClick(() => onCambiarSensor(nodo.id))}
-                  onKeyDown={teclas(nodo.id)}
+                  onKeyDown={teclas(nodo.id, refPila)}
                   aria-label={`${nombreSensor(nodo.sensor)}. Tocar para cambiar el sensor; flechas para mover el bloque`}
                 >
                   <DibujoSensor sensor={nodo.sensor} />
@@ -1062,14 +1158,14 @@ export function EditorBloques(props: Props) {
                   <ContenidoVeces valor={nodo.sensor.valor ?? AJUSTES.opcionesContador[0]} />
                 </span>
               ) : (
-                RanuraNumero(nodo)
+                RanuraNumero(nodo, refPila)
               ))}
             {nodo.type === "forever" && !estatico && (
               <button
                 type="button"
                 className="auto-repetir__asidero"
                 disabled={corriendo}
-                onKeyDown={teclas(nodo.id)}
+                onKeyDown={teclas(nodo.id, refPila)}
                 aria-label="Por siempre. Flechas para mover el bloque"
               >
                 <IcoSiempre className="w-[26px] h-[26px]" />
@@ -1140,7 +1236,7 @@ export function EditorBloques(props: Props) {
             disabled={corriendo}
             onPointerDown={puedeArrastrar ? (ev) => agarrar(ev, { desde: "lienzo", ref: refPila!, id: nodo.id }) : undefined}
             onClick={alClick(() => onQuitar(nodo.id))}
-            onKeyDown={teclas(nodo.id)}
+            onKeyDown={teclas(nodo.id, refPila)}
             aria-label={`${nombreDe(nodo)}. Tocar para quitar; flechas para mover`}
           >
             <IcoHacer />
@@ -1162,7 +1258,7 @@ export function EditorBloques(props: Props) {
           onPointerDown={puedeArrastrar ? (ev) => agarrar(ev, { desde: "lienzo", ref: refPila!, id: nodo.id }) : undefined}
         >
           <IcoHacer />
-          {RanuraNumero(nodo)}
+          {RanuraNumero(nodo, refPila)}
           <button
             type="button"
             className="auto-repetir__quitar"
@@ -1198,7 +1294,7 @@ export function EditorBloques(props: Props) {
           disabled={corriendo}
           onPointerDown={puedeArrastrar ? (ev) => agarrar(ev, { desde: "lienzo", ref: refPila!, id: nodo.id }) : undefined}
           onClick={alClick(() => onQuitar(nodo.id))}
-          onKeyDown={teclas(nodo.id)}
+          onKeyDown={teclas(nodo.id, refPila)}
           aria-label={`${nombreDe(nodo)}. Tocar para quitar; flechas para mover`}
         >
           <DibujoContador tipo={nodo.type} />
@@ -1228,7 +1324,7 @@ export function EditorBloques(props: Props) {
         disabled={corriendo}
         onPointerDown={puedeArrastrar ? (ev) => agarrar(ev, { desde: "lienzo", ref: refPila!, id: accion.id }) : undefined}
         onClick={alClick(() => onQuitar(accion.id))}
-        onKeyDown={teclas(accion.id)}
+        onKeyDown={teclas(accion.id, refPila)}
         aria-label={`${nombreDe(accion)}. Tocar para quitar; flechas para mover`}
       >
         <Dibujo tipo={accion.type} />
@@ -1287,8 +1383,15 @@ export function EditorBloques(props: Props) {
   return (
     <section className="auto-taller auto-vidrio" aria-label="Taller de programación">
       {/* La caja de piezas. Con más de siete, dos columnas: que se vean
-          todas sin desplazar. */}
-      <div className={`auto-caja${piezas.length > 7 ? " auto-caja--doble" : ""}`}>
+          todas sin desplazar. Sin memoria (tarea 3.3) se apaga en gris —
+          un gris de humo distinto del "bloqueado" del mapa de mundos
+          (CLAUDE.md §6.4/§12, global.css): a plena opacidad, sin candado,
+          con el ícono prohibido y el pulso que sólo tiene ESTE gris. El
+          borrado por paleta (tarea 3.2) se anuncia con `--recibe`, el
+          mismo lenguaje que ya usa el tachito. */}
+      <div
+        className={`auto-caja${piezas.length > 7 ? " auto-caja--doble" : ""}${lleno ? " auto-caja--llena" : ""}${destino?.tipo === "paleta" ? " auto-caja--recibe" : ""}`}
+      >
         {piezas.map((p) => {
           const muestra = nodoDeMuestra(p);
           return (
@@ -1300,7 +1403,7 @@ export function EditorBloques(props: Props) {
               disabled={corriendo}
               onPointerDown={(ev) => agarrar(ev, { desde: "caja", tipo: p })}
               onClick={alClick(() => intentarAgregar(p))}
-              aria-label={`Agregar ${nombreDe(muestra).toLowerCase()}`}
+              aria-label={`Agregar ${nombreDe(muestra).toLowerCase()}${lleno ? ". Sin memoria disponible" : ""}`}
             >
               {esContenedor(muestra) ? (
                 <>
@@ -1314,6 +1417,7 @@ export function EditorBloques(props: Props) {
               ) : (
                 <Dibujo tipo={muestra.type} />
               )}
+              {lleno && <IcoNo className="auto-bloque__tope" />}
             </button>
           );
         })}
@@ -1393,16 +1497,35 @@ export function EditorBloques(props: Props) {
             style={{ position: "fixed", left: hudRect.left, top: hudRect.top, width: hudRect.width, height: hudRect.height, pointerEvents: "none" }}
           >
             {/* La memoria: luces, no un número. Es la misma hilera que
-                dibuja la mejora "más memoria", así el chico liga las dos. */}
+                dibuja la mejora "más memoria", así el chico liga las dos.
+                Al tope (tarea 3.3) los puntos ENCENDIDOS se ponen rojos
+                (`--llena`, no `--on`) y la pastilla se tiñe: el mensaje
+                de "no hay lugar" lo terminan de dar ELLOS, no la paleta
+                gris sola. */}
             <div
-              className={`auto-memoria${sacudida ? " auto-memoria--llena" : ""}`}
+              className={`auto-memoria${sacudida ? " auto-memoria--llena" : ""}${lleno ? " auto-memoria--tope" : ""}`}
               role="img"
-              aria-label={`Memoria: ${usada} de ${capacidad}`}
+              aria-label={`Memoria: ${usada} de ${capacidad}${lleno ? ", al tope" : ""}`}
               style={{ pointerEvents: "auto" }}
             >
               {Array.from({ length: capacidad }, (_, i) => (
-                <span key={i} className={`auto-luz${i < usada ? " auto-luz--on" : ""}`} />
+                <span key={i} className={`auto-luz${i < usada ? (lleno ? " auto-luz--llena" : " auto-luz--on") : ""}`} />
               ))}
+            </div>
+
+            {/* El tachito (tarea 3.1): abajo a la izquierda del lienzo, 56 px
+                —por encima del piso táctil de 44 (CLAUDE.md §6.5)— y nunca
+                bajo el «Volver», que vive en la cabecera y nunca sobre el
+                lienzo. Es un BLANCO de soltar, no un botón: la geometría de
+                `calcularDestinoLienzo` lo encuentra por `data-papelera`, no
+                por un click acá. */}
+            <div
+              className={`auto-papelera${destino?.tipo === "papelera" ? " auto-papelera--activa" : ""}`}
+              data-papelera=""
+              role="img"
+              aria-label="Papelera: soltar acá borra la cadena agarrada entera"
+            >
+              <IcoTachito className="w-[26px] h-[26px]" />
             </div>
 
             <button

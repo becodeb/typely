@@ -50,12 +50,22 @@ type RepeatNode = {
 
 type ProgramNode = ActionNode | RepeatNode;
 type Program = ProgramNode[];
+
+/** El lienzo. `Program` NO cambia de tipo: ahora significa «la cadena que
+ *  cuelga del bloque verde». */
+type Stack = { id: string; x: number; y: number; nodos: ProgramNode[] };
+type Canvas = {
+  programa: Program;      // lo único que se ejecuta
+  rutinas: DefNode[];     // definiciones: siempre raíz, siempre llamables
+  pilasSueltas: Stack[];  // inertes y atenuadas, pero cuentan para la memoria
+};
 ```
 
 - IDs estables para resaltar el bloque activo.
 - JSON versionado y validado al cargar.
 - Enteros, profundidad y cantidad de pasos acotados.
-- Cada acción y contenedor cuenta para capacidad; también su contenido.
+- Cada acción y contenedor cuenta para capacidad; también su contenido, y
+  también lo que quedó suelto en el lienzo.
 - El intérprete produce pasos y la UI los anima.
 - Prohibido generar/evaluar JavaScript (`eval`, `Function`, scripts dinámicos).
 

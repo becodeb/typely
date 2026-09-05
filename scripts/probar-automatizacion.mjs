@@ -796,6 +796,80 @@ prueba("L15 · soltar una cadena agarrada como pila nueva conserva la identidad 
   igual(despues, antes, "mover bloques del lienzo a una pila suelta nueva no cambia la capacidad total usada");
 });
 
+prueba("L16 · borrar una cadena agarrada (tachito/paleta) quita EXACTAMENTE su costo de capacidadDeLienzo, y nada más", () => {
+  const rutinas = [def("A", [acc("wait", "w")])]; // 1 (def) + 1 (cuerpo) = 2
+  const otraSuelta = { id: "otra", x: 5, y: 5, nodos: [acc("harvest", "co")] }; // 1
+  const programa = [
+    acc("move_forward", "a"),
+    rep(2, [acc("harvest", "h"), acc("turn_right", "g")], "r"), // 3
+    acc("plant", "p"),
+  ];
+  const pilasSueltas = [otraSuelta];
+  const antes = P.capacidadDeLienzo(programa, rutinas, pilasSueltas);
+
+  // `onBorrarCadena` (EditorBloques.tsx) corta con el mismo `cortarEn` que
+  // usa el arrastre —se lleva "r" y "p", lo que cuelga debajo— y DESCARTA
+  // lo agarrado en vez de volver a colocarlo en algún lado.
+  const corte = P.cortarEn(programa, "r");
+  cierto(corte !== null);
+  const programaSinR = corte.restante;
+  const despues = P.capacidadDeLienzo(programaSinR, rutinas, pilasSueltas);
+
+  igual(despues, antes - P.capacidadUsada(corte.agarrado), "el delta es EXACTAMENTE lo que se borró (2 acciones + 1 contenedor)");
+  igual(programaSinR.map((n) => n.id), ["a"], "sólo desapareció la cadena borrada, nada más de la cadena verde");
+  igual(rutinas, [def("A", [acc("wait", "w")])], "borrar del lienzo no toca las rutinas");
+  igual(pilasSueltas, [otraSuelta], "borrar de la cadena verde no toca otras pilas sueltas");
+});
+
+prueba("L17 · una pila suelta que queda vacía se descarta sola al guardar/cargar, no es un error", () => {
+  const base = M.estadoInicial(azar);
+  const { nave: _nave, ...guardado } = base;
+  guardado.schemaVersion = 3;
+  guardado.rutinas = [];
+  guardado.pilasSueltas = [
+    { id: "vacia", x: 1, y: 1, nodos: [] },
+    { id: "viva", x: 2, y: 2, nodos: [acc("wait", "w")] },
+  ];
+  const e = A.validarCampo(guardado);
+  cierto(e !== null, "una pila sin nodos no invalida la partida");
+  igual(e.pilasSueltas.map((p) => p.id), ["viva"], "la pila vacía se cae sola; la que tiene contenido sobrevive");
+});
+
+prueba("L18 · el predicado de memoria al tope es EXACTAMENTE capacidadUsadaCampo(e) >= capacidad(e)", () => {
+  const e = M.estadoInicial(azar);
+  const tope = M.capacidad(e);
+  e.programa = Array.from({ length: tope - 1 }, (_, i) => acc("wait", "w" + i));
+  igual(M.capacidadUsadaCampo(e), tope - 1);
+  cierto(M.capacidadUsadaCampo(e) < M.capacidad(e), "a uno del tope: la paleta NO se apaga todavía");
+
+  e.programa = [...e.programa, acc("wait", "wtope")];
+  igual(M.capacidadUsadaCampo(e), tope);
+  cierto(M.capacidadUsadaCampo(e) >= M.capacidad(e), "exactamente en el tope: SÍ está lleno — el gate es >=, no >");
+});
+
+prueba("L19 · un movimiento de teclado entre pilas (Alt+↑/↓) preserva la capacidad total del lienzo", () => {
+  const rutinas = [def("A", [acc("wait", "w")])]; // 1 + 1 = 2
+  const pilasSueltas = [{ id: "suelta1", x: 0, y: 0, nodos: [rep(2, [acc("harvest", "h")], "r")] }]; // 2
+  const programa = [acc("move_forward", "a"), acc("turn_left", "b")]; // 2
+  const antes = P.capacidadDeLienzo(programa, rutinas, pilasSueltas);
+
+  // `moverEntrePilas` (EditorBloques.tsx): corta la cadena agarrada de su
+  // pila de origen —igual que el arrastre— y la encastra al FINAL de la
+  // pila vecina en el orden fijo [verde, rutinas…, sueltas…]. Acá: "b" de
+  // la cadena verde cruza al final del cuerpo de la rutina A.
+  const corte = P.cortarEn(programa, "b");
+  cierto(corte !== null);
+  const cuerpoA = rutinas[0].body;
+  const nuevoCuerpoA = P.colocarCadena(cuerpoA, corte.agarrado, { tipo: "final" });
+  cierto(nuevoCuerpoA !== cuerpoA, "cabe a profundidad 0: la cadena cruzó");
+  const rutinasNuevas = [{ ...rutinas[0], body: nuevoCuerpoA }];
+
+  const despues = P.capacidadDeLienzo(corte.restante, rutinasNuevas, pilasSueltas);
+  igual(despues, antes, "cruzar de pila con el teclado no crea ni pierde capacidad");
+  igual(corte.restante.map((n) => n.id), ["a"], "la cadena verde se queda sólo con lo que no cruzó");
+  igual(nuevoCuerpoA.map((n) => n.id), ["w", "b"], "el bloque cruzado queda al FINAL de la pila destino");
+});
+
 /* ================================================================== */
 console.log("\nCONTADOR Y TAMAÑO DEL CAMPO");
 
