@@ -28,6 +28,21 @@ import { pathToFileURL } from "node:url";
 const RAIZ = path.resolve(import.meta.dirname, "..");
 const SALIDA = path.join(RAIZ, ".preview-orbita");
 mkdirSync(SALIDA, { recursive: true });
+
+/* Cómo elige cada jugador guionado cuando el motor ofrece tres cartas. Las
+   estrategias existen para calibrar el TECHO del híbrido: la partida no
+   puede pasar de 3:45 ni con la build más defensiva, y sin build tiene que
+   seguir durando ~2:00. Un escenario sin `elige` juega al azar. */
+const DEFENSIVAS = ["vida", "regeneracion", "escudo", "segunda", "viento", "iman", "congelar"];
+const OFENSIVAS = ["bala", "critico", "teclas", "racha", "onda", "foco"];
+const alAzar = (cartas, rng) => cartas[Math.floor(rng() * cartas.length)].id;
+const ESTRATEGIAS = {
+  azar: alAzar,
+  defensiva: (cartas, rng) => cartas.find((c) => DEFENSIVAS.includes(c.id))?.id ?? alAzar(cartas, rng),
+  ofensiva: (cartas, rng) => cartas.find((c) => OFENSIVAS.includes(c.id))?.id ?? alAzar(cartas, rng),
+  bala: (cartas, rng) =>
+    cartas.find((c) => c.id === "bala")?.id ?? cartas.find((c) => c.id === "vida")?.id ?? alAzar(cartas, rng),
+};
 const BUNDLE = path.join(SALIDA, "motor.bundle.mjs");
 await build({
   entryPoints: [path.join(RAIZ, "src", "utils", "orbita", "motor.ts")],
@@ -82,6 +97,26 @@ const ESCENARIOS = [
     procrastina: 2,
   },
   { nombre: "principiante real (8 PPM, B0)", banda: 0, conducta: () => ({ wpm: 8, err: 0.14, activo: true }) },
+  /* Las estrategias de build, sobre un mismo jugador medio: miden el TECHO
+     del híbrido. Ninguna puede pasar de 3:45. */
+  {
+    nombre: "build defensiva (45 PPM)",
+    banda: 6,
+    conducta: () => ({ wpm: 45, err: 0.05, activo: true }),
+    elige: ESTRATEGIAS.defensiva,
+  },
+  {
+    nombre: "build ofensiva (45 PPM)",
+    banda: 6,
+    conducta: () => ({ wpm: 45, err: 0.05, activo: true }),
+    elige: ESTRATEGIAS.ofensiva,
+  },
+  {
+    nombre: "cazador de balas (45 PPM)",
+    banda: 6,
+    conducta: () => ({ wpm: 45, err: 0.05, activo: true }),
+    elige: ESTRATEGIAS.bala,
+  },
 ];
 
 const PASO = 0.05;
@@ -106,7 +141,8 @@ function jugar(esc, semilla) {
     maxVivasPrueba: 0,
     huecoMax: 0,
     ahogo: 0,
-    poderes: [],
+    niveles: 0,
+    build: [],
     fallas: [],
     ambiguedades: 0,
     errores: 0,
@@ -117,7 +153,24 @@ function jugar(esc, semilla) {
   let reaccionando = 0;
   let corazonesPrev = motor.corazones;
   let hitoIdx = 0;
-  let pendienteVerificar = null; // poder aplicado en el tick anterior
+  const elegirPendiente = () => {
+    const cartas = motor.eligiendo;
+    if (!cartas) return;
+    const nivel = motor.nivel;
+    m.niveles += 1;
+    const ids = cartas.map((c) => c.id);
+    if (cartas.length !== 3) m.fallas.push(`nivel ${nivel} ofreció ${cartas.length} cartas`);
+    if (new Set(ids).size !== ids.length) m.fallas.push(`nivel ${nivel} ofreció cartas repetidas`);
+    for (const c of cartas) {
+      const tope = c.id === "segunda" ? 1 : c.id === "foco" ? 2 : c.id === "bala" || c.id === "vida" ? 99 : 3;
+      if (c.nivelActual >= tope) m.fallas.push(`nivel ${nivel} ofreció ${c.id} ya al tope (${c.nivelActual})`);
+    }
+    const elegida = (esc.elige ?? ESTRATEGIAS.azar)(cartas, rng, motor);
+    m.build.push(elegida);
+    for (const e2 of motor.elegir(elegida)) if (e2.tipo === "fin") m.fin = e2.resultado;
+    if (motor.eligiendo) m.fallas.push(`nivel ${nivel}: eligió ${elegida} y el motor siguió en pausa`);
+    reaccionando = 0.6 + rng() * 0.6; // mirar las cartas lleva un momento
+  };
 
   for (let paso = 0; paso < 330 / PASO && !m.fin; paso++) {
     const antes = { corazones: motor.corazones, escudo: motor.escudo, vivas: motor.vivas.length };
@@ -132,21 +185,13 @@ function jugar(esc, semilla) {
       if (ev.tipo === "destruida" || ev.tipo === "impacto" || ev.tipo === "suelta" || ev.tipo === "roce" || ev.tipo === "rebote") {
         reaccionando = 0.25 + rng() * 0.35;
       }
-      if (ev.tipo === "poderAplicado") {
-        const p = ev.powerup;
-        const despues = { corazones: motor.corazones, escudo: motor.escudo, vivas: motor.vivas.length };
-        let ok = true;
-        if (p === "reparacion") ok = despues.corazones === Math.min(3, antes.corazones + 1);
-        if (p === "escudo") ok = despues.escudo === Math.min(2, antes.escudo + 1);
-        if (p === "pulso") ok = despues.vivas === 0;
-        if (p === "lento") ok = motor.efectos.lentoHasta > t;
-        if (p === "rayo") ok = motor.efectos.rayoHasta > t;
-        if (p === "cosecha") ok = motor.efectos.cosechaHasta > t;
-        if (p === "mira") ok = motor.efectos.miraHasta > t;
-        m.poderes.push({ t: Math.round(t), p, ok });
-        if (!ok) m.fallas.push(`poder ${p} a los ${Math.round(t)} s no hizo lo que dice`);
-      }
     }
+    /* El nivel sube dentro de tecla(), no del tick: por eso se mira el
+       ESTADO del motor y no un evento. Con cartas ofrecidas el motor está
+       en pausa hasta que alguien elija — el jugador guionado elige con su
+       estrategia, y de paso se verifica el sorteo: tres cartas, distintas,
+       ninguna que ya esté al tope. */
+    if (motor.eligiendo) elegirPendiente();
     if (m.fin) break;
 
     /* --- métricas de sensación --- */
@@ -203,15 +248,21 @@ function jugar(esc, semilla) {
     for (const ev of motor.tecla(seEquivoca ? (esperado === "x" ? "z" : "x") : esperado)) {
       if (ev.tipo === "fin") m.fin = ev.resultado;
     }
+    if (motor.eligiendo) elegirPendiente();
   }
 
   if (!m.fin) m.fallas.push("la partida NUNCA terminó (330 s)");
   else {
     const r = m.fin;
-    const esperados = r.palabras + CRISTALES_POR_RANGO[r.rango];
-    if (r.cristales < esperados || r.cristales > r.palabras * 2 + CRISTALES_POR_RANGO[r.rango]) {
-      m.fallas.push(`cristales ${r.cristales} fuera de fórmula (palabras ${r.palabras}, rango ${r.rango})`);
+    /* Los cristales se acuñan sobre lo TIPEADO: lo que cayó por bala o
+       crítico cuenta como palabra pero no paga. */
+    const esperados = r.palabrasTipeadas + CRISTALES_POR_RANGO[r.rango];
+    if (r.cristales !== esperados) {
+      m.fallas.push(`cristales ${r.cristales} fuera de fórmula (tipeadas ${r.palabrasTipeadas}, rango ${r.rango})`);
     }
+    if (r.palabrasTipeadas > r.palabras) m.fallas.push(`tipeadas ${r.palabrasTipeadas} > palabras ${r.palabras}`);
+    /* El techo del híbrido: ninguna build pasa de 3:45. */
+    if (r.duracionMs > 225_000) m.fallas.push(`la partida duró ${Math.round(r.duracionMs / 1000)} s (techo 225)`);
     if (r.precision > 100 || r.precision < 0) m.fallas.push(`precisión ${r.precision}`);
     if (r.ppmPico < r.ppmMedio * 0.5) m.fallas.push(`ppm pico ${r.ppmPico} < medio ${r.ppmMedio}`);
   }
@@ -248,8 +299,8 @@ for (const esc of ESCENARIOS) {
   const prueba = med(corridas.map((c) => c.tFinPrueba ?? 0));
   const corazones = corridas[0].corazonesEn.join(", ") || "—";
   const amz = HITOS.map((h) => `${h}s:${corridas[0].amenazaEn[h] ?? "·"}`).join(" ");
-  const poderes = corridas.flatMap((c) => c.poderes);
-  const poderesOk = poderes.filter((p) => p.ok).length;
+  const niveles = med(corridas.map((c) => c.niveles));
+  const durMax = Math.max(...terminadas.map((c) => c.fin.duracionMs / 1000));
   const fallas = [...new Set(corridas.flatMap((c) => c.fallas))];
   fallasTotales += fallas.length;
 
@@ -260,12 +311,13 @@ for (const esc of ESCENARIOS) {
   );
   console.log(`    amenaza en el tiempo → ${amz}`);
   console.log(`    corazones perdidos (semilla 1) en s: ${corazones} · roces en prueba: ${corridas[0].roces} · rebotes: ${corridas.reduce((a, c) => a + c.rebotes, 0)}`);
+    console.log(`    niveles (semilla 1): ${corridas[0].niveles} · build: ${corridas[0].build.join(", ") || "—"}`);
   console.log(
     `    hueco máx sin palabras ${hueco.toFixed(1)} s · ahogo (≥6 vivas) ${ahogo.toFixed(1)} s` +
       ` · máx vivas ${Math.max(...corridas.map((c) => c.maxVivas))} (prueba ${Math.max(...corridas.map((c) => c.maxVivasPrueba))})`,
   );
   console.log(
-    `    poderes verificados ${poderesOk}/${poderes.length}` +
+    `    niveles ${niveles.toFixed(0)} (mediana) · duración máx ${durMax.toFixed(0)} s (techo 225)` +
       ` · ambigüedades de inicial ${corridas.reduce((a, c) => a + c.ambiguedades, 0)} muestras`,
   );
   if (fallas.length) for (const f of fallas) console.log(`    ✗ ${f}`);

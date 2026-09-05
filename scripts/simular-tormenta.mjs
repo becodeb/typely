@@ -88,13 +88,23 @@ function simular(perfil, semilla) {
     for (const ev of motor.tick(PASO * 1000)) {
       if (ev.tipo === "fin") resultado = ev.resultado;
       if (ev.tipo === "impacto") impactos++;
-      if (ev.tipo === "poderAplicado") capsulas++;
       /* Cambio de objetivo → tiempo de reacción humano. */
       if (ev.tipo === "destruida" || ev.tipo === "impacto" || ev.tipo === "suelta" || ev.tipo === "rebote") {
         reaccionando = 0.25 + rng() * 0.35;
       }
     }
     if (resultado) break;
+
+    /* Subió de nivel (pasa dentro de tecla(), no del tick): elige al azar.
+       Este examen mide la promesa de duración, no la estrategia. La pausa
+       de la elección no cuenta como partida. */
+    if (motor.eligiendo) {
+      capsulas++;
+      const carta = motor.eligiendo[Math.floor(rng() * motor.eligiendo.length)];
+      for (const e2 of motor.elegir(carta.id)) if (e2.tipo === "fin") resultado = e2.resultado;
+      reaccionando = 0.6 + rng() * 0.6;
+      continue;
+    }
 
     if (reaccionando > 0) {
       reaccionando -= PASO;
@@ -180,21 +190,29 @@ for (const perfil of PERFILES) {
   const palabras = Math.round(mediana(corridas.map((c) => c.resultado.palabras)));
   const poderes = Math.round(mediana(corridas.map((c) => c.capsulas)));
 
-  const dentro = durMed >= 90_000 && durMed <= 150_000;
+  /* La promesa del HÍBRIDO (mejoras permanentes, 2026-09-04): la partida
+     base sigue en ~2:00, una buena build estira, y NADA pasa de 3:45. Por
+     eso dos topes: la mediana entre 1:30 y 3:00, y el máximo de las 20
+     partidas en 225 s o menos (el motor corta ahí). */
+  const durMax = Math.max(...dur);
+  const medianaOk = durMed >= 90_000 && durMed <= 180_000;
+  const techoOk = durMax <= 225_000;
+  const dentro = medianaOk && techoOk;
   if (!dentro) todoBien = false;
   console.log(
     `${perfil.nombre}   B${String(perfil.banda).padEnd(4)}` +
-      ` ${seg(durMed).padStart(5)} · ${seg(Math.min(...dur))}–${seg(Math.max(...dur))}`.padEnd(28) +
+      ` ${seg(durMed).padStart(5)} · ${seg(Math.min(...dur))}–${seg(durMax)}`.padEnd(28) +
       `${String(amenaza).padStart(5)}    ${rango.padEnd(10)}` +
       ` ${String(ppm).padStart(4)}   ${String(palabras).padStart(6)}  ${String(poderes).padStart(6)}` +
-      (dentro ? "" : "   ← FUERA de 90–150 s"),
+      (medianaOk ? "" : "   ← mediana FUERA de 90–180 s") +
+      (techoOk ? "" : "   ← máximo PASA el techo de 225 s"),
   );
 }
 
 console.log("");
 console.log(
   todoBien
-    ? "La promesa se cumple: mediana de todos los perfiles dentro de 2:00 ± 0:30."
+    ? "La promesa se cumple: mediana de todos los perfiles entre 1:30 y 3:00, y ninguna partida pasa de 3:45."
     : "Hay perfiles fuera del objetivo — tocar AJUSTES en src/utils/orbita/motor.ts y volver a correr.",
 );
 process.exitCode = todoBien ? 0 : 1;

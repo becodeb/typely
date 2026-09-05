@@ -117,13 +117,18 @@ export const AJUSTES = {
      reaccionar. Con 0.85 la presión cruza 1 cerca de los 60 s. */
   margenInicio: -0.15, //     la partida real arranca al 85 % del techo medido
   margenMax: 0.35, //         a t=120 s la demanda es 1.35 × techo
-  margenExponente: 1.5,
+  margenExponente: 2, //      2 y no 1.5 desde las mejoras permanentes: a los
+  //                          120 s da lo mismo (la partida base sigue en
+  //                          ~2:00), pero después crece más empinado — a los
+  //                          180 s exige casi el doble del techo, a los 210
+  //                          s el 2,5×. Con 1.5 una buena build llegaba a
+  //                          257 s; el techo del híbrido es 3:45
   margenColapso: 0.15, //     de acá en más la fase se llama "colapso"
-  margenPorAuxilio: 0.05, //  cada poder cobrado acelera el final. Subió de
-  //                          0.02 cuando los poderes pasaron a viajar en
-  //                          palabras comunes: antes se cazaban a veces,
-  //                          ahora se cobran todos, y sin esto el lector
-  //                          lento se estiraba a 190 s
+  /* Acá vivía `margenPorAuxilio`: un impuesto por cada poder cobrado para
+     que la partida no se estirara. Se fue con las mejoras permanentes
+     (2026-09-04): las mejoras tienen que VALER, y el techo lo pone la
+     propia curva del margen, que sigue creciendo después de los 120 s
+     — a los 210 s ya exige el doble del techo medido. */
   demandaPiso: 8, //          nunca se exige menos que esto…
   pisoDeriva: 0.025, //       …y el piso sube solo (PPM por segundo): nadie
   //                          queda flotando para siempre por lento que vaya
@@ -173,16 +178,31 @@ export const AJUSTES = {
   respiroFactor: 0.85,
   respiroSegundos: 8,
 
-  /* Poderes escondidos: viajan en una palabra común con estela especial,
-     y recién al destruirla el poder vuela a la nave y se revela cuál era. */
-  poderPrimero: [20, 35] as const, //   s (rango sorteado)
-  poderCadencia: [18, 28] as const, //  s entre poderes
-  poderViajeSegundos: 0.6, //           lo que tarda en volar a la nave
-  lentoFactor: 0.45,
-  lentoSegundos: 5,
-  rayoSegundos: 8,
-  cosechaSegundos: 10,
-  miraSegundos: 10,
+  /* MEJORAS PERMANENTES POR NIVEL (plan del 2026-09-04, artefacto "Mejoras
+     de Tormenta"). El puntaje cruza umbrales geométricos; en cada uno el
+     motor se PAUSA y ofrece tres cartas. Cada mejora se apila por nivel, y
+     las tablas de abajo se indexan por ese nivel (el 0 es "no la tenés"). */
+  nivelUmbral0: 250, //        puntos para el nivel 1 (~20 s de partida)
+  nivelRazon: 1.5, //          cada umbral siguiente es × esto
+  rarezaPesos: { comun: 65, rara: 28, epica: 7 } as const, // por carta
+  balaPesos: [1, 0.15, 0.03] as const, // peso de ofrecer bala según cuántas
+  //                          extra tenés ya: la tercera es suerte, la cuarta
+  //                          casi imposible — tope blando, no duro
+  vidaTopeBlando: 5, //        corazones máximos "normales"…
+  vidaPesoPasado: 0.1, //      …y el peso de ofrecer +1 vida pasado ese tope
+  vientoFactor: [1, 0.92, 0.85, 0.8] as const, // velocidad de las palabras
+  regenSegundos: [0, 30, 20, 12] as const, // cada cuánto vuelve un corazón
+  escudoLatenteSegundos: [0, 20, 12, 8] as const, // sin daño → un escudo
+  ondaCadaPalabras: [0, 0, 12, 8] as const, // además de al subir de nivel
+  ondaFactor: 0.5, //          todo retrocede a esta fracción de su camino
+  criticoProb: [0, 0.15, 0.3, 0.45] as const, // palabra sin errores → doble
+  congelarSegundos: [0, 0.5, 0.8, 1.2] as const, // cuánto dura el congelado
+  congelarCooldown: 12, //     s fijos entre congelados, NO mejora con niveles
+  imanRetroceso: [0, 0.05, 0.1, 0.15] as const, // fracción del camino
+  imanDesde: 0.72, //          solo las que ya están en la zona de peligro
+  teclasMult: [1, 1.5, 2, 2.5] as const, // puntos por mayúscula/tilde/símbolo
+  segundaFactor: 0.4, //       al revivir, todo retrocede a esta fracción
+  balaPuntos: 0.5, //          lo que vale una palabra que cayó sin tipearla
 
   /* Vida e impactos. */
   corazones: 3,
@@ -201,7 +221,12 @@ export const AJUSTES = {
 
   /* Tope absoluto de seguridad: si algo del lazo fallara, la partida
      igual termina. La simulación nunca se acerca a esto. */
-  duracionTopeSegundos: 300,
+  /* El techo del HÍBRIDO (mejoras permanentes): la partida base dura ~2:00,
+     una buena build estira, y a los 3:45 se termina sí o sí. No es un
+     parche: la amenaza está topeada en 100 y todas las perillas salen de
+     ella, así que un tipeador perfecto con Viento e Imán sostenía amenaza
+     100 indefinidamente — con 300 s llegaba a los cinco minutos. */
+  duracionTopeSegundos: 225,
 } as const;
 
 export type Ajustes = typeof AJUSTES;
@@ -210,6 +235,9 @@ export type Ajustes = typeof AJUSTES;
 /* Tipos                                                                */
 /* ==================================================================== */
 
+/** @deprecated Los poderes caídos se reemplazaron por las mejoras
+ *  permanentes. El tipo sobrevive solo porque los iconos y las gemas 3D
+ *  siguen nombrándose así (`gemas/<poder>.webp`); el motor ya no lo usa. */
 export type PowerupId =
   | "reparacion"
   | "escudo"
@@ -218,6 +246,61 @@ export type PowerupId =
   | "rayo"
   | "cosecha"
   | "mira";
+
+/* ---- Mejoras permanentes por nivel ---- */
+
+export type MejoraId =
+  | "bala" //         épica · al destruir una palabra cae también la más urgente
+  | "segunda" //      épica · una vez: al perder el último corazón, revivís
+  | "vida" //         rara · +1 corazón ahora y en el máximo
+  | "regeneracion" // rara · un corazón que falta vuelve cada tanto
+  | "escudo" //       rara · sin daño un rato → se forma un escudo
+  | "critico" //      rara · palabra sin errores → chance de tirar otra
+  | "viento" //       común · las palabras viajan más lento
+  | "foco" //         común · la más urgente siempre marcada
+  | "onda" //         común · al subir de nivel todo retrocede
+  | "congelar" //     común · un error congela todo un instante (con cooldown)
+  | "iman" //         común · al destruir, las de la zona de peligro retroceden
+  | "racha" //        común · errores que no rompen la racha
+  | "teclas"; //      común · más puntos por mayúsculas, tildes y símbolos
+
+export type Rareza = "comun" | "rara" | "epica";
+
+export interface DefMejora {
+  id: MejoraId;
+  rareza: Rareza;
+}
+
+/** El catálogo. La rareza decide con qué frecuencia sale la carta; los
+ *  topes (blando o duro) los decide `pesoDe()` según lo que ya tenés. */
+export const MEJORAS: readonly DefMejora[] = [
+  { id: "viento", rareza: "comun" },
+  { id: "foco", rareza: "comun" },
+  { id: "onda", rareza: "comun" },
+  { id: "congelar", rareza: "comun" },
+  { id: "iman", rareza: "comun" },
+  { id: "racha", rareza: "comun" },
+  { id: "teclas", rareza: "comun" },
+  { id: "vida", rareza: "rara" },
+  { id: "regeneracion", rareza: "rara" },
+  { id: "escudo", rareza: "rara" },
+  { id: "critico", rareza: "rara" },
+  { id: "bala", rareza: "epica" },
+  { id: "segunda", rareza: "epica" },
+];
+
+/** Una de las tres cartas que se ofrecen al subir de nivel. `nivelActual`
+ *  es el que ya tenés de esa mejora (0 = ninguno): la carta muestra a qué
+ *  nivel pasarías. */
+export interface CartaMejora {
+  id: MejoraId;
+  rareza: Rareza;
+  nivelActual: number;
+}
+
+/** Cómo murió una palabra: tipeada por el jugador, o arrastrada por una
+ *  bala o un crítico. Las dos últimas valen la mitad y no suman racha. */
+export type ViaMuerte = "tipeo" | "bala" | "critico";
 
 export type RangoId = "cadete" | "piloto" | "explorador" | "as" | "capitan" | "leyenda";
 
@@ -259,19 +342,12 @@ export interface PalabraViva {
   vida: number;
   /** Posición lateral en el punto de fuga, -1..1. */
   carril: number;
-  /** Poder escondido que trae, si trae. La página lo ve como "trae algo"
-   *  (estela especial) pero no cuál: eso se revela al llegar a la nave. */
-  poder: PowerupId | null;
+  /** Errores cometidos sobre ESTA palabra: el golpe crítico solo se
+   *  dispara con una palabra limpia. */
+  errores: number;
 }
 
 export type FaseMotor = "calibracion" | "persecucion" | "colapso";
-
-export interface EfectosActivos {
-  lentoHasta: number;
-  rayoHasta: number;
-  cosechaHasta: number;
-  miraHasta: number;
-}
 
 export interface ResultadoPartida {
   duracionMs: number;
@@ -285,8 +361,14 @@ export interface ResultadoPartida {
   palabras: number;
   caracteres: number;
   errores: number;
-  /** palabras + extra de cosecha + bono de rango. */
+  /** Las que tipeó el jugador. Las que cayeron por bala o crítico cuentan
+   *  en `palabras` pero no acá: los cristales se acuñan sobre el tipeo. */
+  palabrasTipeadas: number;
+  /** palabras tipeadas + bono de rango. */
   cristales: number;
+  /** Nivel alcanzado y la build con la que terminó. */
+  nivel: number;
+  mejoras: { id: MejoraId; nivel: number }[];
 }
 
 export type EventoMotor =
@@ -294,12 +376,21 @@ export type EventoMotor =
   | { tipo: "engancha"; id: number }
   | { tipo: "suelta"; id: number }
   | { tipo: "acierto"; id: number }
-  | { tipo: "error"; id: number | null }
-  | { tipo: "destruida"; id: number; puntos: number; porRayo: boolean; porPulso: boolean }
-  /** La palabra murió y su poder está volando hacia la nave. */
-  | { tipo: "poderViaja"; id: number; powerup: PowerupId; segundos: number }
-  /** El poder llegó y se aplicó: recién acá se muestra cuál era. */
-  | { tipo: "poderAplicado"; powerup: PowerupId }
+  /** `perdonado`: el error contó para la precisión pero Racha blindada
+   *  evitó que rompiera la racha. */
+  | { tipo: "error"; id: number | null; perdonado: boolean }
+  | { tipo: "destruida"; id: number; puntos: number; via: ViaMuerte }
+  /** El puntaje cruzó un umbral: el motor queda EN PAUSA hasta `elegir()`. */
+  | { tipo: "subeNivel"; nivel: number; cartas: CartaMejora[] }
+  | { tipo: "mejoraElegida"; id: MejoraId; nivel: number }
+  /** Onda de choque: todo retrocedió. */
+  | { tipo: "onda" }
+  /** Congelar al errar se disparó: nada avanza durante `segundos`. */
+  | { tipo: "congela"; segundos: number }
+  | { tipo: "regenera"; corazones: number }
+  | { tipo: "escudoFormado"; escudo: number }
+  /** Segunda oportunidad: perdiste el último corazón y seguís con uno. */
+  | { tipo: "segundaOportunidad" }
   | { tipo: "impacto"; id: number; escudoAbsorbio: boolean; corazones: number }
   /** Una palabra llegó a la nave DURANTE el vuelo de prueba: no lastima,
    *  solo termina la medición. */
@@ -352,12 +443,27 @@ export class MotorTormenta {
   vivas: PalabraViva[] = [];
   engancheId: number | null = null;
 
-  efectos: EfectosActivos = { lentoHasta: -1, rayoHasta: -1, cosechaHasta: -1, miraHasta: -1 };
+  /* — mejoras permanentes por nivel — */
+  /** Nivel alcanzado (0 = todavía ninguno). */
+  nivel = 0;
+  /** Corazones máximos: sube con "+1 vida". */
+  corazonesMax: number;
+  /** Mientras hay cartas ofrecidas el motor está EN PAUSA: `tick` y
+   *  `tecla` no hacen nada hasta `elegir()`. */
+  eligiendo: CartaMejora[] | null = null;
+  private readonly mejoras = new Map<MejoraId, number>();
+  private puntajeUmbral: number;
+  private regenAcum = 0;
+  private sinDanioDesde = 0;
+  private congelarHasta = -1;
+  private congelarListoEn = -1;
+  private perdones = 0;
+  private ondaContador = 0;
+  private segundaUsada = false;
 
   /* — internos del controlador — */
   private demanda: number;
   private rhat = 0;
-  private auxilio = 0;
   /** Segundos OCUPADOS desde el último máximo de R (meseta del vuelo). */
   private ocupadoDesdeMax = 0;
   /** Desde cuándo está lleno el tope del vuelo de prueba (-1 = no lo está). */
@@ -397,16 +503,13 @@ export class MotorTormenta {
   /* Infinito: la primera palabra sale en el primer tick. Con 0, la cuenta
      regresiva terminaba y la pantalla quedaba vacía hasta 4,5 s. */
   private acumuladorSpawn = Number.POSITIVE_INFINITY;
-  private proximoPoder: number;
-  private siguienteConPoder = false;
-  private poderesEnViaje: { powerup: PowerupId; aplicaEn: number }[] = [];
 
   /* — estadísticas — */
   private pulsaciones: Pulsacion[] = [];
   private aciertosTotal = 0;
   private erroresTotal = 0;
   private palabrasTotal = 0;
-  private extraCosecha = 0;
+  private palabrasTipeadas = 0;
   ppmPico = 0;
 
   constructor(opciones: OpcionesMotor) {
@@ -414,8 +517,149 @@ export class MotorTormenta {
     this.rng = opciones.rng ?? Math.random;
     this.bandaMax = Math.max(0, Math.min(CORPUS_BANDAS.length - 1, opciones.bandaMax));
     this.corazones = this.aj.corazones;
+    this.corazonesMax = this.aj.corazones;
     this.demanda = this.aj.calDemanda0;
-    this.proximoPoder = this.entre(...this.aj.poderPrimero);
+    this.puntajeUmbral = this.aj.nivelUmbral0;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Mejoras — lecturas y la elección                                    */
+  /* ------------------------------------------------------------------ */
+
+  /** Nivel que tenés de una mejora (0 = no la tenés). */
+  nivelDe(id: MejoraId): number {
+    return this.mejoras.get(id) ?? 0;
+  }
+
+  /** La build, en el orden en que se fue armando. */
+  get mejorasLista(): { id: MejoraId; nivel: number }[] {
+    return [...this.mejoras.entries()].map(([id, nivel]) => ({ id, nivel }));
+  }
+
+  /** Puntos que faltan para el próximo nivel y el umbral, para la barra. */
+  get progresoNivel(): { puntaje: number; umbral: number } {
+    return { puntaje: this.puntaje, umbral: this.puntajeUmbral };
+  }
+
+  /** Segundos hasta que Congelar al errar vuelva a estar listo (0 = listo). */
+  get congelarRestante(): number {
+    return Math.max(0, this.congelarListoEn - this.t);
+  }
+
+  /** ¿Todo está congelado ahora? */
+  get congelado(): boolean {
+    return this.t < this.congelarHasta;
+  }
+
+  /** Elegir una de las cartas ofrecidas. Devuelve [] si no había nada que
+   *  elegir o la carta no era una de las tres: la página no puede colar
+   *  una mejora que el sorteo no ofreció. */
+  elegir(id: MejoraId): EventoMotor[] {
+    if (!this.eligiendo || !this.eligiendo.some((c) => c.id === id)) return [];
+    const nivel = this.nivelDe(id) + 1;
+    this.mejoras.set(id, nivel);
+    this.eligiendo = null;
+    const eventos: EventoMotor[] = [{ tipo: "mejoraElegida", id, nivel }];
+
+    /* Efectos inmediatos. El resto vive en tick() y tecla(). */
+    if (id === "vida") {
+      this.corazonesMax += 1;
+      this.corazones += 1;
+    }
+    /* Los perdones de Racha blindada se renuevan con cada nivel. */
+    this.perdones = this.nivelDe("racha");
+    /* Onda de choque: subir de nivel empuja todo — también el nivel en el
+       que la agarrás, para que se sienta al instante. */
+    if (this.nivelDe("onda") > 0) eventos.push(...this.onda());
+    return eventos;
+  }
+
+  /** ¿Cruzó el puntaje el umbral? Entonces sube de nivel, sortea tres
+   *  cartas y se queda en pausa esperando `elegir()`. */
+  private revisarNivel(): EventoMotor[] {
+    if (this.eligiendo || this.puntaje < this.puntajeUmbral) return [];
+    this.nivel += 1;
+    this.puntajeUmbral = Math.round(this.puntajeUmbral * this.aj.nivelRazon);
+    const cartas = this.sortearCartas();
+    if (!cartas.length) return [];
+    this.eligiendo = cartas;
+    return [{ tipo: "subeNivel", nivel: this.nivel, cartas }];
+  }
+
+  /** Peso de ofrecer una mejora AHORA. Cero = no se ofrece (tope duro);
+   *  un peso chico = puede tocar con suerte (tope blando). */
+  private pesoDe(def: DefMejora): number {
+    const aj = this.aj;
+    const base = aj.rarezaPesos[def.rareza];
+    const nivel = this.nivelDe(def.id);
+    switch (def.id) {
+      case "bala":
+        return base * (aj.balaPesos[Math.min(nivel, aj.balaPesos.length - 1)] ?? 0);
+      case "vida":
+        return base * (this.corazonesMax >= aj.vidaTopeBlando ? aj.vidaPesoPasado : 1);
+      case "segunda":
+        return nivel >= 1 ? 0 : base;
+      case "foco":
+        return nivel >= 2 ? 0 : base;
+      default:
+        /* Las demás tienen tres niveles y tope duro en el tercero. */
+        return nivel >= 3 ? 0 : base;
+    }
+  }
+
+  /** Tres cartas distintas, sorteadas por peso y sin reposición. */
+  private sortearCartas(): CartaMejora[] {
+    const bolsa = MEJORAS.map((def) => ({ def, peso: this.pesoDe(def) })).filter((x) => x.peso > 0);
+    const cartas: CartaMejora[] = [];
+    while (cartas.length < 3 && bolsa.length) {
+      const total = bolsa.reduce((a, x) => a + x.peso, 0);
+      let azar = this.rng() * total;
+      let idx = bolsa.length - 1;
+      for (let i = 0; i < bolsa.length; i++) {
+        azar -= bolsa[i]!.peso;
+        if (azar <= 0) {
+          idx = i;
+          break;
+        }
+      }
+      const { def } = bolsa.splice(idx, 1)[0]!;
+      cartas.push({ id: def.id, rareza: def.rareza, nivelActual: this.nivelDe(def.id) });
+    }
+    return cartas;
+  }
+
+  /** Onda de choque: todo retrocede a una fracción de su camino. La
+   *  pantalla que se despeja así no dice nada del tipeo: el empuje se
+   *  calla un intervalo. */
+  private onda(): EventoMotor[] {
+    for (const p of this.vivas) p.progreso *= this.aj.ondaFactor;
+    this.empujeSuspendidoHasta = Math.max(
+      this.empujeSuspendidoHasta,
+      this.t + this.intervaloActual + 0.5,
+    );
+    return [{ tipo: "onda" }];
+  }
+
+  /** Congelar al errar: si la tenés y no está en cooldown, todo se frena
+   *  un instante. El cooldown es FIJO: la mejora alarga el congelado, no
+   *  acorta la espera — si no, errar a propósito se volvía estrategia. */
+  private congelar(): EventoMotor[] {
+    const segundos = this.aj.congelarSegundos[this.nivelDe("congelar")] ?? 0;
+    if (!segundos || this.t < this.congelarListoEn) return [];
+    this.congelarHasta = this.t + segundos;
+    this.congelarListoEn = this.t + this.aj.congelarCooldown;
+    return [{ tipo: "congela", segundos }];
+  }
+
+  /** Racha blindada: gasta un perdón si queda. */
+  private perdonar(): boolean {
+    if (this.perdones <= 0) return false;
+    this.perdones -= 1;
+    return true;
+  }
+
+  private masUrgente(): PalabraViva | null {
+    return [...this.vivas].sort((a, b) => b.progreso - a.progreso)[0] ?? null;
   }
 
   /* ------------------------------------------------------------------ */
@@ -435,7 +679,7 @@ export class MotorTormenta {
   }
 
   get cristalesVivos(): number {
-    return this.palabrasTotal + this.extraCosecha;
+    return this.palabrasTipeadas;
   }
 
   get rangoActual(): RangoId {
@@ -448,6 +692,8 @@ export class MotorTormenta {
 
   tick(dtMs: number): EventoMotor[] {
     if (this.terminada) return [];
+    /* Con cartas ofrecidas el juego está en pausa: ni el reloj corre. */
+    if (this.eligiendo) return [];
     /* Un frame monstruoso (pestaña que vuelve del fondo) no puede
        convertirse en una lluvia de impactos: se recorta. */
     const dt = Math.min(Math.max(dtMs, 0), 100) / 1000;
@@ -455,7 +701,30 @@ export class MotorTormenta {
 
     const eventos: EventoMotor[] = [];
     const aj = this.aj;
-    const lento = this.t < this.efectos.lentoHasta ? aj.lentoFactor : 1;
+    /* Viento a favor frena las palabras de forma permanente; Congelar al
+       errar las detiene del todo un instante. El reloj del motor sigue
+       corriendo igual (cooldowns, regeneración): lo que se frena es el
+       AVANCE, no el tiempo. */
+    const lento = aj.vientoFactor[this.nivelDe("viento")] ?? 1;
+    const congelado = this.t < this.congelarHasta;
+    const avance = congelado ? 0 : dt * lento;
+
+    /* ---- Mejoras que trabajan solas ---- */
+    const regenCada = aj.regenSegundos[this.nivelDe("regeneracion")] ?? 0;
+    if (regenCada && this.corazones < this.corazonesMax) {
+      this.regenAcum += dt;
+      if (this.regenAcum >= regenCada) {
+        this.regenAcum = 0;
+        this.corazones += 1;
+        eventos.push({ tipo: "regenera", corazones: this.corazones });
+      }
+    } else this.regenAcum = 0;
+    const latente = aj.escudoLatenteSegundos[this.nivelDe("escudo")] ?? 0;
+    if (latente && this.escudo < aj.escudoTope && this.t - this.sinDanioDesde >= latente) {
+      this.escudo += 1;
+      this.sinDanioDesde = this.t;
+      eventos.push({ tipo: "escudoFormado", escudo: this.escudo });
+    }
 
     /* ---- Controlador ---- */
     const R = this.ppmInstantaneo * Math.pow(this.precisionInstantanea, 1.7);
@@ -468,8 +737,7 @@ export class MotorTormenta {
     } else {
       this.vacioDesde = -1;
     }
-    const empujeSuspendido =
-      this.t < this.efectos.lentoHasta || this.t < this.empujeSuspendidoHasta;
+    const empujeSuspendido = congelado || this.t < this.empujeSuspendidoHasta;
     const vacio =
       !empujeSuspendido &&
       this.vacioDesde >= 0 &&
@@ -512,10 +780,12 @@ export class MotorTormenta {
       const empujado = Math.min(base * empuje, Math.max(base, this.demanda * aj.vacioTechoSobreDemanda));
       this.rhat = Math.min(aj.rhatTope, empujado);
       const tPartida = Math.max(0, this.t - this.tInicioPartida);
+      /* La curva no se aplana a los 120 s: (t/120)^1.5 sigue creciendo, y a
+         los 210 s ya exige el doble del techo. Ese es el techo de duración
+         de una buena build — nada de impuesto por mejora. */
       const margen =
         aj.margenInicio +
-        (aj.margenMax - aj.margenInicio) * Math.pow(tPartida / 120, aj.margenExponente) +
-        this.auxilio * aj.margenPorAuxilio;
+        (aj.margenMax - aj.margenInicio) * Math.pow(tPartida / 120, aj.margenExponente);
       if (this.fase === "persecucion" && margen > aj.margenColapso) {
         this.fase = "colapso";
       }
@@ -572,38 +842,19 @@ export class MotorTormenta {
         : Math.min(aj.simultaneasMax, 3 + Math.floor(this.amenaza / 20));
 
     /* ---- Nacimientos ---- */
-    /* ---- ¿La próxima palabra trae un poder escondido? ---- */
-    if (
-      this.fase !== "calibracion" &&
-      !this.siguienteConPoder &&
-      !this.vivas.some((p) => p.poder) &&
-      this.t >= this.proximoPoder
-    ) {
-      this.siguienteConPoder = true;
-    }
-
-    this.acumuladorSpawn += dt * lento;
+    this.acumuladorSpawn += avance;
     if (this.acumuladorSpawn >= intervalo && this.vivas.length < tope) {
       this.acumuladorSpawn = 0;
       const palabra = this.nacer(banda, vida);
       eventos.push({ tipo: "nace", palabra });
     }
 
-    /* ---- Poderes que llegan a la nave ---- */
-    for (const viaje of [...this.poderesEnViaje]) {
-      if (this.t < viaje.aplicaEn) continue;
-      this.poderesEnViaje = this.poderesEnViaje.filter((v) => v !== viaje);
-      eventos.push({ tipo: "poderAplicado", powerup: viaje.powerup });
-      eventos.push(...this.aplicarPowerup(viaje.powerup));
-    }
-
     /* ---- Avance y aterrizajes ---- */
     for (const p of [...this.vivas]) {
-      p.progreso += (dt * lento) / p.vida;
+      p.progreso += avance / p.vida;
       if (p.progreso < 1) continue;
 
       this.quitar(p.id);
-      /* Si traía un poder, se perdió con ella: el aterrizaje duele igual. */
 
       /* Durante el vuelo de prueba nada lastima: te alcanzó una → el juego
          ya sabe tu techo, y la partida real arranca acá. */
@@ -630,8 +881,23 @@ export class MotorTormenta {
       } else {
         this.corazones -= 1;
       }
+      /* Cualquier golpe, absorbido o no, reinicia el reloj del escudo
+         latente: "sin recibir daño" quiere decir sin que te toquen. */
+      this.sinDanioDesde = this.t;
       this.invulnerableHasta = this.t + aj.invulnerableSegundos;
       eventos.push({ tipo: "impacto", id: p.id, escudoAbsorbio, corazones: this.corazones });
+
+      /* Segunda oportunidad: una vez, al perder el último corazón. */
+      if (this.corazones <= 0 && this.nivelDe("segunda") > 0 && !this.segundaUsada) {
+        this.segundaUsada = true;
+        this.corazones = 1;
+        for (const q of this.vivas) q.progreso *= aj.segundaFactor;
+        this.empujeSuspendidoHasta = Math.max(
+          this.empujeSuspendidoHasta,
+          this.t + this.intervaloActual + 0.5,
+        );
+        eventos.push({ tipo: "segundaOportunidad" });
+      }
 
       /* Respiro anti-frustración: la espiral de muerte temprana es la que
          hace que un chico no vuelva a jugar. Una vez por partida. */
@@ -662,11 +928,21 @@ export class MotorTormenta {
 
   /** Un carácter ya compuesto por el sistema (á, ñ, ¿ llegan enteros). */
   tecla(ch: string): EventoMotor[] {
-    if (this.terminada || !ch) return [];
+    if (this.terminada || !ch || this.eligiendo) return [];
     this.ultimaTecla = this.t;
     const eventos: EventoMotor[] = [];
+    const aj = this.aj;
 
     let objetivo = this.engancheId != null ? this.porId(this.engancheId) : null;
+
+    if (!objetivo && this.nivelDe("foco") > 0) {
+      /* Foco: sin enganche, el tipeo apunta solo a la más urgente. */
+      objetivo = this.masUrgente();
+      if (objetivo) {
+        this.engancheId = objetivo.id;
+        eventos.push({ tipo: "engancha", id: objetivo.id });
+      }
+    }
 
     if (!objetivo) {
       /* Enganche por primera letra; si hay empate gana la más cercana a
@@ -676,8 +952,7 @@ export class MotorTormenta {
         .sort((a, b) => b.progreso - a.progreso);
       objetivo = candidatas[0] ?? null;
       if (!objetivo) {
-        this.registrar(false);
-        eventos.push({ tipo: "error", id: null });
+        eventos.push(...this.errar(null));
         return eventos;
       }
       this.engancheId = objetivo.id;
@@ -687,28 +962,75 @@ export class MotorTormenta {
     const esperado = objetivo.texto[objetivo.escrito];
     if (ch !== esperado) {
       /* El error NO desengancha: un tropiezo no te deja indefenso. */
-      this.registrar(false);
-      eventos.push({ tipo: "error", id: objetivo.id });
+      objetivo.errores += 1;
+      eventos.push(...this.errar(objetivo.id));
       return eventos;
     }
 
     this.registrar(true);
     objetivo.escrito += 1;
     if (this.fase === "calibracion") this.medirRitmo(objetivo);
-    objetivo.progreso = Math.max(0, objetivo.progreso - this.aj.empujeRetroceso);
+    objetivo.progreso = Math.max(0, objetivo.progreso - aj.empujeRetroceso);
     eventos.push({ tipo: "acierto", id: objetivo.id });
 
     if (objetivo.escrito >= objetivo.texto.length) {
       this.engancheId = null;
-      eventos.push(...this.matar(objetivo, { porRayo: false, porPulso: false }));
-      /* Rayo dividido: la palabra completada daña también a la más
-         cercana. */
-      if (this.t < this.efectos.rayoHasta) {
-        const cercana = [...this.vivas].sort((a, b) => b.progreso - a.progreso)[0];
-        if (cercana) eventos.push(...this.matar(cercana, { porRayo: true, porPulso: false }));
+      const limpia = objetivo.errores === 0;
+      eventos.push(...this.destruir(objetivo, "tipeo"));
+
+      /* Bala extra: el rayo se bifurca y cae también la más urgente,
+         una por bala. */
+      let arrastradas = 0;
+      for (let i = 0; i < this.nivelDe("bala"); i++) {
+        const urgente = this.masUrgente();
+        if (!urgente) break;
+        eventos.push(...this.destruir(urgente, "bala"));
+        arrastradas += 1;
       }
+      /* Golpe crítico: solo con una palabra limpia. */
+      const pc = aj.criticoProb[this.nivelDe("critico")] ?? 0;
+      if (pc && limpia && this.rng() < pc) {
+        const cercana = this.masUrgente();
+        if (cercana) {
+          eventos.push(...this.destruir(cercana, "critico"));
+          arrastradas += 1;
+        }
+      }
+      /* La pantalla que una bala o un crítico vacían no dice nada del
+         tipeo: el empuje se calla hasta que vuelva la cadencia normal. */
+      if (arrastradas) {
+        this.empujeSuspendidoHasta = Math.max(
+          this.empujeSuspendidoHasta,
+          this.t + this.intervaloActual + 0.5,
+        );
+      }
+      /* Imán: las que ya están en la zona de peligro retroceden. */
+      const iman = aj.imanRetroceso[this.nivelDe("iman")] ?? 0;
+      if (iman) {
+        for (const p of this.vivas) {
+          if (p.progreso > aj.imanDesde) p.progreso = Math.max(0, p.progreso - iman);
+        }
+      }
+      /* Onda de choque por palabras (niveles 2 y 3). */
+      const cada = aj.ondaCadaPalabras[this.nivelDe("onda")] ?? 0;
+      if (cada) {
+        this.ondaContador += 1;
+        if (this.ondaContador >= cada) {
+          this.ondaContador = 0;
+          eventos.push(...this.onda());
+        }
+      }
+      eventos.push(...this.revisarNivel());
     }
     return eventos;
+  }
+
+  /** Un error: cuenta para la precisión siempre; rompe la racha salvo que
+   *  Racha blindada lo perdone; y puede disparar Congelar al errar. */
+  private errar(id: number | null): EventoMotor[] {
+    const perdonado = this.perdonar();
+    this.registrar(false, perdonado);
+    return [{ tipo: "error", id, perdonado }, ...this.congelar()];
   }
 
   /** Escape: soltar el enganche para atender una palabra más urgente. */
@@ -835,13 +1157,6 @@ export class MotorTormenta {
       }
     }
 
-    let poder: PowerupId | null = null;
-    if (this.siguienteConPoder) {
-      this.siguienteConPoder = false;
-      poder = this.sortearPowerup();
-      this.proximoPoder = this.t + this.entre(...this.aj.poderCadencia);
-    }
-
     const palabra: PalabraViva = {
       id: this.proximoId++,
       texto,
@@ -850,106 +1165,25 @@ export class MotorTormenta {
       progreso: 0,
       vida,
       carril: (this.rng() * 2 - 1) * 0.85,
-      poder,
+      errores: 0,
     };
     this.vivas.push(palabra);
     this.largoUltimo = texto.length;
     return palabra;
   }
 
-  /** Destruye una palabra y, si traía un poder, lo manda de viaje a la
-   *  nave: se aplica cuando LLEGA, no antes, para que la sorpresa se
-   *  revele donde se ve. */
-  private matar(p: PalabraViva, via: { porRayo: boolean; porPulso: boolean }): EventoMotor[] {
-    const eventos = this.destruir(p, via);
-    /* La pantalla que un rayo o un pulso vacían no dice nada del tipeo:
-       el empuje se calla hasta que vuelva a haber cadencia normal. */
-    if (via.porRayo || via.porPulso) {
-      this.empujeSuspendidoHasta = Math.max(
-        this.empujeSuspendidoHasta,
-        this.t + this.intervaloActual + 0.5,
-      );
-    }
-    if (p.poder) {
-      const segundos = this.aj.poderViajeSegundos;
-      this.poderesEnViaje.push({ powerup: p.poder, aplicaEn: this.t + segundos });
-      eventos.push({ tipo: "poderViaja", id: p.id, powerup: p.poder, segundos });
-    }
-    return eventos;
+  /** ¿Palabra "difícil" para Teclas difíciles? Mayúscula, tilde, ñ, o
+   *  cualquier cosa que no sea una letra minúscula pelada. */
+  private esDificil(texto: string): boolean {
+    return /[A-ZÁÉÍÓÚÜÑáéíóúüñ]|[^a-z\s]/.test(texto);
   }
 
-  private sortearPowerup(): PowerupId {
-    /* Pesos según el momento: reparación cuando faltan corazones, pulso
-       cuando la pantalla está ahogada. */
-    const pesos: [PowerupId, number][] = [
-      ["reparacion", this.corazones < this.aj.corazones ? 20 : 4],
-      ["escudo", this.escudo < this.aj.escudoTope ? 18 : 4],
-      ["pulso", this.vivas.length >= 5 ? 16 : 5],
-      ["lento", 15],
-      ["rayo", 12],
-      ["cosecha", 12],
-      ["mira", 10],
-    ];
-    const total = pesos.reduce((a, [, w]) => a + w, 0);
-    let azar = this.rng() * total;
-    for (const [id, w] of pesos) {
-      azar -= w;
-      if (azar <= 0) return id;
-    }
-    return "lento";
-  }
-
-  private aplicarPowerup(id: PowerupId): EventoMotor[] {
-    const eventos: EventoMotor[] = [];
-    const aj = this.aj;
-    /* Todo auxilio consumido acelera el margen: sin esto, el que mejor
-       juega estira la partida a 4 minutos y la promesa se rompe justo
-       para él (§4.5 del diseño). */
-    this.auxilio += 1;
-
-    switch (id) {
-      case "reparacion":
-        this.corazones = Math.min(aj.corazones, this.corazones + 1);
-        break;
-      case "escudo":
-        this.escudo = Math.min(aj.escudoTope, this.escudo + 1);
-        break;
-      case "pulso":
-        for (const p of [...this.vivas]) {
-          eventos.push(...this.matar(p, { porRayo: false, porPulso: true }));
-        }
-        this.engancheId = null;
-        break;
-      case "lento":
-        this.efectos.lentoHasta = this.t + aj.lentoSegundos;
-        /* Con la lluvia frenada la pantalla se vacía sola; tampoco cuenta
-           el primer intervalo después, que arranca de cero. */
-        this.empujeSuspendidoHasta = Math.max(
-          this.empujeSuspendidoHasta,
-          this.efectos.lentoHasta + this.intervaloActual,
-        );
-        break;
-      case "rayo":
-        this.efectos.rayoHasta = this.t + aj.rayoSegundos;
-        break;
-      case "cosecha":
-        this.efectos.cosechaHasta = this.t + aj.cosechaSegundos;
-        break;
-      case "mira":
-        this.efectos.miraHasta = this.t + aj.miraSegundos;
-        break;
-    }
-    return eventos;
-  }
-
-  private destruir(
-    p: PalabraViva,
-    via: { porRayo: boolean; porPulso: boolean },
-  ): EventoMotor[] {
+  private destruir(p: PalabraViva, via: ViaMuerte): EventoMotor[] {
     this.quitar(p.id);
     if (this.engancheId === p.id) this.engancheId = null;
 
     const aj = this.aj;
+    const tipeada = via === "tipeo";
     const mult = Math.min(
       aj.rachaTope,
       1 + aj.rachaSalto * Math.floor(this.racha / aj.rachaPaso),
@@ -959,15 +1193,24 @@ export class MotorTormenta {
       (1 + aj.puntosPorBanda * p.banda) *
       (1 + this.amenaza / 50) *
       mult;
-    if (via.porRayo || via.porPulso) puntos *= 0.5;
+    /* Lo que cae sin tipearlo vale la mitad y no suma racha: la racha es
+       por tipear bien, y eso no lo tipeaste vos. */
+    if (!tipeada) puntos *= aj.balaPuntos;
+    /* Teclas difíciles premia justo lo que el juego enseña — solo sobre
+       lo que tipeaste. */
+    if (tipeada && this.esDificil(p.texto)) {
+      puntos *= aj.teclasMult[this.nivelDe("teclas")] ?? 1;
+    }
     puntos = Math.round(puntos);
 
     this.puntaje += puntos;
     this.palabrasTotal += 1;
-    if (this.t < this.efectos.cosechaHasta) this.extraCosecha += 1;
-    if (!via.porRayo && !via.porPulso) this.racha += 1;
+    if (tipeada) {
+      this.palabrasTipeadas += 1;
+      this.racha += 1;
+    }
 
-    return [{ tipo: "destruida", id: p.id, puntos, porRayo: via.porRayo, porPulso: via.porPulso }];
+    return [{ tipo: "destruida", id: p.id, puntos, via }];
   }
 
   private finalizar(): EventoMotor {
@@ -988,17 +1231,20 @@ export class MotorTormenta {
       palabras: this.palabrasTotal,
       caracteres: this.aciertosTotal,
       errores: this.erroresTotal,
-      cristales: this.palabrasTotal + this.extraCosecha + CRISTALES_POR_RANGO[rango],
+      palabrasTipeadas: this.palabrasTipeadas,
+      cristales: this.palabrasTipeadas + CRISTALES_POR_RANGO[rango],
+      nivel: this.nivel,
+      mejoras: this.mejorasLista,
     };
     return { tipo: "fin", resultado };
   }
 
-  private registrar(ok: boolean) {
+  private registrar(ok: boolean, perdonado = false) {
     this.pulsaciones.push({ t: this.t, ok });
     if (ok) this.aciertosTotal += 1;
     else {
       this.erroresTotal += 1;
-      this.racha = 0;
+      if (!perdonado) this.racha = 0;
     }
   }
 
