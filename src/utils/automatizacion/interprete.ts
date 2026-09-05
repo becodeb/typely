@@ -127,7 +127,12 @@ export interface Interprete {
 export function crearInterprete(programa: Programa, e: EstadoCampo): Interprete {
   // Un mapa letra→cuerpo, construido UNA vez por corrida: llamar no
   // vuelve a buscar la definición en el árbol en cada paso.
-  const rutinas = rutinasDe(programa);
+  //
+  // Las definiciones viven en el lienzo (`e.rutinas`), no en la cadena
+  // verde. Se sigue mirando la cadena por compatibilidad: un programa
+  // armado a mano —el examen, o un v2 recién migrado en memoria— puede
+  // traerlas adentro, y las del lienzo ganan.
+  const rutinas = new Map([...rutinasDe(programa), ...rutinasDe(e.rutinas ?? [])]);
   const pila: Marco[] = [{ lista: programa, i: 0, contenedor: null, vuelta: 0, acciones: 0 }];
   const interprete: Interprete = { pasos: 0, contador: 0, siguiente };
 

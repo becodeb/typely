@@ -155,12 +155,22 @@ Estas ineficiencias crean luego la necesidad natural de sensores.
 
 ### Edición
 
-- Tocar en paleta agrega al próximo espacio libre.
-- Tocar un bloque colocado lo quita.
-- Arrastrar reordena, pero nunca es la única forma de editar.
+- Tocar en paleta agrega al final de la cadena verde.
+- Tocar un bloque colocado lo quita —sólo ése, y la cadena se vuelve a unir.
+- Arrastrar mueve el bloque Y TODO LO QUE CUELGA DEBAJO, y nunca es la
+  única forma de editar.
+- Soltar en un lugar vacío del lienzo deja la cadena ahí, suelta. Borrar es
+  un acto aparte: el tachito, o soltar sobre la paleta. Los dos borran la
+  cadena agarrada entera.
+- Sólo se ejecuta lo que cuelga del bloque verde. Lo suelto se ve atenuado
+  —nunca gris— y sigue ocupando memoria.
+- `Mi rutina` se ve a todo color aunque no cuelgue del verde: `Hacer A` la
+  encuentra igual. Se distingue por la forma de sombrero, no por el color
+  ni por la opacidad.
 - Editor bloqueado mientras corre el programa.
 - Bloque activo iluminado en sincronía con la nave.
-- Si no hay capacidad, vibran las ranuras y brilla la mejora de memoria.
+- Si no hay capacidad, vibran las ranuras, los puntos se ponen rojos y la
+  paleta se apaga en gris.
 
 ### Capacidad
 
@@ -168,6 +178,9 @@ Estas ineficiencias crean luego la necesidad natural de sensores.
 - Representar con chips, ranuras o luces.
 - Cada acción y cada contenedor `Repetir` ocupan una unidad; también cuentan sus
   bloques interiores.
+- La memoria cuenta TODO el lienzo: la cadena verde, las rutinas y las pilas
+  sueltas. «Ocupado» ya no quiere decir «se ejecuta»: una idea guardada al
+  costado también pesa, y por eso hay que decidir qué se tira.
 
 ### Bloques iniciales
 

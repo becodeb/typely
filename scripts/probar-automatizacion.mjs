@@ -529,7 +529,7 @@ prueba("R7 · `def` sólo va en la raíz, llamar a una letra sin definir es un n
   cierto(P.validarPrograma([rep(2, [def("A", [])], "r")]) === null, "Mi rutina adentro de otro bloque no vale: sólo en la raíz");
 });
 
-prueba("R8 · un campo guardado con def/call sobrevive validarCampo sin subir de versión", () => {
+prueba("R8 · un campo v2 con def/call migra a v3: la rutina sale a `rutinas`, la llamada queda en `programa`", () => {
   const prog = [def("A", [acc("move_forward", "m")]), llamar("A", "raiz")];
   const base = M.estadoInicial(azar);
   const { nave: _nave, ...guardado } = base;
@@ -537,8 +537,197 @@ prueba("R8 · un campo guardado con def/call sobrevive validarCampo sin subir de
   guardado.programa = JSON.parse(JSON.stringify(prog));
   const e = A.validarCampo(guardado);
   cierto(e !== null, "el campo con rutinas se lee");
-  igual(e.schemaVersion, 2, "sin bump de versión");
-  igual(e.programa.map((n) => n.type), ["def", "call"]);
+  igual(e.schemaVersion, 3, "migra a v3");
+  igual(e.programa.map((n) => n.type), ["call"], "la llamada queda colgando del verde");
+  igual(e.rutinas.map((n) => n.type), ["def"], "la definición sale al lienzo");
+});
+
+/* ================================================================== */
+console.log("\nEL LIENZO");
+
+prueba("L1 · cortarDesde corta la cadena en dos por el id, y null si no está", () => {
+  const cadena = [acc("move_forward", "a"), acc("turn_left", "b"), acc("harvest", "c")];
+  const corte = P.cortarDesde(cadena, "b");
+  igual(corte.arriba.map((n) => n.id), ["a"]);
+  igual(corte.agarrado.map((n) => n.id), ["b", "c"]);
+  igual(P.cortarDesde(cadena, "zzz"), null, "un id que no está: null");
+});
+
+prueba("L2 · cortarEn corta adentro de una cavidad sin tocar el resto del árbol", () => {
+  const prog = [
+    acc("move_forward", "a"),
+    rep(2, [acc("harvest", "h"), acc("turn_right", "g"), acc("wait", "w")], "r"),
+  ];
+  const corte = P.cortarEn(prog, "g");
+  igual(corte.agarrado.map((n) => n.id), ["g", "w"], "se lleva el bloque y todo lo que cuelga debajo, DENTRO de la cavidad");
+  igual(corte.restante[0].id, "a", "lo de afuera de la cavidad no se toca");
+  igual(corte.restante[1].body.map((n) => n.id), ["h"], "adentro de la cavidad sólo queda lo de arriba del corte");
+  igual(P.cortarEn(prog, "zzz"), null, "un id que no está en ningún lado: null");
+});
+
+prueba("L3 · colocarCadena empalma una cadena entera antes de un bloque, en orden", () => {
+  const base = [acc("move_forward", "a"), acc("harvest", "b")];
+  const cadena = [acc("turn_left", "x"), acc("turn_right", "y")];
+  const salida = P.colocarCadena(base, cadena, { tipo: "antes", id: "b" });
+  igual(salida.map((n) => n.id), ["a", "x", "y", "b"]);
+});
+
+prueba("L4 · colocarCadena pega al final, en orden", () => {
+  const base = [acc("move_forward", "a")];
+  const cadena = [acc("turn_left", "x"), acc("turn_right", "y")];
+  igual(P.colocarCadena(base, cadena, { tipo: "final" }).map((n) => n.id), ["a", "x", "y"]);
+});
+
+prueba("L5 · colocarCadena rechaza la cadena ENTERA y devuelve la misma referencia si el eslabón más alto no entra", () => {
+  const base = [rep(2, [acc("harvest", "h")], "r")];
+  // altura 2: Repetir[Si[avanzar]]. Sola, a profundidad 1 (dentro de "r"),
+  // 1 + 2 = 3 > maxProfundidad(2): no entra.
+  const alto = rep(2, [si({ tipo: "listo" }, [acc("move_forward", "m")])], "r2");
+  const cadena = [acc("turn_left", "x"), alto]; // "x" solo sí entraría
+  const salida = P.colocarCadena(base, cadena, { tipo: "dentro", id: "r" });
+  cierto(salida === base, "ni siquiera el primer bloque de la cadena se coloca: todo o nada");
+});
+
+prueba("L6 · cabeA con una cadena: decide el eslabón MÁS ALTO, no el primero", () => {
+  const bajo = acc("move_forward", "a");
+  const alto = rep(2, [si({ tipo: "listo" }, [acc("harvest", "h")])], "r"); // altura 2
+  cierto(P.cabeA([bajo, alto], 0), "al nivel del lienzo (profundidad 0): 0+2<=2, entra");
+  cierto(!P.cabeA([bajo, alto], 1), "a profundidad 1: 1+2>2, no entra, aunque `bajo` solo sí entraría");
+  cierto(P.cabeA(bajo, 1), "de referencia: el nodo bajo SOLO sí entra a profundidad 1");
+});
+
+prueba("L7 · cabeA rechaza una cadena que lleva un Por siempre o una Mi rutina fuera del nivel del lienzo", () => {
+  const siempreNodo = { id: "s", type: "forever", body: [] };
+  const defNodo = def("A", []);
+  cierto(P.cabeA([acc("move_forward", "a"), siempreNodo], 0), "Por siempre en la cadena, al nivel del lienzo: sí");
+  cierto(!P.cabeA([acc("move_forward", "a"), siempreNodo], 1), "la misma cadena adentro de un contenedor: no");
+  cierto(P.cabeA([defNodo], 0), "una rutina, al nivel del lienzo: sí");
+  cierto(!P.cabeA([acc("move_forward", "a"), defNodo], 1), "una rutina en la cadena, adentro de un contenedor: no");
+});
+
+prueba("L8 · capacidadDeLienzo suma la cadena verde, las rutinas y las pilas sueltas", () => {
+  const programa = [
+    rep(4, [acc("move_forward", "a"), acc("harvest", "b")], "r"), // 3
+    llamar("A", "call1"), // 1
+    { id: "cm", type: "counter_add" }, // 1
+  ]; // total 5
+  const rutinas = [def("A", [acc("move_forward", "m"), acc("harvest", "h"), acc("wait", "w")])]; // 1 + 3 = 4
+  const pilasSueltas = [
+    { nodos: [acc("turn_left", "gi"), acc("harvest", "co")] }, // 2
+    { nodos: [rep(2, [acc("wait", "es")], "r2")] }, // 2
+  ]; // total 4
+  igual(P.capacidadDeLienzo(programa, rutinas, pilasSueltas), 13, "5 + 4 + 4 = 13, el ejemplo de design.md");
+});
+
+prueba("L9 · PROGRESION §11 sigue valiendo con la rutina en el lienzo: 1 vez la definición + 3 llamadas < 3 copias", () => {
+  const cuerpo = [acc("move_forward", "a"), acc("harvest", "b"), acc("wait", "c")]; // 3
+  const rutinas = [def("A", cuerpo)]; // 1 + 3 = 4
+  const programa = [llamar("A", "l1"), llamar("A", "l2"), llamar("A", "l3")]; // 3
+  const total = P.capacidadDeLienzo(programa, rutinas, []);
+  igual(total, 7, "1 (def, una sola vez en rutinas) + 3 (cuerpo) + 3 (tres llamadas) = 7");
+  const copiasInline = [...cuerpo, ...cuerpo, ...cuerpo];
+  igual(P.capacidadUsada(copiasInline), 9, "tres copias sueltas = 9");
+  cierto(total < P.capacidadUsada(copiasInline), "la rutina en el lienzo sigue pesando menos que las copias, 7 < 9");
+});
+
+prueba("L10 · la migración v2→v3 conserva el orden y produce los MISMOS pasos que el programa plano original (con rutinas, Hacer A con N, y Contador)", () => {
+  // Un programa de cut 4: `Mi rutina A`, `Hacer A con N` y `Contador +1`
+  // mezclados con acciones sueltas — el snapshot que la persistencia-lienzo
+  // spec pide verificar explícitamente.
+  const plano = [
+    acc("move_forward", "m1"),
+    def("A", [acc("harvest", "h")]),
+    acc("turn_right", "g"),
+    { id: "call1", type: "call", rutina: "A", veces: 3 }, // Hacer A con N
+    { id: "cm1", type: "counter_add" },
+    acc("wait", "w"),
+  ];
+  const pasosOriginal = P.expandir(plano).pasos.map((p) => p.nodoId);
+
+  const base = M.estadoInicial(azar);
+  const { nave: _nave, ...guardado } = base;
+  guardado.schemaVersion = 2;
+  guardado.programa = JSON.parse(JSON.stringify(plano));
+  const e = A.validarCampo(guardado);
+  cierto(e !== null, "un v2 con rutinas + Hacer A con N + Contador se lee");
+  igual(
+    e.programa.map((n) => n.id),
+    ["m1", "g", "call1", "cm1", "w"],
+    "el orden original, sin el def, se conserva EN SU LUGAR",
+  );
+  igual(e.rutinas.map((n) => n.id), ["defA"], "la definición sale a rutinas");
+
+  const pasosMigrado = P.expandir(e.programa, undefined, undefined, e.rutinas).pasos.map((p) => p.nodoId);
+  igual(pasosMigrado, pasosOriginal, "correr la partida migrada produce la MISMA secuencia de pasos que la original");
+
+  // Vivo, con el intérprete (el camino real del juego): mismos nodoId de
+  // acción en el mismo orden, tanto para el programa original como el
+  // migrado — "se comporta igual" no es sólo expandir().
+  const eOriginal = M.estadoInicial(azar);
+  const itOriginal = I.crearInterprete(plano, eOriginal);
+  const pasosVivosOriginal = [];
+  for (let n = 0; n < 50; n++) {
+    const p = itOriginal.siguiente();
+    if (!p) break;
+    pasosVivosOriginal.push(p);
+  }
+  const itMigrado = I.crearInterprete(e.programa, e);
+  const pasosVivosMigrado = [];
+  for (let n = 0; n < 50; n++) {
+    const p = itMigrado.siguiente();
+    if (!p) break;
+    pasosVivosMigrado.push(p);
+  }
+  igual(
+    pasosVivosMigrado.map((p) => [p.nodoId, p.tipo]),
+    pasosVivosOriginal.map((p) => [p.nodoId, p.tipo]),
+    "el intérprete corre la partida migrada IDÉNTICA a la original, tick a tick",
+  );
+});
+
+prueba("L11 · clamping: coordenadas fuera de rango o inválidas se recortan, el lienzo ausente no rompe nada, una clave colgante se cae sola, y un nodo roto en una pila suelta descarta la partida entera", () => {
+  const base = M.estadoInicial(azar);
+  const { nave: _nave, ...guardado } = base;
+  guardado.schemaVersion = 3;
+  guardado.rutinas = [];
+  guardado.pilasSueltas = [{ id: "p1", x: NaN, y: 999999, nodos: [acc("move_forward", "m")] }];
+  // `lienzo` queda ausente (undefined): no puede romper la validación.
+  const e = A.validarCampo(guardado);
+  cierto(e !== null, "un x/y fuera de rango o NaN no descarta la partida");
+  igual(e.pilasSueltas[0].x, 0, "NaN se recorta a 0");
+  igual(e.pilasSueltas[0].y, 4000, "un y gigantesco se recorta al máximo del lienzo");
+  cierto(typeof e.lienzo.idInicio === "string" && e.lienzo.idInicio.length > 0, "sin lienzo, se regenera uno entero");
+
+  const conRutina = M.estadoInicial(azar);
+  const { nave: _n2, ...g2 } = conRutina;
+  g2.schemaVersion = 3;
+  g2.rutinas = [def("A", [])];
+  g2.pilasSueltas = [];
+  g2.lienzo = { idInicio: 12345, inicio: { x: 0, y: 0 }, rutinas: { "no-existe": { x: 1, y: 1 } } };
+  const e2 = A.validarCampo(g2);
+  cierto(e2 !== null);
+  cierto(
+    typeof e2.lienzo.idInicio === "string" && e2.lienzo.idInicio.length > 0,
+    "un idInicio inválido se regenera en vez de tirar la partida",
+  );
+  igual(Object.keys(e2.lienzo.rutinas), [g2.rutinas[0].id], "sólo sobrevive la clave de la rutina viva, la colgante se cae sola");
+
+  const g3 = { ...g2, pilasSueltas: [{ id: "roto", x: 0, y: 0, nodos: [{ id: "x", type: "no_existe" }] }] };
+  igual(A.validarCampo(g3), null, "un nodo mal formado en una pila suelta descarta TODA la partida");
+});
+
+prueba("L12 · el tope de nodos es del LIENZO ENTERO: tres listas, cada una por debajo de 60, pueden sumar más y se rechazan juntas", () => {
+  const accs = (n, prefix) => Array.from({ length: n }, (_, i) => acc("wait", prefix + i));
+  const base = M.estadoInicial(azar);
+  const { nave: _nave, ...guardado } = base;
+  guardado.schemaVersion = 3;
+  guardado.programa = accs(25, "p");
+  guardado.rutinas = [def("A", accs(25, "r"))]; // 1 + 25 = 26
+  guardado.pilasSueltas = [{ id: "s1", x: 0, y: 0, nodos: accs(25, "s") }]; // 25
+  cierto(A.validarCampo(guardado) === null, "25 + 26 + 25 = 76 > 60: se rechaza aunque cada lista sola entraría");
+
+  guardado.pilasSueltas = [{ id: "s1", x: 0, y: 0, nodos: accs(9, "s") }]; // 25 + 26 + 9 = 60
+  cierto(A.validarCampo(guardado) !== null, "exactamente en el tope (60), sí entra");
 });
 
 /* ================================================================== */
@@ -826,7 +1015,7 @@ prueba("M7 · el cuarzo crece más lento que la chispa, y en 1x1 sólo rebrota c
   }
 });
 
-prueba("M8 · un snapshot de la versión 1 se lee como versión 2 sin perder nada", () => {
+prueba("M8 · un snapshot de la versión 1 se lee como versión 3 sin perder nada", () => {
   const celda = { etapa: 1, variante: "punta", restanteMs: 100 };
   const viejo = {
     schemaVersion: 1, lado: 2, celdas: [celda, celda, celda, celda], saldo: 17, acumulado: 40,
@@ -834,7 +1023,7 @@ prueba("M8 · un snapshot de la versión 1 se lee como versión 2 sin perder nad
   };
   const e = A.validarCampo(viejo);
   cierto(e !== null, "se lee");
-  igual(e.schemaVersion, 2);
+  igual(e.schemaVersion, 3, "migra a v3 (antes: 2)");
   igual(e.saldos, { punta: 17, racimo: 0, prisma: 0, estrella: 0 }, "el saldo pasa a chispas");
   igual(e.cosechas, [{ t: 1000, v: 1 }, { t: 2000, v: 1 }]);
   igual(e.niveles, { punta: 1, racimo: 1, prisma: 1, estrella: 1 });

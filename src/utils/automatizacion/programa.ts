@@ -5,6 +5,17 @@
  * derecha maneje. Por eso el bloque activo se ilumina: es el renglón que
  * está leyendo.
  *
+ * Desde el Lienzo (automatizacion-lienzo-de-bloques): `Programa` sigue
+ * siendo exactamente el mismo tipo, pero cambia de SENTIDO — ahora es la
+ * cadena que cuelga del bloque verde de arranque. `EstadoCampo.rutinas` y
+ * `.pilasSueltas` (motor.ts) son sus hermanos en el lienzo; este archivo
+ * sigue sin saber nada de ellos como GEOMETRÍA (decisión de diseño #2:
+ * `programa.ts` se queda libre de estado de mundo), pero sí sabe agarrar,
+ * cortar y recomponer una CADENA de nodos (`cortarDesde`, `cortarEn`,
+ * `colocarCadena`) y sumar la capacidad de cualquier colección de listas
+ * de nodos (`capacidadDeLienzo`, con un parámetro estructural en vez de
+ * un `Pila` importado).
+ *
  * Tres reglas que no se negocian (IMPLEMENTACION.md §3):
  *
  *   1. NUNCA se genera ni se evalúa JavaScript. Nada de `eval`, `Function`
@@ -244,6 +255,24 @@ export function entra(programa: Programa, capacidad: number, costo = 1): boolean
   return capacidadUsada(programa) + costo <= capacidad;
 }
 
+/** La memoria que ocupa TODO el lienzo: la cadena verde, las rutinas y las
+ *  pilas sueltas. "Ocupado" dejó de querer decir "se ejecuta" (MVP.md §7):
+ *  una idea guardada al costado también pesa, y por eso hay que decidir
+ *  qué se tira. `pilasSueltas` se recibe como forma estructural —sólo
+ *  `{ nodos }`— para que este archivo nunca tenga que importar `Pila` de
+ *  `motor.ts` (decisión de diseño #2). */
+export function capacidadDeLienzo(
+  programa: Programa,
+  rutinas: readonly NodoDef[] = [],
+  pilasSueltas: readonly { nodos: NodoPrograma[] }[] = [],
+): number {
+  return (
+    capacidadUsada(programa) +
+    capacidadUsada(rutinas as Programa) +
+    pilasSueltas.reduce((s, p) => s + capacidadUsada(p.nodos), 0)
+  );
+}
+
 /** Costo en memoria de quitar/agregar ese nodo (él más su contenido). */
 export function costoDeNodo(nodo: NodoPrograma): number {
   return esContenedor(nodo) ? 1 + ramas(nodo).reduce((s, r) => s + capacidadUsada(listaDeRama(nodo, r)), 0) : 1;
@@ -428,13 +457,18 @@ export function expandir(
   programa: Programa,
   maxPasos = AJUSTES.maxPasosEjecucion,
   lado = AJUSTES.ladoInicial,
+  // ADITIVO (Lienzo, decisión de diseño #4): las definiciones que viven
+  // en `EstadoCampo.rutinas`, no en la cadena. Con el valor por defecto
+  // `[]` el mapa fusionado es EXACTAMENTE `rutinasDe(programa)`, así que
+  // todo call site existente compila y se comporta byte-idéntico.
+  rutinasLienzo: NodoDef[] = [],
 ): {
   pasos: PasoExpandido[];
   completo: boolean;
 } {
   const pasos: PasoExpandido[] = [];
   let completo = true;
-  const rutinas = rutinasDe(programa);
+  const rutinas = new Map([...rutinasDe(programa), ...rutinasDe(rutinasLienzo)]);
 
   const recorrer = (nodos: Programa, contenedorId?: string, vuelta?: number, llamadas = 0): void => {
     for (const nodo of nodos) {
@@ -550,13 +584,29 @@ export function profundidadDe(programa: Programa, id: string, nivel = 0): number
   return null;
 }
 
-/** ¿Cabe `nodo` en una lista que está a `profundidad`? El tope de
- *  anidamiento vale para todo lo que se suelte; `Por siempre` además
- *  sólo va en la libreta. */
-export function cabeA(nodo: NodoPrograma, profundidad: number): boolean {
-  if (nodo.type === "forever" && profundidad > 0) return false;
-  if (nodo.type === "def" && profundidad > 0) return false;
-  return profundidad + alturaDe(nodo) <= AJUSTES.maxProfundidad;
+/** La altura de la cadena es la del eslabón MÁS ALTO: todos caen en la
+ *  misma lista al soltarse, así que el que no entra decide por todos. */
+export function alturaDeCadena(cadena: readonly NodoPrograma[]): number {
+  let max = 0;
+  for (const n of cadena) max = Math.max(max, alturaDe(n));
+  return max;
+}
+
+/** ¿Cabe esto en una lista que está a `profundidad`? Acepta un nodo SUELTO
+ *  o una CADENA entera agarrada del lienzo (`cortarDesde`): el arrastre de
+ *  Scratch se lleva el bloque tocado y todo lo que cuelga debajo, así que
+ *  lo que decide si cabe es el eslabón más alto, no el primero. `Por
+ *  siempre` y `Mi rutina` mantienen su regla propia en CUALQUIER eslabón:
+ *  sólo al nivel del lienzo (profundidad 0). Con un único nodo,
+ *  `alturaDeCadena` es exactamente `alturaDe`, así que todo call site
+ *  existente (`insertarAntes`, `insertarEn`) se comporta byte-idéntico. */
+export function cabeA(nodo: NodoPrograma | NodoPrograma[], profundidad: number): boolean {
+  const cadena = Array.isArray(nodo) ? nodo : [nodo];
+  for (const n of cadena) {
+    if (n.type === "forever" && profundidad > 0) return false;
+    if (n.type === "def" && profundidad > 0) return false;
+  }
+  return profundidad + alturaDeCadena(cadena) <= AJUSTES.maxProfundidad;
 }
 
 /** Mete `nodo` justo ANTES del bloque `idDestino`, esté donde esté —
@@ -687,6 +737,89 @@ export function colocar(programa: Programa, nodo: NodoPrograma, destino: Destino
   return insertarAntes(programa, nodo, destino.id);
 }
 
+/* ------------------------------------------------------------------ */
+/* Agarrar y soltar una CADENA (el lienzo)                             */
+/* ------------------------------------------------------------------ */
+
+/** Corta una lista en dos por el id: lo de arriba se queda, el bloque y
+ *  TODO lo que cuelga debajo se va como UNA unidad. Es la semántica de
+ *  Scratch, y es la única regla nueva del arrastre. Null si `id` no está
+ *  en esa lista (no busca en cavidades: para eso está `cortarEn`). */
+export function cortarDesde(
+  nodos: NodoPrograma[],
+  id: string,
+): { arriba: NodoPrograma[]; agarrado: NodoPrograma[] } | null {
+  const i = nodos.findIndex((n) => n.id === id);
+  if (i < 0) return null;
+  return { arriba: nodos.slice(0, i), agarrado: nodos.slice(i) };
+}
+
+/** A qué profundidad caería una CADENA si se la suelta en `d`: la lógica
+ *  de `colocar`, pero devolviendo el número en vez de intentar el
+ *  encastre — así `colocarCadena` puede pedirle a `cabeA` que mire el
+ *  eslabón más alto ANTES de tocar el árbol. */
+function profundidadDestino(programa: Programa, d: Destino): number | null {
+  if (d.tipo === "final") return 0;
+  if (d.tipo === "antes") return profundidadDe(programa, d.id);
+  const p = profundidadDe(programa, d.id);
+  return p === null ? null : p + 1;
+}
+
+/** Coloca una CADENA entera en un destino, en orden, o no coloca nada:
+ *  una cadena que no entra jamás se parte a la mitad. */
+export function colocarCadena(programa: Programa, cadena: NodoPrograma[], destino: Destino): Programa {
+  if (cadena.length === 0) return programa;
+  const prof = profundidadDestino(programa, destino);
+  if (prof === null || !cabeA(cadena, prof)) return programa;
+  let salida = colocar(programa, cadena[0], destino);
+  if (salida === programa) return programa;
+  for (let i = 1; i < cadena.length; i++) {
+    // `despuesDe` ya sabe decir "antes de mi hermano siguiente, o al
+    // final de mi lista": es exactamente "pegado abajo del anterior".
+    const siguiente = colocar(salida, cadena[i], despuesDe(salida, cadena[i - 1].id));
+    if (siguiente === salida) return programa; // defensivo: `cabeA` ya lo cubrió
+    salida = siguiente;
+  }
+  return salida;
+}
+
+/** La misma lista que `listaDe` encontró, pero YA reemplazada por
+ *  `lista` en el árbol. Sacado de `desplazarNodo`, que hacía esto en
+ *  línea: `cortarEn` lo necesita igual para devolver el "resto" después
+ *  de sacar una cadena de una cavidad. */
+function conListaDe(
+  programa: Programa,
+  donde: { lista: NodoPrograma[]; contenedor: NodoContenedor | null; rama: Rama },
+  lista: NodoPrograma[],
+): Programa {
+  if (!donde.contenedor) return lista;
+  const c = donde.contenedor;
+  const reemplazar = (nodos: Programa): Programa =>
+    nodos.map((n) => {
+      if (!esContenedor(n)) return n;
+      if (n.id === c.id) return conRama(n, donde.rama, lista);
+      let copia: NodoContenedor = n;
+      for (const r of ramas(n)) copia = conRama(copia, r, reemplazar(listaDeRama(n, r)));
+      return copia;
+    });
+  return reemplazar(programa);
+}
+
+/** Lo mismo que `cortarDesde`, pero buscando en cualquier cavidad del
+ *  árbol: agarrar el segundo bloque de adentro de un `Repetir` también se
+ *  lleva sus hermanos de abajo, sin sacarlos del contenedor. Null si `id`
+ *  no aparece en ningún lado. */
+export function cortarEn(
+  programa: Programa,
+  id: string,
+): { restante: Programa; agarrado: NodoPrograma[] } | null {
+  const donde = listaDe(programa, id);
+  if (!donde) return null;
+  const corte = cortarDesde(donde.lista, id);
+  if (!corte) return null;
+  return { restante: conListaDe(programa, donde, corte.arriba), agarrado: corte.agarrado };
+}
+
 /** Mueve un bloque que ya está en el programa a otro lugar. Es quitar y
  *  colocar, con dos guardas: no se puede soltar un contenedor adentro de
  *  sí mismo, y soltar donde ya estaba no cambia nada. Si el destino no
@@ -714,15 +847,5 @@ export function desplazarNodo(programa: Programa, id: string, delta: -1 | 1): Pr
   if (j < 0 || j >= donde.lista.length) return programa;
   const lista = [...donde.lista];
   [lista[i], lista[j]] = [lista[j], lista[i]];
-  if (!donde.contenedor) return lista;
-  const c = donde.contenedor;
-  const reemplazar = (nodos: Programa): Programa =>
-    nodos.map((n) => {
-      if (!esContenedor(n)) return n;
-      if (n.id === c.id) return conRama(n, donde.rama, lista);
-      let copia: NodoContenedor = n;
-      for (const r of ramas(n)) copia = conRama(copia, r, reemplazar(listaDeRama(n, r)));
-      return copia;
-    });
-  return reemplazar(programa);
+  return conListaDe(programa, donde, lista);
 }

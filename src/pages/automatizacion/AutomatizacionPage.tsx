@@ -66,10 +66,12 @@ import {
   costoDeNodo,
   desplazarNodo,
   esContenedor,
+  esDefinicion,
   moverNodo,
   nuevoId,
   quitarNodo,
   type Destino,
+  type NodoDef,
   type NodoPrograma,
   type Programa,
   type Sensor,
@@ -269,10 +271,22 @@ export function AutomatizacionPage() {
   }, []);
 
   /* ---------------- edición del programa ---------------- */
+  /* PUENTE TEMPORAL (Lienzo, tarea 1.9 — se borra en la tarea 2b.5).
+   *
+   * `EditorBloques` todavía sólo sabe mostrar un `Programa` en lista, no
+   * un lienzo con rutinas aparte. Mientras tanto le mostramos la UNIÓN
+   * de `e.rutinas` (las `Mi rutina`, siempre primero) y `e.programa` (la
+   * cadena verde), y en cada edición volvemos a separarlas: los `def`
+   * vuelven a `rutinas`, todo lo demás vuelve a `programa`. Sin esto, una
+   * partida migrada a v3 dejaría de mostrarle al chico su propia rutina
+   * aunque `Hacer A` la siga ejecutando — una regresión visible que la
+   * migración no puede introducir en silencio. */
   const cambiarPrograma = useCallback(
     (fn: (p: Programa) => Programa) => {
       if (corriendo) return;
-      e.programa = fn(e.programa);
+      const fusion = fn([...e.rutinas, ...e.programa]);
+      e.rutinas = fusion.filter(esDefinicion) as NodoDef[];
+      e.programa = fusion.filter((n) => !esDefinicion(n));
       guardador.current.pedir(usuario, e, true);
       repintar();
     },
@@ -287,10 +301,15 @@ export function AutomatizacionPage() {
         if (capacidadUsada(p) + costoDeNodo(nodo) > capacidad(e)) return p;
         // Arrastrada: cae donde el chico la soltó.
         if (destino) return colocar(p, nodo, destino);
-        // Tocada: al final. Si el último bloque es un contenedor y la
-        // pieza es una acción, entra ADENTRO — es lo que uno espera
-        // después de poner un `Repetir` o un `Si` vacío.
-        const ultimo = p[p.length - 1];
+        // Tocada: al final DE LA CADENA VERDE —no de la fusión con las
+        // rutinas, que sólo existe para que el puente temporal le siga
+        // mostrando sus rutinas al chico. Si el último bloque de la
+        // cadena verde es un contenedor y la pieza es una acción, entra
+        // ADENTRO — es lo que uno espera después de poner un `Repetir` o
+        // un `Si` vacío. (Si la cadena verde está vacía y sólo hay
+        // rutinas, `ultimo` es `undefined` y el bloque cae al final,
+        // nunca adentro de una `Mi rutina` ajena.)
+        const ultimo = e.programa[e.programa.length - 1];
         if (ultimo && esContenedor(ultimo) && !esContenedor(nodo)) {
           const adentro = colocar(p, nodo, { tipo: "dentro", id: ultimo.id });
           if (adentro !== p) return adentro;
@@ -434,7 +453,10 @@ export function AutomatizacionPage() {
       </header>
 
       <EditorBloques
-        programa={e.programa}
+        // PUENTE TEMPORAL (tarea 1.9, se borra en la tarea 2b.5): rutinas
+        // primero, cadena verde después — ver el comentario en
+        // `cambiarPrograma` más arriba.
+        programa={[...e.rutinas, ...e.programa]}
         capacidad={capacidad(e)}
         tieneRepetir={tieneRepetir(e)}
         piezas={piezasCompradas(e)}

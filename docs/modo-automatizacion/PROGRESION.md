@@ -271,7 +271,14 @@ Cada corte deja el juego jugable y el examen en verde.
 - [ ] `Por siempre` corre hasta que se toca Detener, y la producción por
       minuto sube sola mientras el chico mira.
 - [ ] Una rutina definida una vez y llamada tres veces ocupa menos memoria
-      que las tres copias.
+      que las tres copias, esté donde esté en el lienzo.
+- [ ] Un bloque se suelta en cualquier parte del lienzo y se queda ahí, y
+      agarrarlo se lleva ese bloque y todo lo que cuelga abajo.
+- [ ] Sólo lo conectado al bloque verde se ejecuta; lo suelto se ve atenuado,
+      nunca gris, y las `Mi rutina` a todo color.
+- [ ] Al llenar la memoria —contando lo suelto— los puntos se ponen rojos y
+      la paleta se apaga; no se puede tomar otro bloque.
+- [ ] Una partida guardada en v2 se abre en v3 y se comporta igual.
 - [ ] El mismo programa con `tamaño del campo` recorre la 3×3 y la 4×4.
 - [ ] La nave gira pasando por vistas intermedias, despega al arrancar y
       aterriza al terminar; nunca tapa la veta del muelle estando quieta.

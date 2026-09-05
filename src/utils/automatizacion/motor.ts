@@ -51,7 +51,7 @@ import {
   type Costo,
   type Mineral,
 } from "../../data/automatizacion/balance";
-import type { Programa, TipoAccion } from "./programa";
+import { capacidadDeLienzo, nuevoId, type NodoDef, type NodoPrograma, type Programa, type TipoAccion } from "./programa";
 
 export type Direccion = "north" | "east" | "south" | "west";
 export type EtapaCristal = 0 | 1 | 2 | 3;
@@ -65,6 +65,44 @@ export interface EstadoNave {
   col: number;
   direccion: Direccion;
 }
+
+/** Un punto en coordenadas de LIENZO (px, no vinculado a ninguna
+ *  resolución de pantalla — ver `EditorBloques.tsx`'s `aLienzo`). */
+export interface Punto {
+  x: number;
+  y: number;
+}
+
+/** Una pila suelta del lienzo: bloques encadenados que NO cuelgan del
+ *  bloque verde, con su posición en coordenadas de lienzo. No se ejecuta,
+ *  pero ocupa memoria igual (MVP.md §7). */
+export interface Pila {
+  id: string;
+  x: number;
+  y: number;
+  nodos: NodoPrograma[];
+}
+
+/** Dónde está cada cosa en el lienzo. La geometría vive APARTE del árbol:
+ *  un nodo es lógica, no píxeles, y `validarPrograma` no tiene que
+ *  aprender de coordenadas. */
+export interface Lienzo {
+  /** Id del bloque verde. Se persiste para resaltarlo y referenciarlo; si
+   *  el snapshot trae uno que no cierra, se REGENERA — nunca se descarta
+   *  la partida por eso. */
+  idInicio: string;
+  /** Ancla fija del bloque verde. Siempre (0, 0): el lienzo se define con
+   *  el origen en el verde, así "recentrar" es volver la vista a cero. */
+  inicio: Punto;
+  /** Posición de cada `Mi rutina`, por el id de su nodo `def`. */
+  rutinas: Record<string, Punto>;
+}
+
+export const PUNTO_INICIO: Punto = { x: 0, y: 0 };
+/** Fila por defecto de las rutinas: a la derecha del verde, una debajo de
+ *  otra, para que una partida migrada nunca las apile encima. */
+export const puntoRutinaPorDefecto = (i: number): Punto => ({ x: 340, y: i * 200 });
+export const lienzoInicial = (): Lienzo => ({ idInicio: nuevoId(), inicio: PUNTO_INICIO, rutinas: {} });
 
 export interface Celda {
   etapa: EtapaCristal;
@@ -82,7 +120,7 @@ export interface Cosecha {
 }
 
 export interface EstadoCampo {
-  schemaVersion: 2;
+  schemaVersion: 3;
   lado: number;
   nave: EstadoNave;
   celdas: Celda[];
@@ -97,12 +135,25 @@ export interface EstadoCampo {
   /** Nivel de evolución de cada mineral, 1 a 4 (PROGRESION.md §3). */
   niveles: Record<Mineral, number>;
   mejoras: Record<string, number>;
+  /** La cadena que cuelga del bloque verde. Es lo ÚNICO que se ejecuta. */
   programa: Programa;
+  /** Las definiciones: siempre raíz, siempre llamables, nunca en la
+   *  cadena verde (Lienzo, automatizacion-lienzo-de-bloques). */
+  rutinas: NodoDef[];
+  /** Pilas inertes: se ven atenuadas y cuentan para la memoria. */
+  pilasSueltas: Pila[];
+  lienzo: Lienzo;
   mejorTasa: number;
   /** Cosechas válidas recientes, para la producción por minuto. */
   cosechas: Cosecha[];
   /** Tiempo jugado acumulado, en ms. El único reloj del mundo. */
   relojMs: number;
+}
+
+/** La memoria que ocupa TODO el lienzo: la cadena verde, las rutinas y
+ *  las pilas sueltas juntas. */
+export function capacidadUsadaCampo(e: EstadoCampo): number {
+  return capacidadDeLienzo(e.programa, e.rutinas, e.pilasSueltas);
 }
 
 export type TipoEvento =
@@ -163,7 +214,7 @@ export function estadoInicial(azar: () => number = Math.random): EstadoCampo {
   }
 
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     lado,
     nave: origen(lado),
     celdas,
@@ -173,6 +224,9 @@ export function estadoInicial(azar: () => number = Math.random): EstadoCampo {
     niveles: porMineral(1),
     mejoras: {},
     programa: [],
+    rutinas: [],
+    pilasSueltas: [],
+    lienzo: lienzoInicial(),
     mejorTasa: 0,
     cosechas: [],
     relojMs: 0,
