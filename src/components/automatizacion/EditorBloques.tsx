@@ -50,6 +50,8 @@ import {
   IcoContadorCero,
   IcoContadorMas,
   IcoEsperar,
+  IcoInicio,
+  IcoRecentrar,
   IcoRetroceder,
   IcoCosechar,
   IcoGirarDer,
@@ -78,6 +80,7 @@ import {
   costoDeNodo,
   despuesDe,
   esContenedor,
+  esDefinicion,
   esRepetir,
   listaDeRama,
   ramas,
@@ -87,6 +90,7 @@ import {
   type NodoAccion,
   type NodoCall,
   type NodoContenedor,
+  type NodoDef,
   type NodoMientras,
   type NodoPrograma,
   type NodoRepetir,
@@ -99,6 +103,7 @@ import {
   type TipoContador,
   type Veces,
 } from "../../utils/automatizacion/programa";
+import { puntoRutinaPorDefecto, type Lienzo, type Pila, type Punto } from "../../utils/automatizacion/motor";
 
 /* ------------------------------------------------------------------ */
 /* Colores y nombres                                                   */
@@ -313,7 +318,17 @@ export interface PiezasDeControl {
 }
 
 interface Props {
+  /** PUENTE TEMPORAL (tarea 1.9, se borra en la tarea 2b.5): rutinas
+   *  primero, cadena verde después — ver el comentario en
+   *  `AutomatizacionPage.cambiarCampo`. Acá adentro se vuelven a separar
+   *  con `esDefinicion` para dibujar cada cosa en su lugar del lienzo. */
   programa: Programa;
+  /** Pilas sueltas del lienzo: nada las crea todavía en esta tanda (2b lo
+   *  hace), pero ya se dibujan si existen — de un guardado futuro, o de
+   *  una vuelta atrás de rama. */
+  pilasSueltas: readonly Pila[];
+  /** Ancla del bloque verde y posición de cada `Mi rutina`. */
+  lienzo: Lienzo;
   capacidad: number;
   tieneRepetir: boolean;
   piezas: PiezasDeControl;
@@ -329,6 +344,13 @@ interface Props {
   onCambiarSensor: (id: string) => void;
 }
 
+/** Tamaño del ancla verde: la cadena cuelga justo debajo, pegada. */
+const ALTO_INICIO = 64;
+/** Margen inicial de la vista: el ancla no queda pegada a la esquina. */
+const MARGEN = 40;
+const ZOOM_MIN = 0.6;
+const ZOOM_MAX = 2.4;
+
 const mismoDestino = (a: DestinoEditor, b: DestinoEditor) =>
   a?.tipo === b?.tipo &&
   (a?.tipo === "final" ||
@@ -339,6 +361,8 @@ const mismoDestino = (a: DestinoEditor, b: DestinoEditor) =>
 export function EditorBloques(props: Props) {
   const {
     programa,
+    pilasSueltas,
+    lienzo: datosLienzo,
     capacidad,
     tieneRepetir,
     piezas: compradas,
@@ -349,7 +373,16 @@ export function EditorBloques(props: Props) {
     onCambiarVeces,
     onCambiarSensor,
   } = props;
-  const usada = capacidadUsada(programa);
+  /* PUENTE TEMPORAL (tarea 1.9): `programa` todavía llega fusionado
+     (rutinas primero, cadena verde después). Acá se vuelve a separar para
+     dibujar cada cosa en su lugar del lienzo — el bloque verde ejecuta
+     `cadenaVerde`, las `Mi rutina` son sombreros aislados. */
+  const cadenaVerde = programa.filter((n) => !esDefinicion(n));
+  const rutinas = programa.filter(esDefinicion) as NodoDef[];
+  /* La memoria es de TODO el lienzo (PROGRESION.md §11): la cadena verde,
+     las rutinas —ya sumadas en `programa` por el puente— y las pilas
+     sueltas, que el puente no toca. */
+  const usada = capacidadUsada(programa) + pilasSueltas.reduce((s, p) => s + capacidadUsada(p.nodos), 0);
   /* Qué letras ya tienen `Mi rutina` definida: mientras no la tengan se
      ofrece definirla, y una vez definida se ofrece llamarla — nunca las
      dos piezas juntas para la misma letra. */
@@ -362,6 +395,7 @@ export function EditorBloques(props: Props) {
   propsRef.current = props;
 
   const lienzoRef = useRef<HTMLDivElement>(null);
+  const capaRef = useRef<HTMLDivElement>(null);
   const [arrastre, setArrastre] = useState<Arrastre | null>(null);
   const [destino, setDestino] = useState<DestinoEditor>(null);
   const arrastreRef = useRef<Arrastre | null>(null);
@@ -381,10 +415,165 @@ export function EditorBloques(props: Props) {
     sacudidaTimer.current = setTimeout(() => setSacudida(false), 450);
   }, []);
 
-  const entra = useCallback(
-    (costo: number) => capacidadUsada(propsRef.current.programa) + costo <= propsRef.current.capacidad,
-    [],
-  );
+  /* ---------------- la ventana: acercar, alejar, recorrer ----------------
+     `.auto-lienzo` es el VIEWPORT (tamaño fijo, `overflow:hidden`);
+     `.auto-lienzo__capa` es la capa que lleva el transform y guarda
+     coordenadas de DATOS. Origen `0 0` y no `center` (decisión #7,
+     design.md): con `0 0` el punto (0,0) de esa capa es siempre su propia
+     esquina superior izquierda, así que convertir pantalla→lienzo es sólo
+     dividir por el zoom, sin restar la mitad del ancho. */
+  const [vista, setVista] = useState({ z: 1, x: MARGEN, y: MARGEN });
+  const vistaRef = useRef(vista);
+  vistaRef.current = vista;
+  const paneoRef = useRef<{ sx: number; sy: number; bx: number; by: number } | null>(null);
+  const [hudRect, setHudRect] = useState<DOMRect | null>(null);
+
+  /** Aplica un zoom nuevo dejando quieto el punto (sx, sy) de la pantalla:
+   *  sin esto el zoom siempre tira hacia el origen y se pierde de vista lo
+   *  que se estaba mirando. */
+  const acercarEn = useCallback((nextZ: number | ((z: number) => number), sx?: number, sy?: number) => {
+    setVista((v) => {
+      const pedido = typeof nextZ === "function" ? nextZ(v.z) : nextZ;
+      const z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, pedido));
+      const capa = capaRef.current;
+      if (!capa || z === v.z) return { ...v, z };
+      const r = capa.getBoundingClientRect();
+      const px = sx ?? r.left + r.width / 2;
+      const py = sy ?? r.top + r.height / 2;
+      // Punto de lienzo bajo el cursor, ANTES de aplicar el nuevo zoom.
+      const lx = (px - r.left) / v.z;
+      const ly = (py - r.top) / v.z;
+      return { z, x: v.x - lx * (z - v.z), y: v.y - ly * (z - v.z) };
+    });
+  }, []);
+
+  /** Vuelve a encuadrar el ancla del bloque verde: el recorte de decisión
+   *  #9 (design.md) para no perderlo nunca de vista. */
+  const recentrar = useCallback(() => setVista({ z: 1, x: MARGEN, y: MARGEN }), []);
+
+  /* De pantalla a lienzo y de vuelta. Preparadas para el snap 2D y el
+     contorno fantasma de las tareas 2b.1/2b.2 — en esta tanda el arrastre
+     sigue resolviéndose en 1D con `calcularDestino`. */
+  const aLienzo = useCallback((cx: number, cy: number): Punto | null => {
+    const capa = capaRef.current;
+    if (!capa) return null;
+    const r = capa.getBoundingClientRect();
+    return { x: (cx - r.left) / vistaRef.current.z, y: (cy - r.top) / vistaRef.current.z };
+  }, []);
+  const aPantalla = (p: Punto, r: DOMRect, z: number): Punto => ({ x: r.left + p.x * z, y: r.top + p.y * z });
+  void aLienzo;
+  void aPantalla;
+
+  /** ¿El evento salió de un panel del HUD? Portado a `document.body`
+   *  (decisión #8): nunca es descendiente de la capa, pero el chequeo se
+   *  mantiene por si algún día algo del HUD vuelve a vivir adentro. */
+  const enHud = (t: EventTarget | null): boolean => t instanceof Element && !!t.closest("[data-hud]");
+
+  /* Tocar el vacío del lienzo recorre; tocar un bloque lo arrastra — la
+     misma disyuntiva que IslandDetailPage resuelve con `[data-level-node]`
+     (CLAUDE.md §6.1/§6.2), acá con `[data-nodo]`. También se excluye
+     cualquier `<button>`: adentro de una `Mi rutina` (sin asa propia,
+     `arrastrable=false`) la ranura, el sensor y la cruz de quitar siguen
+     vivos, y sin este chequeo un toque ahí arrancaría un paneo a la vez
+     que el click — en un dedo, ninguno de los dos llegaría entero. */
+  const alBajarLienzo = useCallback((ev: PointerEventReact<HTMLDivElement>) => {
+    if (propsRef.current.corriendo) return;
+    if (enHud(ev.target)) return;
+    if (ev.target instanceof Element && ev.target.closest("button, [data-nodo]")) return;
+    ev.preventDefault();
+    paneoRef.current = { sx: ev.clientX, sy: ev.clientY, bx: vistaRef.current.x, by: vistaRef.current.y };
+  }, []);
+
+  useEffect(() => {
+    function alMoverPaneo(ev: PointerEvent) {
+      const p = paneoRef.current;
+      if (!p) return;
+      setVista((v) => ({ ...v, x: p.bx + (ev.clientX - p.sx), y: p.by + (ev.clientY - p.sy) }));
+    }
+    function alSoltarPaneo() {
+      paneoRef.current = null;
+    }
+    window.addEventListener("pointermove", alMoverPaneo);
+    window.addEventListener("pointerup", alSoltarPaneo);
+    window.addEventListener("pointercancel", alSoltarPaneo);
+    return () => {
+      window.removeEventListener("pointermove", alMoverPaneo);
+      window.removeEventListener("pointerup", alSoltarPaneo);
+      window.removeEventListener("pointercancel", alSoltarPaneo);
+    };
+  }, []);
+
+  /* Rueda = zoom sobre el cursor. Nativo y no `onWheel` de React: React lo
+     registra pasivo, y un listener pasivo no puede `preventDefault`. */
+  useEffect(() => {
+    const el = lienzoRef.current;
+    if (!el) return;
+    function alRodar(ev: WheelEvent) {
+      if (propsRef.current.corriendo) return;
+      if (enHud(ev.target)) return;
+      ev.preventDefault();
+      const paso = ev.deltaY < 0 ? 1.15 : 1 / 1.15;
+      acercarEn((z) => z * paso, ev.clientX, ev.clientY);
+    }
+    el.addEventListener("wheel", alRodar, { passive: false });
+    return () => el.removeEventListener("wheel", alRodar);
+  }, [acercarEn]);
+
+  /* Pellizco de dos dedos = zoom, centrado en el punto medio. */
+  useEffect(() => {
+    const el = lienzoRef.current;
+    if (!el) return;
+    let base: { dist: number; z: number } | null = null;
+    const separacion = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    function alTocarPellizco(ev: TouchEvent) {
+      if (propsRef.current.corriendo || ev.touches.length !== 2) return;
+      base = { dist: separacion(ev.touches), z: vistaRef.current.z };
+    }
+    function alMoverPellizco(ev: TouchEvent) {
+      if (!base || ev.touches.length !== 2) return;
+      ev.preventDefault();
+      const cx = (ev.touches[0].clientX + ev.touches[1].clientX) / 2;
+      const cy = (ev.touches[0].clientY + ev.touches[1].clientY) / 2;
+      acercarEn(base.z * (separacion(ev.touches) / base.dist), cx, cy);
+    }
+    function alSoltarPellizco(ev: TouchEvent) {
+      if (ev.touches.length < 2) base = null;
+    }
+    el.addEventListener("touchstart", alTocarPellizco, { passive: true });
+    el.addEventListener("touchmove", alMoverPellizco, { passive: false });
+    el.addEventListener("touchend", alSoltarPellizco, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", alTocarPellizco);
+      el.removeEventListener("touchmove", alMoverPellizco);
+      el.removeEventListener("touchend", alSoltarPellizco);
+    };
+  }, [acercarEn]);
+
+  /* El HUD (memoria, recentrar) va por un portal a `document.body`
+   *  (decisión #8, MANDATORIO): `.auto-taller` lleva `backdrop-filter`, lo
+   *  que vuelve `position: fixed` relativo A ÉL — la misma trampa que el
+   *  fantasma ya esquiva. Se mide el viewport con un `ResizeObserver` en
+   *  vez de escuchar sólo `resize`: acá el tamaño también cambia con la
+   *  compra de mejoras que reflowan el layout, no sólo con la ventana. */
+  useEffect(() => {
+    const el = lienzoRef.current;
+    if (!el) return;
+    const medir = () => setHudRect(el.getBoundingClientRect());
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    window.addEventListener("resize", medir);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", medir);
+    };
+  }, []);
+
+  const entra = useCallback((costo: number) => {
+    const p = propsRef.current;
+    const pilasCosto = p.pilasSueltas.reduce((s, pi) => s + capacidadUsada(pi.nodos), 0);
+    return capacidadUsada(p.programa) + pilasCosto + costo <= p.capacidad;
+  }, []);
 
   /* ---------------- el arrastre ---------------- */
 
@@ -401,7 +590,11 @@ export function EditorBloques(props: Props) {
     const marca = lienzo.querySelector("[data-marca]");
     if (marca && dentroDe(marca.getBoundingClientRect(), x, y)) return destinoRef.current;
 
-    const prog = propsRef.current.programa;
+    /* Sólo la cadena verde: las `Mi rutina` viajan al frente del `programa`
+       fusionado (puente temporal) y no participan de este cálculo 1D —
+       si no se las filtrara, "por encima de todo" (más abajo) encontraría
+       la primera rutina en vez del primer bloque real de la cadena. */
+    const prog = propsRef.current.programa.filter((n) => !esDefinicion(n));
     const excluido = (el: Element) => el.closest("[data-levantado]") !== null;
     const rectDe = (id: string) =>
       lienzo.querySelector(`[data-nodo="${id}"]`)?.getBoundingClientRect() ?? null;
@@ -642,11 +835,18 @@ export function EditorBloques(props: Props) {
    *  Por la misma razón cada entrada lleva de clave el id de su nodo (y
    *  el hueco, la suya): con claves por posición, subir un bloque con la
    *  flecha lo remontaba y el foco se perdía en el primer movimiento. */
-  function dibujarLista(nodos: NodoPrograma[], contenedor: string | null, rama: Rama, nivel: number, estatico: boolean): ReactNode[] {
+  function dibujarLista(
+    nodos: NodoPrograma[],
+    contenedor: string | null,
+    rama: Rama,
+    nivel: number,
+    estatico: boolean,
+    arrastrable = true,
+  ): ReactNode[] {
     const salida: ReactNode[] = [];
     for (const n of nodos) {
       if (!estatico && destinoVisible?.tipo === "antes" && destinoVisible.id === n.id) salida.push(marca);
-      salida.push(dibujarNodo(n, nivel, estatico));
+      salida.push(dibujarNodo(n, nivel, estatico, arrastrable));
     }
     if (!estatico && marcaEn(contenedor, rama)) salida.push(marca);
     return salida;
@@ -679,13 +879,13 @@ export function EditorBloques(props: Props) {
     );
   }
 
-  function dibujarCavidad(nodo: NodoContenedor, rama: Rama, nivel: number, estatico: boolean): ReactNode {
+  function dibujarCavidad(nodo: NodoContenedor, rama: Rama, nivel: number, estatico: boolean, arrastrable = true): ReactNode {
     const lista = listaDeRama(nodo, rama);
     return (
       <div className="auto-repetir__cuerpo">
         <div className="auto-repetir__espina" />
         <div className="auto-repetir__cavidad" data-parte="cavidad" data-rama={rama}>
-          {dibujarLista(lista, nodo.id, rama, nivel + 1, estatico)}
+          {dibujarLista(lista, nodo.id, rama, nivel + 1, estatico, arrastrable)}
           {lista.length === 0 && !(!estatico && marcaEn(nodo.id, rama)) && (
             <div className="auto-hueco auto-hueco--cavidad" />
           )}
@@ -694,19 +894,26 @@ export function EditorBloques(props: Props) {
     );
   }
 
-  function dibujarNodo(nodo: NodoPrograma, nivel: number, estatico: boolean): ReactNode {
+  /** `arrastrable=false` dibuja el nodo VIVO —colores, pulso de "activo",
+   *  tocar para quitar, ciclar sensor/veces, teclado— pero sin asa de
+   *  arrastre ni `data-nodo`/`data-clase`: así una `Mi rutina` o una pila
+   *  suelta jamás aparece en el escaneo de `calcularDestino`, que sigue
+   *  acotado a la cadena verde (tarea 2a.7), sin perder la edición de su
+   *  cuerpo que ya tenía bajo el puente temporal. */
+  function dibujarNodo(nodo: NodoPrograma, nivel: number, estatico: boolean, arrastrable = true): ReactNode {
     const levantado = !estatico && arrastre?.origen.desde === "libreta" && arrastre.origen.id === nodo.id;
     const activo = !estatico && nodoActivo === nodo.id;
+    const puedeArrastrar = !estatico && arrastrable;
 
     if (esContenedor(nodo)) {
-      const asa = estatico ? undefined : (ev: PointerEventReact<HTMLElement>) => agarrar(ev, { desde: "libreta", id: nodo.id });
+      const asa = puedeArrastrar ? (ev: PointerEventReact<HTMLElement>) => agarrar(ev, { desde: "libreta", id: nodo.id }) : undefined;
       return (
         <div
           key={nodo.id}
-          className={`auto-repetir${levantado ? " auto-repetir--levantado" : ""}${activo ? " auto-repetir--activo" : ""}`}
+          className={`auto-repetir${levantado ? " auto-repetir--levantado" : ""}${activo ? " auto-repetir--activo" : ""}${nodo.type === "def" ? " auto-repetir--sombrero" : ""}`}
           style={{ "--auto-tono": nodo.type === "def" ? COLOR_LLAMADA[nodo.rutina] : COLOR_CONTENEDOR[nodo.type] } as CSSProperties}
-          data-nodo={estatico ? undefined : nodo.id}
-          data-clase={estatico ? undefined : "contenedor"}
+          data-nodo={puedeArrastrar ? nodo.id : undefined}
+          data-clase={puedeArrastrar ? "contenedor" : undefined}
           data-nivel={nivel}
           data-levantado={levantado ? "" : undefined}
         >
@@ -779,13 +986,13 @@ export function EditorBloques(props: Props) {
               </button>
             )}
           </div>
-          {dibujarCavidad(nodo, "body", nivel, estatico)}
+          {dibujarCavidad(nodo, "body", nivel, estatico, arrastrable)}
           {nodo.type === "if" && nodo.sino && (
             <>
               <div className="auto-repetir__brazo auto-repetir__brazo--medio" data-parte="brazo-medio" onPointerDown={asa}>
                 <IcoSino className="w-[20px] h-[20px] opacity-90" />
               </div>
-              {dibujarCavidad(nodo, "sino", nivel, estatico)}
+              {dibujarCavidad(nodo, "sino", nivel, estatico, arrastrable)}
             </>
           )}
           <div className="auto-repetir__brazo" data-parte="brazo" onPointerDown={asa}>
@@ -819,10 +1026,10 @@ export function EditorBloques(props: Props) {
             type="button"
             className={clase}
             style={estilo}
-            data-nodo={nodo.id}
-            data-clase="accion"
+            data-nodo={puedeArrastrar ? nodo.id : undefined}
+            data-clase={puedeArrastrar ? "accion" : undefined}
             disabled={corriendo}
-            onPointerDown={(ev) => agarrar(ev, { desde: "libreta", id: nodo.id })}
+            onPointerDown={puedeArrastrar ? (ev) => agarrar(ev, { desde: "libreta", id: nodo.id }) : undefined}
             onClick={alClick(() => onQuitar(nodo.id))}
             onKeyDown={teclas(nodo.id)}
             aria-label={`${nombreDe(nodo)}. Tocar para quitar; flechas para mover`}
@@ -840,9 +1047,9 @@ export function EditorBloques(props: Props) {
           key={nodo.id}
           className={clase}
           style={estilo}
-          data-nodo={nodo.id}
-          data-clase="accion"
-          onPointerDown={(ev) => agarrar(ev, { desde: "libreta", id: nodo.id })}
+          data-nodo={puedeArrastrar ? nodo.id : undefined}
+          data-clase={puedeArrastrar ? "accion" : undefined}
+          onPointerDown={puedeArrastrar ? (ev) => agarrar(ev, { desde: "libreta", id: nodo.id }) : undefined}
         >
           <IcoHacer />
           {RanuraNumero(nodo)}
@@ -875,10 +1082,10 @@ export function EditorBloques(props: Props) {
           type="button"
           className={clase}
           style={estilo}
-          data-nodo={nodo.id}
-          data-clase="accion"
+          data-nodo={puedeArrastrar ? nodo.id : undefined}
+          data-clase={puedeArrastrar ? "accion" : undefined}
           disabled={corriendo}
-          onPointerDown={(ev) => agarrar(ev, { desde: "libreta", id: nodo.id })}
+          onPointerDown={puedeArrastrar ? (ev) => agarrar(ev, { desde: "libreta", id: nodo.id }) : undefined}
           onClick={alClick(() => onQuitar(nodo.id))}
           onKeyDown={teclas(nodo.id)}
           aria-label={`${nombreDe(nodo)}. Tocar para quitar; flechas para mover`}
@@ -904,10 +1111,10 @@ export function EditorBloques(props: Props) {
         type="button"
         className={clase}
         style={estilo}
-        data-nodo={accion.id}
-        data-clase="accion"
+        data-nodo={puedeArrastrar ? accion.id : undefined}
+        data-clase={puedeArrastrar ? "accion" : undefined}
         disabled={corriendo}
-        onPointerDown={(ev) => agarrar(ev, { desde: "libreta", id: accion.id })}
+        onPointerDown={puedeArrastrar ? (ev) => agarrar(ev, { desde: "libreta", id: accion.id }) : undefined}
         onClick={alClick(() => onQuitar(accion.id))}
         onKeyDown={teclas(accion.id)}
         aria-label={`${nombreDe(accion)}. Tocar para quitar; flechas para mover`}
@@ -978,32 +1185,99 @@ export function EditorBloques(props: Props) {
         })}
       </div>
 
-      {/* La libreta */}
+      {/* El lienzo: viewport de tamaño fijo (`overflow:hidden`) con una
+          capa propia adentro que lleva el pan/zoom (decisión #7 y #3 del
+          load-bearing list: el transform nunca va sobre un elemento que ya
+          anima `transform` por su cuenta). */}
       <div
         ref={lienzoRef}
         className={`auto-lienzo${arrastre ? " auto-lienzo--recibiendo" : ""}`}
+        onPointerDown={alBajarLienzo}
       >
-        {/* La memoria: luces, no un número. Es la misma hilera que dibuja
-            la mejora "más memoria", así el chico liga las dos. */}
         <div
-          className={`auto-memoria${sacudida ? " auto-memoria--llena" : ""}`}
-          role="img"
-          aria-label={`Memoria: ${usada} de ${capacidad}`}
+          ref={capaRef}
+          className="auto-lienzo__capa"
+          style={{ transform: `translate(${vista.x}px, ${vista.y}px) scale(${vista.z})` }}
         >
-          {Array.from({ length: capacidad }, (_, i) => (
-            <span key={i} className={`auto-luz${i < usada ? " auto-luz--on" : ""}`} />
+          {/* El ancla verde: fija, con forma de sombrero, sin `data-nodo`
+              — no se arrastra, sólo su cadena. */}
+          <div
+            className="auto-inicio"
+            style={{ left: datosLienzo.inicio.x, top: datosLienzo.inicio.y }}
+            aria-hidden="true"
+          >
+            <IcoInicio className="w-[28px] h-[28px]" />
+          </div>
+
+          {/* La cadena verde: lo ÚNICO que ejecuta. Cuelga pegada del ancla. */}
+          <div
+            className="auto-pila"
+            style={{ left: datosLienzo.inicio.x, top: datosLienzo.inicio.y + ALTO_INICIO }}
+          >
+            {dibujarLista(cadenaVerde, null, "body", 0, false)}
+            {huecoFinal && <div className="auto-hueco" />}
+            {cadenaVerde.length === 0 && !arrastre && (
+              <p className="auto-lienzo__pista">Tocá una pieza, o arrastrala hasta acá.</p>
+            )}
+          </div>
+
+          {/* `Mi rutina`: sombrero aislado a todo color (decisión #9) —
+              `Hacer A` la sigue encontrando aunque no cuelgue del verde,
+              así que atenuarla mentiría. Sin asa propia (`arrastrable=
+              false`): no hay snap 2D todavía para reubicarla (tarea 2b). */}
+          {rutinas.map((def, i) => {
+            const pt = datosLienzo.rutinas[def.id] ?? puntoRutinaPorDefecto(i);
+            return (
+              <div key={def.id} style={{ position: "absolute", left: pt.x, top: pt.y }}>
+                {dibujarNodo(def, 0, false, false)}
+              </div>
+            );
+          })}
+
+          {/* Pilas sueltas: nada las crea todavía en esta tanda (2b), pero
+              ya se dibujan atenuadas si un guardado las trae. */}
+          {pilasSueltas.map((pila) => (
+            <div key={pila.id} className="auto-pila--suelta" style={{ left: pila.x, top: pila.y }}>
+              {pila.nodos.map((n) => dibujarNodo(n, 0, true))}
+            </div>
           ))}
         </div>
-
-        <div className="auto-pila">
-          {dibujarLista(programa, null, "body", 0, false)}
-          {huecoFinal && <div className="auto-hueco" />}
-        </div>
-
-        {programa.length === 0 && !arrastre && (
-          <p className="auto-lienzo__pista">Tocá una pieza, o arrastrala hasta acá.</p>
-        )}
       </div>
+
+      {/* HUD portado a `document.body` (decisión #8, MANDATORIO): igual
+          que el fantasma, esquiva el `backdrop-filter` de `.auto-taller`,
+          que convertiría `position: fixed` en relativo a él. */}
+      {hudRect &&
+        createPortal(
+          <div
+            data-hud=""
+            style={{ position: "fixed", left: hudRect.left, top: hudRect.top, width: hudRect.width, height: hudRect.height, pointerEvents: "none" }}
+          >
+            {/* La memoria: luces, no un número. Es la misma hilera que
+                dibuja la mejora "más memoria", así el chico liga las dos. */}
+            <div
+              className={`auto-memoria${sacudida ? " auto-memoria--llena" : ""}`}
+              role="img"
+              aria-label={`Memoria: ${usada} de ${capacidad}`}
+              style={{ pointerEvents: "auto" }}
+            >
+              {Array.from({ length: capacidad }, (_, i) => (
+                <span key={i} className={`auto-luz${i < usada ? " auto-luz--on" : ""}`} />
+              ))}
+            </div>
+
+            <button
+              type="button"
+              className="auto-recentrar"
+              style={{ pointerEvents: "auto" }}
+              onClick={recentrar}
+              aria-label="Volver a encuadrar el bloque de arranque"
+            >
+              <IcoRecentrar className="w-[22px] h-[22px]" />
+            </button>
+          </div>,
+          document.body,
+        )}
 
       {/* El fantasma: la pieza levantada, siguiendo al puntero. Va en un
           portal porque el taller tiene `backdrop-filter` y los bloques

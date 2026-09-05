@@ -512,6 +512,33 @@ export function IcoPiezaRutinas({ className }: Props) {
   );
 }
 
+/** El ancla del lienzo: un cohete despegando, sobre el bloque verde fijo.
+ *  Sin texto —el bloque mismo dice "acá empieza"— y a pura silueta, para
+ *  que se lea a 28 px igual que el resto de los dibujos de bloque. */
+export function IcoInicio({ className }: Props) {
+  return (
+    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
+      <path
+        d="M17 4c4 3 6 8 6 13 0 3-1 6-6 13-5-7-6-10-6-13 0-5 2-10 6-13z"
+        fill="currentColor"
+      />
+      <circle cx="17" cy="14" r="3" fill="var(--auto-tono, #22c7b8)" />
+      <path d="M11 22l-4 6M23 22l4 6" {...trazo} strokeWidth="3.4" />
+    </svg>
+  );
+}
+
+/** Recentrar: la mira que vuelve a encuadrar el ancla del lienzo. */
+export function IcoRecentrar({ className }: Props) {
+  return (
+    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
+      <circle cx="17" cy="17" r="9" {...trazo} strokeWidth="3.2" />
+      <circle cx="17" cy="17" r="2.4" fill="currentColor" />
+      <path d="M17 2v6M17 26v6M2 17h6M26 17h6" {...trazo} strokeWidth="3.2" />
+    </svg>
+  );
+}
+
 /** El destello de cuatro puntas del mundo: marca el zócalo vacío donde
  *  todavía no brotó nada. */
 export function Destello({ className, style }: Props) {

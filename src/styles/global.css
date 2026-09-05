@@ -1761,15 +1761,29 @@ a { color: inherit; text-decoration: none; }
   overflow-y: auto;
 }
 
+/* El lienzo es ahora un VIEWPORT de tamaño fijo (`overflow:hidden`, ya no
+   `auto`): un scroller debajo de un transform pelea con el paneo. Su
+   contenido pannable/zoomable vive en `.auto-lienzo__capa`, la capa
+   propia que lleva el transform (nunca ESTE elemento: acá no hay ninguna
+   animación de entrada con la que pisarse, pero la regla es la misma que
+   IslandDetailPage, CLAUDE.md §6.1). */
 .auto-lienzo {
   position: relative;
   min-height: 0;
   border-radius: 20px;
-  padding: 14px 16px;
-  overflow: auto;
+  overflow: hidden;
   background-color: rgba(255, 255, 255, 0.34);
   background-image: radial-gradient(rgba(83, 107, 255, 0.22) 1.4px, transparent 1.4px);
   background-size: 22px 22px;
+  touch-action: none;
+}
+/* `transform-origin: 0 0` y NO `center`: esta capa guarda coordenadas de
+   DATOS (`lienzo.inicio`, `lienzo.rutinas[id]`, `pila.x/y`), y
+   `(cx - r.left) / z` sólo da el punto exacto con el origen en `0 0`. */
+.auto-lienzo__capa {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
 }
 
 /* La memoria: una hilera de luces dentro de una pastilla lila, en la
@@ -1805,7 +1819,11 @@ a { color: inherit; text-decoration: none; }
    más. Ni modal ni cartel (MVP.md §7). */
 .auto-memoria--llena { animation: auto-corto 0.42s ease; }
 
-.auto-pila { display: flex; flex-direction: column; align-items: flex-start; }
+/* Sólo la cadena verde vive acá ahora: las `Mi rutina` y las pilas
+   sueltas tienen sus propios envoltorios (`.auto-repetir--sombrero`,
+   `.auto-pila--suelta`), así que `position: absolute` es seguro sin
+   modificador. */
+.auto-pila { position: absolute; display: flex; flex-direction: column; align-items: flex-start; }
 .auto-lienzo__pista { margin-top: 12px; font-size: 14px; font-weight: 600; color: #6b7bab; }
 /* Mientras hay una pieza en el aire, la libreta se ilumina apenas: es
    el lugar donde se puede soltar. */
@@ -2577,6 +2595,99 @@ a { color: inherit; text-decoration: none; }
   from { opacity: 1; }
   to { opacity: 0; }
 }
+
+/* ---------------- el lienzo libre (Slice 2a) ----------------
+   El bloque verde: ancla fija del lienzo, con forma de sombrero. No lleva
+   `data-nodo` —no se arrastra, sólo su cadena— así que es puro adorno:
+   `pointer-events: none` para que un toque encima siga paneando. */
+.auto-inicio {
+  --auto-tono: #22c7b8;
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 64px;
+  color: #fff;
+  border-radius: 26px 26px 10px 10px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--auto-tono) 78%, #fff) 0%,
+      var(--auto-tono) 46%,
+      color-mix(in srgb, var(--auto-tono) 86%, #000) 100%
+    );
+  box-shadow: 0 0 0 3px rgba(84, 232, 198, 0.35), 0 10px 22px rgba(54, 86, 134, 0.28);
+  pointer-events: none;
+}
+
+/* `Mi rutina` es un SOMBRERO: tapa redondeada y sin muesca arriba, que es
+   la forma de decir "acá no encastra nada". Va a todo color aunque no
+   cuelgue del verde, porque `Hacer A` sí la encuentra: atenuarla
+   mentiría (decisión #9). La posición en el lienzo la pone el envoltorio
+   `position:absolute` que arma `EditorBloques`, así que acá sólo va la
+   forma. */
+.auto-repetir--sombrero > .auto-repetir__lomo {
+  position: relative;
+  border-radius: 26px 26px 10px 10px;
+  padding-top: 10px;
+  clip-path: none;
+}
+.auto-repetir--sombrero > .auto-repetir__lomo::before {
+  content: "";
+  position: absolute;
+  left: 18px;
+  top: -9px;
+  width: 74px;
+  height: 18px;
+  border-radius: 999px 999px 0 0;
+  background: color-mix(in srgb, var(--auto-tono) 78%, #fff);
+}
+/* Sin asa (`arrastrable=false`, tarea 2a.7): el cursor de agarrar del
+   lomo/brazo genérico mentiría acá. */
+.auto-repetir--sombrero .auto-repetir__lomo,
+.auto-repetir--sombrero .auto-repetir__brazo { cursor: default; }
+
+/* Pila suelta: NO cuelga del bloque verde, así que no se ejecuta.
+   Atenuada, nunca gris —el gris dice "no se puede"— y con la saturación
+   casi intacta, que es lo que la separa del levantado (0.28 y
+   desaturado, y además dura medio segundo). El sello punteado lo dice
+   sin depender del color. Nada la crea todavía en esta tanda (llega en
+   la tarea 2b), pero ya se dibuja si un guardado la trae. */
+.auto-pila--suelta { position: absolute; opacity: 0.72; }
+.auto-pila--suelta .auto-bloque,
+.auto-pila--suelta .auto-repetir__lomo,
+.auto-pila--suelta .auto-repetir__brazo { filter: saturate(0.92) brightness(0.97); }
+.auto-pila--suelta::before {
+  content: "";
+  position: absolute;
+  inset: -6px -6px -6px -8px;
+  border-radius: 18px;
+  border: 2px dashed rgba(83, 107, 255, 0.3);
+  pointer-events: none;
+}
+
+/* Recentrar: 44 px, piso táctil (CLAUDE.md §6.5). Vive DENTRO del
+   envoltorio del HUD, que ya es `position: fixed` calcado al viewport del
+   lienzo — por eso este botón es `absolute`, no `fixed`: el portal entero
+   se mueve con un solo `getBoundingClientRect()`. */
+.auto-recentrar {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 2px solid rgba(130, 140, 190, 0.28);
+  color: #52658f;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 10px 22px rgba(54, 86, 134, 0.22);
+  cursor: pointer;
+}
+.auto-recentrar:hover { transform: translateY(-2px); }
+.auto-recentrar:active { transform: scale(0.94); }
 
 
 /* ════════════════════════════════════════════════════════════════════

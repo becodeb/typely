@@ -45,6 +45,7 @@ import {
   actualizarRecord,
   avanzarMundo,
   capacidad,
+  capacidadUsadaCampo,
   comprar,
   ejecutarPaso,
   estadoInicial,
@@ -54,13 +55,13 @@ import {
   msPorAccion,
   piezasCompradas,
   plantables,
+  puntoRutinaPorDefecto,
   tasaReciente,
   tieneRepetir,
   volverAlOrigen,
   type EstadoCampo,
 } from "../../utils/automatizacion/motor";
 import {
-  capacidadUsada,
   colocar,
   conSensor,
   costoDeNodo,
@@ -270,23 +271,29 @@ export function AutomatizacionPage() {
     };
   }, []);
 
-  /* ---------------- edición del programa ---------------- */
+  /* ---------------- edición del campo ---------------- */
   /* PUENTE TEMPORAL (Lienzo, tarea 1.9 — se borra en la tarea 2b.5).
    *
-   * `EditorBloques` todavía sólo sabe mostrar un `Programa` en lista, no
-   * un lienzo con rutinas aparte. Mientras tanto le mostramos la UNIÓN
-   * de `e.rutinas` (las `Mi rutina`, siempre primero) y `e.programa` (la
-   * cadena verde), y en cada edición volvemos a separarlas: los `def`
-   * vuelven a `rutinas`, todo lo demás vuelve a `programa`. Sin esto, una
-   * partida migrada a v3 dejaría de mostrarle al chico su propia rutina
-   * aunque `Hacer A` la siga ejecutando — una regresión visible que la
-   * migración no puede introducir en silencio. */
-  const cambiarPrograma = useCallback(
+   * `EditorBloques` todavía edita un `Programa` en lista, no un lienzo con
+   * rutinas aparte (el DIBUJO ya las separa para el lienzo — tarea 2a.6 —
+   * pero la edición sigue viajando fusionada). Mientras tanto le pasamos
+   * la UNIÓN de `e.rutinas` (las `Mi rutina`, siempre primero) y
+   * `e.programa` (la cadena verde), y en cada edición volvemos a
+   * separarlas: los `def` vuelven a `rutinas`, todo lo demás vuelve a
+   * `programa`. Sin esto, una partida migrada a v3 dejaría de mostrarle
+   * al chico su propia rutina aunque `Hacer A` la siga ejecutando — una
+   * regresión visible que la migración no puede introducir en silencio. */
+  const cambiarCampo = useCallback(
     (fn: (p: Programa) => Programa) => {
       if (corriendo) return;
       const fusion = fn([...e.rutinas, ...e.programa]);
       e.rutinas = fusion.filter(esDefinicion) as NodoDef[];
       e.programa = fusion.filter((n) => !esDefinicion(n));
+      // Toda `Mi rutina` nueva necesita un lugar en el lienzo: la misma
+      // fila por defecto que usa la migración v1/v2→v3 (motor.ts).
+      e.rutinas.forEach((d, i) => {
+        if (!e.lienzo.rutinas[d.id]) e.lienzo.rutinas[d.id] = puntoRutinaPorDefecto(i);
+      });
       guardador.current.pedir(usuario, e, true);
       repintar();
     },
@@ -297,8 +304,10 @@ export function AutomatizacionPage() {
     (pieza: Pieza, destino?: Destino) => {
       const nodo: NodoPrograma = crearNodo(pieza, nuevoId());
 
-      cambiarPrograma((p) => {
-        if (capacidadUsada(p) + costoDeNodo(nodo) > capacidad(e)) return p;
+      cambiarCampo((p) => {
+        // La memoria es de TODO el lienzo (PROGRESION.md §11): la cadena
+        // verde, las rutinas y las pilas sueltas — no sólo `p`.
+        if (capacidadUsadaCampo(e) + costoDeNodo(nodo) > capacidad(e)) return p;
         // Arrastrada: cae donde el chico la soltó.
         if (destino) return colocar(p, nodo, destino);
         // Tocada: al final DE LA CADENA VERDE —no de la fusión con las
@@ -317,13 +326,13 @@ export function AutomatizacionPage() {
         return [...p, nodo];
       });
     },
-    [cambiarPrograma, e],
+    [cambiarCampo, e],
   );
 
   /** Tocar la pastilla del sensor pasa al siguiente de la lista. */
   const cambiarSensor = useCallback(
     (id: string) =>
-      cambiarPrograma((p) => {
+      cambiarCampo((p) => {
         const opciones = sensoresDisponibles(e);
         const reemplazar = (nodos: Programa): Programa =>
           nodos.map((n) => {
@@ -338,22 +347,22 @@ export function AutomatizacionPage() {
           });
         return reemplazar(p);
       }),
-    [cambiarPrograma, e],
+    [cambiarCampo, e],
   );
 
   const quitar = useCallback(
-    (id: string) => cambiarPrograma((p) => quitarNodo(p, id)),
-    [cambiarPrograma],
+    (id: string) => cambiarCampo((p) => quitarNodo(p, id)),
+    [cambiarCampo],
   );
 
   const mover = useCallback(
-    (id: string, destino: Destino) => cambiarPrograma((p) => moverNodo(p, id, destino)),
-    [cambiarPrograma],
+    (id: string, destino: Destino) => cambiarCampo((p) => moverNodo(p, id, destino)),
+    [cambiarCampo],
   );
 
   const desplazar = useCallback(
-    (id: string, delta: -1 | 1) => cambiarPrograma((p) => desplazarNodo(p, id, delta)),
-    [cambiarPrograma],
+    (id: string, delta: -1 | 1) => cambiarCampo((p) => desplazarNodo(p, id, delta)),
+    [cambiarCampo],
   );
 
   /** Cicla la ranura numérica del nodo tocado: `Repetir.times`,
@@ -363,7 +372,7 @@ export function AutomatizacionPage() {
    *  disparador sin agregar un tercer mecanismo de ciclado. */
   const cambiarVeces = useCallback(
     (id: string) =>
-      cambiarPrograma((p) => {
+      cambiarCampo((p) => {
         const reemplazar = (nodos: Programa): Programa =>
           nodos.map((n) => {
             if (n.id === id) {
@@ -384,7 +393,7 @@ export function AutomatizacionPage() {
           });
         return reemplazar(p);
       }),
-    [cambiarPrograma],
+    [cambiarCampo],
   );
 
   /* ---------------- compras ---------------- */
@@ -455,8 +464,10 @@ export function AutomatizacionPage() {
       <EditorBloques
         // PUENTE TEMPORAL (tarea 1.9, se borra en la tarea 2b.5): rutinas
         // primero, cadena verde después — ver el comentario en
-        // `cambiarPrograma` más arriba.
+        // `cambiarCampo` más arriba.
         programa={[...e.rutinas, ...e.programa]}
+        pilasSueltas={e.pilasSueltas}
+        lienzo={e.lienzo}
         capacidad={capacidad(e)}
         tieneRepetir={tieneRepetir(e)}
         piezas={piezasCompradas(e)}

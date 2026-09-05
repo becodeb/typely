@@ -65,18 +65,18 @@ boundary, never a retrofit.
 
 ## Phase 2a: Slice 2 — Canvas core (~380 lines, playable alone)
 
-- [ ] 2a.1 `EditorBloques.tsx`: `.auto-lienzo` becomes the viewport (`position: relative; overflow: hidden`, drops `overflow: auto`); add child `.auto-lienzo__capa` carrying `transform: translate(x,y) scale(z)` with **`transform-origin: 0 0`** — deliberately NOT `center` like `IslandDetailPage`, because this transform layer holds data coordinates and `(cx - r.left)/z` is only exact with a `0 0` origin.
-- [ ] 2a.2 `EditorBloques.tsx`: add `aLienzo`/`aPantalla` coordinate conversion, `acercarEn` (zoom-at-cursor), `recentrar` (`setVista({z:1, x:MARGEN, y:MARGEN})`).
-- [ ] 2a.3 `EditorBloques.tsx`: add `alRodar` (wheel, `{passive:false}`, gated `!corriendo`), pinch handlers (native touch listeners, `{passive:false}` + `preventDefault`), `alBajar` pan-vs-drag disambiguation guarded on `[data-nodo]`.
-- [ ] 2a.4 `EditorBloques.tsx`: render HUD (memory dots, recenter button) through `createPortal(…, document.body)` with a `ResizeObserver` on `.auto-lienzo` — MANDATORY because `.auto-taller` carries `backdrop-filter`, which makes `position: fixed` relative to that element instead of the viewport, exactly the trap the existing drag ghost already portals around.
-- [ ] 2a.5 `EditorBloques.tsx`: render the green `.auto-inicio` START block — fixed anchor, hat shape, no `data-nodo` (not itself draggable, only its chain is).
-- [ ] 2a.6 `EditorBloques.tsx`: render hat-shaped `def` stacks (`.auto-repetir--sombrero`) at full colour as isolated singletons, and loose stacks (`.auto-pila--suelta`, dimmed) — all three stack kinds positioned absolutely from `lienzo` coordinates.
-- [ ] 2a.7 `EditorBloques.tsx`: scope drag-and-drop to the green chain only, reusing the EXISTING 1D `calcularDestino` — no 2D snap, no ghost outline, no bin/palette-delete in this unit (that is 2b/3's job).
-- [ ] 2a.8 `IconosAuto.tsx`: add `IcoInicio`, `IcoRecentrar` (CSS/SVG-drawn, CLAUDE.md §15).
-- [ ] 2a.9 `global.css`: `.auto-lienzo` viewport, `.auto-lienzo__capa`, `.auto-inicio`, `.auto-repetir--sombrero`, `.auto-pila--suelta`, HUD/`.auto-recentrar` styles.
-- [ ] 2a.10 `AutomatizacionPage.tsx`: wire `cambiarCampo`, `capacidadUsadaCampo` gate; the Task 1.9 bridge stays in place until 2b.5.
-- [ ] 2a.11 `docs/modo-automatizacion/MVP.md` §5 and `IMPLEMENTACION.md` §4: apply the exact replacement blocks from `design.md`.
-- [ ] 2a.12 Verify: `npm run build` passes; `node scripts/probar-automatizacion.mjs` stays at 83/83 (no new engine logic in this unit).
+- [x] 2a.1 `EditorBloques.tsx`: `.auto-lienzo` becomes the viewport (`position: relative; overflow: hidden`, drops `overflow: auto`); add child `.auto-lienzo__capa` carrying `transform: translate(x,y) scale(z)` with **`transform-origin: 0 0`** — deliberately NOT `center` like `IslandDetailPage`, because this transform layer holds data coordinates and `(cx - r.left)/z` is only exact with a `0 0` origin.
+- [x] 2a.2 `EditorBloques.tsx`: add `aLienzo`/`aPantalla` coordinate conversion, `acercarEn` (zoom-at-cursor), `recentrar` (`setVista({z:1, x:MARGEN, y:MARGEN})`).
+- [x] 2a.3 `EditorBloques.tsx`: add `alRodar` (wheel, `{passive:false}`, gated `!corriendo`), pinch handlers (native touch listeners, `{passive:false}` + `preventDefault`), `alBajar` pan-vs-drag disambiguation guarded on `[data-nodo]`.
+- [x] 2a.4 `EditorBloques.tsx`: render HUD (memory dots, recenter button) through `createPortal(…, document.body)` with a `ResizeObserver` on `.auto-lienzo` — MANDATORY because `.auto-taller` carries `backdrop-filter`, which makes `position: fixed` relative to that element instead of the viewport, exactly the trap the existing drag ghost already portals around.
+- [x] 2a.5 `EditorBloques.tsx`: render the green `.auto-inicio` START block — fixed anchor, hat shape, no `data-nodo` (not itself draggable, only its chain is).
+- [x] 2a.6 `EditorBloques.tsx`: render hat-shaped `def` stacks (`.auto-repetir--sombrero`) at full colour as isolated singletons, and loose stacks (`.auto-pila--suelta`, dimmed) — all three stack kinds positioned absolutely from `lienzo` coordinates.
+- [x] 2a.7 `EditorBloques.tsx`: scope drag-and-drop to the green chain only, reusing the EXISTING 1D `calcularDestino` — no 2D snap, no ghost outline, no bin/palette-delete in this unit (that is 2b/3's job). Implemented via a new `arrastrable` flag threaded through `dibujarNodo`/`dibujarCavidad`/`dibujarLista` (default `true` for the green chain; `false` for `def` hats and loose stacks) that suppresses `data-nodo`/`data-clase`/the pointer-down "asa" — hiding them from `calcularDestino`'s DOM scan — while deliberately KEEPING tap-to-quit/cycle-veces/cycle-sensor/keyboard-reorder alive inside a `Mi rutina` body and the "activo" execution pulse (see Deviations in the apply report: a fully-static alternative was rejected because it would have silently broken the `Hacer A` execution highlight).
+- [x] 2a.8 `IconosAuto.tsx`: add `IcoInicio`, `IcoRecentrar` (CSS/SVG-drawn, CLAUDE.md §15).
+- [x] 2a.9 `global.css`: `.auto-lienzo` viewport, `.auto-lienzo__capa`, `.auto-inicio`, `.auto-repetir--sombrero`, `.auto-pila--suelta`, HUD/`.auto-recentrar` styles.
+- [x] 2a.10 `AutomatizacionPage.tsx`: wire `cambiarCampo`, `capacidadUsadaCampo` gate; the Task 1.9 bridge stays in place until 2b.5.
+- [x] 2a.11 `docs/modo-automatizacion/MVP.md` §5 and `IMPLEMENTACION.md` §4: apply the exact replacement blocks from `design.md`.
+- [x] 2a.12 Verify: `npm run build` passes; `node scripts/probar-automatizacion.mjs` stays at 83/83 (no new engine logic in this unit).
 - [ ] 2a.13 **Manual browser check (not harness-verifiable):** pan/zoom on a touch device, HUD not magnified by the lens, green-chain drag still works, 1366×768 no-scroll layout intact.
 
 ## Phase 2b: Slice 2 — 2D snap + inversion (~325 lines)

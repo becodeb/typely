@@ -73,13 +73,16 @@ type CellState = {
 };
 
 type AutomationState = {
-  schemaVersion: 1;
+  schemaVersion: 3;
   ship: ShipState;
   cells: CellState[];
   balance: number;
   upgrades: Record<string, number>;
   revealed: string[];
-  program: Program;
+  program: Program;        // la cadena que cuelga del bloque verde
+  routines: DefNode[];
+  looseStacks: Stack[];
+  canvasView: { startId: string; start: Point; routines: Record<string, Point> };
   bestRate: number;
   harvestEvents: number[];
   running: boolean;
@@ -88,6 +91,13 @@ type AutomationState = {
 
 `running` no se persiste. El snapshot cargado siempre inicia detenido en
 `{ row: 1, col: 0, direction: "north" }`.
+
+Un snapshot v1/v2 se lee como v3: las `Mi rutina` salen a `routines` y todo
+lo demás, EN SU ORDEN ORIGINAL, queda colgando del bloque verde. El orden
+plano viejo ERA el de ejecución, así que la partida migrada se comporta
+igual. Las coordenadas que no cierran se RECORTAN y una referencia colgante
+se descarta; un nodo mal formado, en cambio, sigue invalidando el snapshot
+entero.
 
 ## 5. Relojes
 

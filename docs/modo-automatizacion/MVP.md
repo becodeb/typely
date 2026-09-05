@@ -89,7 +89,7 @@ Debe entrar completa en 1366×768 sin scroll.
 ┌────────────────────────────────────────────────────────────┐
 │ volver                           cristales   producción/min │
 ├──────────────────────────────────────┬─────────────────────┤
-│ PALETA       PROGRAMA                │     CAMPO 2×2       │
+│ PALETA       LIENZO (se recorre)     │     CAMPO 2×2       │
 │ [↑]          ┌───────────────┐       │   cristales+nave    │
 │ [↶]          │       ↑       │       │                     │
 │ [↷]          ├───────────────┤       ├─────────────────────┤
@@ -107,6 +107,13 @@ Debe entrar completa en 1366×768 sin scroll.
 - Tienda como franja compacta inferior.
 - Cabecera solo con volver, saldo y producción reciente.
 - Campo y editor son las dos superficies dominantes; no anidar tarjetas.
+- El editor es un LIENZO con ventana propia: se acerca, se aleja y se
+  recorre con el dedo. Las tres columnas —paleta, lienzo y campo— no
+  cambian de ancho, y el campo no se achica para hacerle lugar.
+- El bloque verde tiene un ancla fija en el lienzo y un botón para volver
+  a encuadrarlo: nunca se puede perder de vista.
+- Tachito abajo a la izquierda del lienzo, de 44 px como mínimo. No pisa
+  el «Volver», que vive en la cabecera y nunca sobre el lienzo.
 
 ### Botón principal
 
