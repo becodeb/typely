@@ -1249,6 +1249,7 @@ export function TormentaPage() {
                     onClick={() => elegirMejora(c.id)}
                   >
                     <span className="orb-carta__tecla">{i + 1}</span>
+                    <Gema nombre={c.id} className="orb-carta__gema" />
                     <span className="orb-carta__rareza">
                       {c.rareza === "comun" ? "común" : c.rareza === "rara" ? "rara" : "épica"}
                     </span>
