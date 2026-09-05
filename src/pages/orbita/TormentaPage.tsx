@@ -321,6 +321,12 @@ export function TormentaPage() {
      mientras existan). El ref las espeja para el atajo de teclado 1-2-3. */
   const [cartas, setCartas] = useState<CartaMejora[] | null>(null);
   const cartasRef = useRef<CartaMejora[] | null>(null);
+  /* Palabras que llegaron a la nave en plena invulnerabilidad y rebotaron:
+     salen despedidas hacia arriba y se desvanecen. */
+  const [rebotes, setRebotes] = useState<
+    { id: number; x: number; y: number; escala: number; texto: string }[]
+  >([]);
+  const naveRef = useRef<HTMLDivElement | null>(null);
   const [nivelActual, setNivelActual] = useState(0);
   const [revelado, setRevelado] = useState<Revelado | null>(null);
   const [erroneaId, setErroneaId] = useState<number | null>(null);
@@ -377,6 +383,7 @@ export function TormentaPage() {
     setCartas(null);
     cartasRef.current = null;
     setNivelActual(0);
+    setRebotes([]);
     setAvisos([]);
     setRevelado(null);
     ultimaPos.current.clear();
@@ -560,13 +567,43 @@ export function TormentaPage() {
             setPalabras((prev) => prev.filter((p) => p.id !== ev.id));
             break;
           }
-          case "rebote":
-            /* Llegó en plena invulnerabilidad: no lastima, pero se va. Se
-               desarma en gris, sin sonido de golpe. */
-            enterrar(ev.id, "#8fa4cc", true);
+          case "rebote": {
+            /* Llegó en plena invulnerabilidad: no lastima, REBOTA. La
+               palabra sale despedida hacia arriba entera y se desvanece, y
+               la nave destella blanco — el mismo gesto que un escudo que
+               absorbe. Antes se desarmaba en gris y se leía como "la letra
+               desapareció", no como "rebotó porque acabás de recibir un
+               golpe". */
+            const el = palabraEls.current.get(ev.id);
+            const escena = escenaRef.current;
+            if (el && escena) {
+              const r = el.getBoundingClientRect();
+              const e = escena.getBoundingClientRect();
+              const idReb = efectoIds.current++;
+              setRebotes((prev) => [
+                ...prev,
+                {
+                  id: idReb,
+                  x: ((r.left + r.width / 2 - e.left) / e.width) * 100,
+                  y: ((r.top + r.height / 2 - e.top) / e.height) * 100,
+                  escala: Number(/scale\(([\d.]+)\)/.exec(el.style.transform)?.[1] ?? 1),
+                  texto: el.textContent ?? "",
+                },
+              ]);
+              window.setTimeout(() => setRebotes((prev) => prev.filter((x) => x.id !== idReb)), 700);
+            }
+            const nave = naveRef.current;
+            if (nave) {
+              nave.classList.remove("orb-nave--flash");
+              void nave.offsetWidth;
+              nave.classList.add("orb-nave--flash");
+              window.setTimeout(() => nave.classList.remove("orb-nave--flash"), 340);
+            }
             palabraEls.current.delete(ev.id);
             setPalabras((prev) => prev.filter((p) => p.id !== ev.id));
+            if (sonidoRef.current) blip(520, 760, 0.04);
             break;
+          }
           case "impacto":
             enterrar(ev.id, "#ff8fa8", true);
             palabraEls.current.delete(ev.id);
@@ -693,6 +730,9 @@ export function TormentaPage() {
       escenaRef.current?.classList.toggle("orb-escena--peligro", hayPeligro);
       /* Congelar al errar: escarcha sobre la escena mientras nada avanza. */
       escenaRef.current?.classList.toggle("orb-escena--congelada", motor.congelado);
+      /* Invulnerable tras un golpe: la nave parpadea, como en cualquier juego
+         con este mecanismo — lo que llegue mientras tanto rebota. */
+      naveRef.current?.classList.toggle("orb-nave--invulnerable", motor.invulnerable);
 
       /* HUD y tinte, a ~3 Hz — no hace falta más y ahorra renders. */
       acumuladorHud += dt;
@@ -984,6 +1024,20 @@ export function TormentaPage() {
           </span>
         ))}
 
+        {/* Las que llegaron en plena invulnerabilidad: rebotan enteras. */}
+        {rebotes.map((r) => (
+          <span
+            key={r.id}
+            className="orb-rebote"
+            aria-hidden="true"
+            style={
+              { left: `${r.x}%`, top: `${r.y}%`, fontSize: "2rem", "--orb-esc": r.escala } as React.CSSProperties
+            }
+          >
+            {r.texto}
+          </span>
+        ))}
+
         {/* Las que acaban de morir, desarmándose letra por letra. */}
         {cadaveres.map((c) => (
           <span
@@ -1050,7 +1104,7 @@ export function TormentaPage() {
         ))}
 
         {/* La nave del chico — la que se ganó con estrellas. */}
-        <div className="orb-nave">
+        <div ref={naveRef} className="orb-nave">
           {estela && (
             <span
               className="orb-estela"
