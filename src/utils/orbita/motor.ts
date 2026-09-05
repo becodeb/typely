@@ -551,6 +551,12 @@ export class MotorTormenta {
     return this.t < this.congelarHasta;
   }
 
+  /** ¿La nave está en la ventana de invulnerabilidad que sigue a un golpe?
+   *  La página la hace parpadear: lo que llegue en este rato rebota. */
+  get invulnerable(): boolean {
+    return this.t < this.invulnerableHasta;
+  }
+
   /** Elegir una de las cartas ofrecidas. Devuelve [] si no había nada que
    *  elegir o la carta no era una de las tres: la página no puede colar
    *  una mejora que el sorteo no ofreció. */
