@@ -931,7 +931,13 @@ a { color: inherit; text-decoration: none; }
    de noche, y el negro no existe en ese cuento. Coincide con el campo
    estelar mientras carga. */
 .orb-fondo { position: fixed; inset: 0; overflow: hidden; background: #141b4d; }
-.orb-fondo > * { position: absolute; inset: -4%; width: 108%; height: 108%; }
+/* Las capas sobresalen un 4 % por cada lado para que la deriva (±1,2 %) no
+   deje bordes. `max-width: none` es obligatorio: el reset de Tailwind pone
+   `img { max-width: 100% }`, y con eso las tres IMÁGENES quedaban en 100 %
+   de ancho corridas 4 % a la izquierda — una franja sin fondo a la derecha,
+   de 55 px en una Chromebook y 80 px en un monitor de 1920. Los divs de
+   tinte no tienen ese tope y por eso ellos sí cubrían. */
+.orb-fondo > * { position: absolute; inset: -4%; width: 108%; height: 108%; max-width: none; }
 .orb-estrellas { object-fit: cover; animation: orbDeriva 90s ease-in-out infinite alternate; }
 /* El mundo de las islas visto desde la órbita: vive solo en la franja de
    abajo (Images/orbita/ORBITA.md §7.1) y es lo más lejano, así que deriva
