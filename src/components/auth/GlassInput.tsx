@@ -1,5 +1,8 @@
 import type { ReactNode } from "react";
 
+/* Campo del login (CLAUDE.md §5): cápsula blanca con el ícono en una
+   burbuja de color de marca y foco turquesa. Estilos en `.login-campo`
+   (global.css); sólo lo usa LoginPage. */
 interface GlassInputProps {
   icon: ReactNode;
   label: string;
@@ -8,6 +11,8 @@ interface GlassInputProps {
   type?: string;
   autoComplete?: string;
   action?: ReactNode;
+  /** Color de la burbuja del ícono. */
+  tone?: "menta" | "violeta";
 }
 
 export function GlassInput({
@@ -16,26 +21,26 @@ export function GlassInput({
   icon,
   label,
   onChange,
+  tone = "menta",
   type = "text",
   value,
 }: GlassInputProps) {
   return (
-    <label className="grid gap-2">
+    <label className="login-campo">
       <span className="absolute w-px h-px overflow-hidden whitespace-nowrap clip-0">
         {label}
       </span>
-      <span className="glass-surface grid grid-cols-[auto_1fr_auto] items-center gap-2.5 rounded-xl h-12 px-3">
-        <span className="text-muted grid place-items-center">{icon}</span>
-        <input
-          className="bg-transparent outline-none text-text placeholder:text-muted/60 w-full h-full"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          type={type}
-          autoComplete={autoComplete}
-          placeholder={label}
-        />
-        {action}
+      <span className={`login-campo__icono login-campo__icono--${tone}`} aria-hidden="true">
+        {icon}
       </span>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        type={type}
+        autoComplete={autoComplete}
+        placeholder={label}
+      />
+      {action}
     </label>
   );
 }

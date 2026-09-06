@@ -126,7 +126,7 @@ export function RankingPage() {
         </header>
 
         {!sincroniza ? (
-          <section className="orb-vidrio w-[min(28rem,94vw)] p-6 text-center grid gap-2">
+          <section className="orb-vidrio tarjeta-marca w-[min(28rem,94vw)] p-6 text-center grid gap-2">
             <p
               className="m-0 font-bold"
               style={{ fontFamily: "var(--font-display)", fontSize: "1.15rem" }}
@@ -172,7 +172,7 @@ export function RankingPage() {
                 {podio.map((f) => (
                   <div
                     key={f.pos}
-                    className={`orb-vidrio orb-podio__lugar orb-podio__lugar--${f.pos}`}
+                    className={`orb-vidrio tarjeta-marca orb-podio__lugar orb-podio__lugar--${f.pos}`}
                     style={
                       f.mine
                         ? { outline: "3px solid rgba(84, 232, 198, 0.8)", outlineOffset: "2px" }
@@ -216,7 +216,7 @@ export function RankingPage() {
               </section>
             )}
 
-            <section className="orb-vidrio w-[min(34rem,94vw)] overflow-hidden" aria-live="polite">
+            <section className="orb-vidrio tarjeta-marca w-[min(34rem,94vw)] overflow-hidden" aria-live="polite">
               {cargando ? (
                 <p className="orb-suave m-0 p-6 text-center font-semibold">Cargando…</p>
               ) : error ? (

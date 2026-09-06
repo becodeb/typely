@@ -1351,7 +1351,7 @@ export function TormentaPage() {
           style={{ background: "rgba(20, 27, 77, 0.55)" }}
         >
           <section
-            className="orb-vidrio w-[min(30rem,94vw)] max-h-[88vh] overflow-y-auto p-6 text-center grid gap-4"
+            className="orb-vidrio tarjeta-marca w-[min(30rem,94vw)] max-h-[88vh] overflow-y-auto p-6 text-center grid gap-4"
             aria-label="Resultado de la partida"
           >
             {!(record && record.puntaje > resultado.puntaje) && (

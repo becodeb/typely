@@ -231,7 +231,7 @@ export function OrbitaHubPage() {
           style={{ background: "rgba(20, 27, 77, 0.6)" }}
         >
           <section
-            className="orb-vidrio w-[min(26rem,94vw)] p-6 grid gap-4 text-center"
+            className="orb-vidrio tarjeta-marca w-[min(26rem,94vw)] p-6 grid gap-4 text-center"
             aria-label="Elegí tu nombre de piloto"
           >
             <h2 className="m-0 font-extrabold text-2xl" style={{ fontFamily: "var(--font-display)" }}>

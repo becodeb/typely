@@ -150,7 +150,7 @@ export function HangarPage() {
 
         {/* Alias */}
         {sincroniza && (
-          <section className="orb-vidrio w-[min(30rem,94vw)] px-4 py-3 flex items-center gap-3 flex-wrap">
+          <section className="orb-vidrio tarjeta-marca w-[min(30rem,94vw)] px-4 py-3 flex items-center gap-3 flex-wrap">
             <span className="orb-suave text-sm font-semibold">Nombre de piloto</span>
             {editandoAlias ? (
               <>
@@ -204,7 +204,7 @@ export function HangarPage() {
             return (
               <article
                 key={item.id}
-                className="orb-vidrio !rounded-[22px] px-3.5 py-3 flex items-center gap-3"
+                className="orb-vidrio tarjeta-marca !rounded-[22px] px-3.5 py-3 flex items-center gap-3"
                 style={
                   puesto
                     ? { outline: "3px solid rgba(84, 232, 198, 0.8)", outlineOffset: "1px" }

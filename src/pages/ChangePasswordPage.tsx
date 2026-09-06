@@ -53,7 +53,7 @@ export function ChangePasswordPage() {
       style={{ backgroundImage: `url("${assets.loginBg}")` }}
     >
       <section
-        className="glass-card-smooth relative w-[min(28rem,92vw)] mx-auto my-[7vh] p-8 pt-12 text-center flex flex-col items-center gap-6 animate-card-in z-20"
+        className="glass-card-smooth tarjeta-marca relative w-[min(28rem,92vw)] mx-auto my-[7vh] p-8 pt-12 text-center flex flex-col items-center gap-6 animate-card-in z-20"
         aria-label="Cambiar contraseña"
       >
         <span

@@ -377,6 +377,330 @@ a { color: inherit; text-decoration: none; }
   animation: gradientSweepLR 6s linear infinite;
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   LOGIN — la tarjeta "caramelo y gemas" (CLAUDE.md §5)
+   ------------------------------------------------------------------
+   Clases propias con prefijo .login-*, como .gp-*, .nv-* y .orb-*: esta
+   pantalla NO usa glass-surface ni glass-card-smooth, que comparten media
+   app y no se tocan para arreglar una sola pantalla.
+
+   La idea: la tarjeta está hecha del mismo material que el logo. Vidrio
+   blanco con tintes muy sutiles de marca (menta → lila → rosa), un filete
+   iridiscente de 4 px con los colores del juego, gemas perladas en las
+   cuatro esquinas, un patrón de destellos ✦ adentro, el wordmark 3D real
+   rompiendo el borde superior y brillo de caramelo en el botón. Antes era
+   un rectángulo de vidrio con un título en texto degradado y la marca no
+   aparecía en ningún lado.
+
+   El blur va escrito a mano en las DOS formas (como .modal-overlay): en
+   una regla plana Lightning CSS conserva ambas; el problema documentado
+   arriba es sólo dentro de @utility. */
+.login-shell {
+  position: relative;
+  width: min(32rem, 92vw);
+  /* Contenedor de consulta: los adornos de esquina se miden en `cqw`
+     (1 % del ancho de la tarjeta), en las dos direcciones, así conservan
+     su proporción a cualquier alto y con cualquier zoom. */
+  container-type: inline-size;
+  /* El wordmark asoma 84px por encima de la tarjeta y está posicionado en
+     absoluto, así que no cuenta para el centrado. El margen superior lo
+     suma: lo que se centra es el conjunto logo + tarjeta, y en una ventana
+     corta el logo no se va por arriba. */
+  margin: calc(3vh + 84px) auto 3vh;
+  /* Si la ventana no da, `useAjusteAlViewport` le pone un `zoom` < 1 a este
+     bloque: la tarjeta entera se encoge hasta entrar, con márgenes y todo.
+     Los breakpoints de abajo achican primero lo que se puede achicar sin
+     perder nitidez (alturas, paddings); el zoom es el último recurso y por
+     eso nunca hay scroll en el login. */
+}
+/* El filete es del MISMO oro que el riel de los adornos de esquina: los
+   tonos están muestreados de login-esquina.webp (sombra #e48a12, medio
+   #f9d22b, luz #ffdc3c), así la tarjeta y las esquinas son una sola pieza.
+   Va como metal, con un brillo que corre en diagonal, no como tinte. */
+.login-rim {
+  position: relative;
+  border-radius: 44px;
+  padding: 4px;
+  background: transparent;
+  box-shadow: 0 30px 90px rgba(80, 70, 180, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+/* El oro va en un anillo aparte, recortado con una máscara a los 4 px del
+   borde. Si fuera el fondo del contenedor se vería A TRAVÉS del vidrio
+   translúcido de la tarjeta y la teñiría de amarillo. */
+.login-rim::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 44px;
+  padding: 4px;
+  background: linear-gradient(160deg,
+    #fff0b0 0%,
+    #f9d22b 18%,
+    #e48a12 40%,
+    #ffdc3c 58%,
+    #f0b41f 78%,
+    #e48a12 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+.login-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 40px;
+  padding: 96px 40px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  text-align: center;
+  background:
+    linear-gradient(135deg, rgba(84, 232, 198, 0.10), rgba(255, 255, 255, 0) 38%, rgba(155, 124, 255, 0.07) 68%, rgba(255, 159, 202, 0.12) 100%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(244, 250, 255, 0.66));
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+  backdrop-filter: blur(28px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+}
+/* Todo lo que va adentro se apila sobre el patrón de destellos. */
+.login-card > * { position: relative; }
+.login-destellos {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.45;
+  pointer-events: none;
+}
+/* El wordmark y las gemas viven FUERA de .login-card (que recorta) y se
+   anclan al shell, así asoman por encima del filete. */
+.login-wordmark {
+  position: absolute;
+  left: 50%;
+  top: -84px;
+  width: min(360px, 72%);
+  height: auto;
+  translate: -50% 0;
+  filter: drop-shadow(0 16px 22px rgba(80, 70, 180, 0.38));
+  pointer-events: none;
+  user-select: none;
+  /* Por encima de los adornos de esquina: el logo se apoya sobre ellos. */
+  z-index: 2;
+}
+/* El adorno de esquina es arte generado (login-esquina.webp), dibujado para
+   la esquina superior izquierda: un riel dorado con gemas y nubes cuyo borde
+   interior es cóncavo y abraza la esquina. Las otras tres son la misma
+   imagen girada. Se ancla al shell, por fuera de .login-card. Posición,
+   ancho y giro NO viven acá: salen de src/data/loginEsquinas.ts como
+   estilo inline en cqw, y se colocan con /login?editor=1. */
+.login-esquina {
+  position: absolute;
+  height: auto;
+  filter: drop-shadow(0 8px 14px rgba(80, 70, 180, 0.30));
+  pointer-events: none;
+  user-select: none;
+  z-index: 1;
+}
+/* Sólo con el editor de desarrollo abierto: se pueden agarrar, y la
+   seleccionada se marca. */
+.login-esquina--editable {
+  pointer-events: auto;
+  cursor: grab;
+  outline: 2px dashed rgba(124, 113, 255, 0.55);
+  outline-offset: 2px;
+}
+.login-esquina--editable:active { cursor: grabbing; }
+.login-esquina--seleccionada {
+  outline: 3px solid #7c71ff;
+  filter: drop-shadow(0 0 0 #fff) drop-shadow(0 0 10px rgba(124, 113, 255, 0.9));
+}
+.login-titulo {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 42px;
+  line-height: 1.05;
+  color: #18325f;
+}
+.login-subtitulo {
+  margin: 6px 0 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: #52658f;
+}
+.login-divisor {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: #6e63d6;
+}
+.login-divisor::before, .login-divisor::after { content: ""; flex: 1; height: 2px; border-radius: 2px; }
+.login-divisor::before { background: linear-gradient(90deg, rgba(84, 232, 198, 0), #54e8c6, #7c71ff); }
+.login-divisor::after  { background: linear-gradient(90deg, #7c71ff, #ff9fca, rgba(255, 159, 202, 0)); }
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+}
+.login-campo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 60px;
+  padding: 0 14px 0 12px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 2px solid rgba(130, 140, 190, 0.24);
+  box-shadow: inset 0 1px 0 #fff, 0 6px 16px rgba(58, 89, 132, 0.08);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+  cursor: text;
+}
+.login-campo:focus-within {
+  border-color: #73f3dc;
+  box-shadow: 0 0 0 4px rgba(115, 243, 220, 0.25), inset 0 1px 0 #fff;
+}
+.login-campo__icono {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  color: #fff;
+}
+.login-campo__icono--menta   { background: linear-gradient(135deg, #54e8c6, #25c8df); box-shadow: 0 4px 10px rgba(37, 200, 223, 0.35); }
+.login-campo__icono--violeta { background: linear-gradient(135deg, #9b7cff, #536bff); box-shadow: 0 4px 10px rgba(124, 113, 255, 0.35); }
+.login-campo input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  background: transparent;
+  border: 0;
+  outline: none;
+  font-size: 16px;
+  font-weight: 500;
+  color: #17355f;
+}
+.login-campo input::placeholder { color: #7d8bb0; }
+.login-boton {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 800;
+  transition: transform 180ms ease, filter 180ms ease;
+}
+.login-boton:hover { transform: translateY(-2px); filter: brightness(1.03); }
+.login-boton:active { transform: scale(0.98); }
+.login-boton:disabled { opacity: 0.5; pointer-events: none; }
+.login-boton > * { position: relative; }
+.login-boton--primario {
+  height: 64px;
+  margin-top: 4px;
+  border-radius: 22px;
+  font-size: 23px;
+  letter-spacing: 0.01em;
+  color: #fff;
+  background: linear-gradient(90deg, #54e8c6, #25c8df, #536bff);
+  box-shadow: 0 14px 30px rgba(35, 190, 210, 0.35), inset 0 -3px 0 rgba(23, 53, 95, 0.18);
+}
+/* El brillo de caramelo: media tecla de luz arriba, como las letras del logo. */
+.login-boton--primario::before {
+  content: "";
+  position: absolute;
+  left: 6px; right: 6px; top: 4px;
+  height: 46%;
+  border-radius: 18px 18px 40px 40px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.06));
+  pointer-events: none;
+}
+.login-boton--demo {
+  height: 58px;
+  border-radius: 20px;
+  font-size: 19px;
+  font-weight: 700;
+  color: #5e4edb;
+  background: rgba(255, 255, 255, 0.84);
+  border: 2px solid rgba(155, 124, 255, 0.38);
+  box-shadow: 0 8px 18px rgba(80, 70, 180, 0.10);
+}
+.login-nota {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #8a97bd;
+}
+/* Ventana corta (Chromebook con la barra del navegador): el wordmark entra
+   menos en el borde y los controles se aprietan un poco, así el botón demo
+   no queda bajo el pliegue. Nada cambia de ancho. */
+@media (max-height: 700px) {
+  .login-shell { margin: calc(2vh + 64px) auto 2vh; }
+  .login-wordmark { top: -64px; width: min(280px, 64%); }
+  .login-card { padding: 70px 40px 24px; gap: 12px; }
+  .login-titulo { font-size: 36px; }
+  .login-subtitulo { margin-top: 4px; font-size: 16px; }
+  .login-form { gap: 12px; }
+  .login-campo { height: 52px; }
+  .login-boton--primario { height: 56px; }
+  .login-boton--demo { height: 48px; font-size: 18px; }
+}
+/* Tablet y ventana angosta (≤1180px): las mascotas, que miden en vh, se
+   meten detrás de la tarjeta. Se achican y se pegan al borde; el ancho de
+   la tarjeta no se toca. */
+@media (max-width: 1180px) {
+  .login-mascota--ella { max-height: 48vh; left: 1.5vw; }
+  .login-mascota--el { max-height: 56vh; right: 2vw; }
+}
+/* Teléfono: la tarjeta baja a 92vw y el título tiene que entrar en una línea. */
+@media (max-width: 480px) {
+  .login-card { padding-left: 24px; padding-right: 24px; }
+  .login-titulo { font-size: 34px; }
+  .login-subtitulo { font-size: 15px; }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   TARJETA DE MARCA — el vidrio del login, para el resto del juego
+   ------------------------------------------------------------------
+   La versión liviana de la tarjeta de login (CLAUDE.md §5): el mismo
+   vidrio blanco con tintes menta → lila → rosa, el mismo patrón de
+   destellos ✦ y el filete iridiscente de 3 px con los colores del juego.
+   SIN oro y SIN adornos de esquina: eso es sólo del login.
+
+   Se suma como clase a las TARJETAS y MODALES de las pantallas del alumno
+   (cambio de contraseña, logros, misiones, fin de nivel, celebración de
+   skin, Órbita) por encima de glass-card / glass-card-smooth / orb-vidrio,
+   que siguen existiendo para píldoras, globos y menús. No va en píldoras
+   ni en el HUD, y en la pantalla de nivel sólo la llevan los modales: el
+   borde de degradado encendido sigue siendo de la consigna (§6.5).
+
+   El filete es la cuarta capa del background, recortada al border-box,
+   detrás de tres capas recortadas al padding-box — sin pseudoelementos ni
+   `position`, así sirve en cualquier tarjeta, incluso fija o absoluta. */
+.tarjeta-marca {
+  border: 3px solid transparent;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='104' height='104' viewBox='0 0 104 104'%3E%3Cpath d='M22 10 l2.4 6.4 6.4 2.4 -6.4 2.4 -2.4 6.4 -2.4 -6.4 -6.4 -2.4 6.4 -2.4z' fill='%239b7cff' fill-opacity='.45'/%3E%3Cpath d='M74 58 l1.8 4.8 4.8 1.8 -4.8 1.8 -1.8 4.8 -1.8 -4.8 -4.8 -1.8 4.8 -1.8z' fill='%2354e8c6' fill-opacity='.45'/%3E%3Ccircle cx='86' cy='18' r='2.2' fill='%23ff9fca' fill-opacity='.45'/%3E%3Ccircle cx='34' cy='80' r='1.8' fill='%23ffd552' fill-opacity='.45'/%3E%3Ccircle cx='60' cy='30' r='1.4' fill='%2333c7f0' fill-opacity='.45'/%3E%3C/svg%3E") padding-box,
+    linear-gradient(135deg, rgba(84, 232, 198, 0.10), rgba(255, 255, 255, 0) 38%, rgba(155, 124, 255, 0.07) 68%, rgba(255, 159, 202, 0.12) 100%) padding-box,
+    linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(244, 250, 255, 0.66)) padding-box,
+    linear-gradient(160deg, rgba(255, 255, 255, 0.98) 0%, rgba(84, 232, 198, 0.60) 22%, rgba(51, 199, 240, 0.50) 46%, rgba(155, 124, 255, 0.55) 72%, rgba(255, 159, 202, 0.62) 100%) border-box;
+  box-shadow: 0 24px 70px rgba(58, 89, 132, 0.22), 0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+
 /* ── App-wide pretty scrollbars (replace the chunky default ones) ── */
 * {
   scrollbar-width: thin;

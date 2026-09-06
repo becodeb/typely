@@ -13,6 +13,10 @@ export const assets = {
   /* La marca. Original en `Images/brand/logos/`; esta copia la genera
      `scripts/import-brand-logo.mjs` recortada y en WebP. */
   logoWordmark: "/assets/brand/logo-typely.webp",
+  /* Adorno de esquina de la tarjeta de login (dibujado para la esquina
+     superior izquierda; las otras tres se giran por CSS). Original en
+     `Images/brand/login/`, copia por `scripts/import-login-esquina.mjs`. */
+  loginEsquina: "/assets/edutic-art/login-esquina.webp",
 
   loginBg: "/assets/edutic-art/login-sky-islands-bg.webp",
   homeBg: "/assets/edutic-art/sky-soft-bg.webp",

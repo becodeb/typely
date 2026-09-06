@@ -49,7 +49,7 @@ export function RewardsPage() {
       </header>
 
       {/* ── Hero: total stars ── */}
-      <section className="w-full max-w-3xl flex items-center gap-4 glass-surface p-4 rounded-2xl animate-card-in">
+      <section className="w-full max-w-3xl flex items-center gap-4 glass-surface tarjeta-marca p-4 rounded-2xl animate-card-in">
         <span className="grid place-items-center w-16 h-16 rounded-2xl bg-amber-200/40 text-amber-600 shrink-0">
           <Trophy size={54} />
         </span>
@@ -68,7 +68,7 @@ export function RewardsPage() {
           const unlocked = totalStars >= reward.threshold;
           return (
             <article
-              className={`glass-card-smooth flex flex-col items-center gap-3 p-5 text-center transition-all duration-200 ${
+              className={`glass-card-smooth tarjeta-marca flex flex-col items-center gap-3 p-5 text-center transition-all duration-200 ${
                 unlocked
                   ? "opacity-100 shadow-card animate-star-pop"
                   : "opacity-50 grayscale"
