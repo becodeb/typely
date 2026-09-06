@@ -1,10 +1,8 @@
 /* El hangar — cosméticos y alias.
  *
  * Los cristales compran COSMÉTICOS, nunca ventaja: una estela y un color
- * de rayo no tocan ninguna perilla del motor. La nave base sigue siendo
- * la que el chico se ganó con estrellas en el modo historia (f1…f5): los
- * cristales la VISTEN, no la reemplazan — así los dos modos se alimentan
- * sin que ninguno anule al otro.
+ * de rayo no tocan ninguna perilla del motor. La nave base es exclusiva
+ * de Órbita e independiente de las estrellas de Aventura.
  *
  * El precio que vale es el del servidor; este catálogo solo dibuja. En
  * demo el hangar se mira pero no se compra: sin cuenta no hay saldo.
@@ -22,7 +20,7 @@ import { Gema } from "../../components/orbita/OrbitaIconos";
 import { COSMETICOS, colorEstela, type Cosmetico } from "../../data/orbitaCosmeticos";
 import { useAuth } from "../../hooks/useAuth";
 import { api, ApiError, type ArcadePerfil } from "../../utils/api";
-import { skinUrl } from "../../utils/assets";
+import { NAVE_ORBITA_BASE } from "../../data/orbitaNaves";
 import {
   actualizarPerfilLocal,
   hidratarPerfil,
@@ -39,7 +37,7 @@ function Miniatura({ item }: { item: Cosmetico }) {
       style={{ "--orb-mini-color": item.color } as React.CSSProperties}
       aria-hidden="true"
     >
-      <img src={skinUrl("ship", 0, 0)} alt="" decoding="async" />
+      <img src={NAVE_ORBITA_BASE.vistas.neutra.imagen} alt="" decoding="async" />
     </span>
   );
 }

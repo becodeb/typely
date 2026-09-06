@@ -15,7 +15,7 @@
 import { ArrowLeft, Play, Rocket, Trophy } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { CharacterSkin } from "../../components/common/CharacterSkin";
+import { NaveOrbita } from "../../components/orbita/NaveOrbita";
 import { Gema, InsigniaRango } from "../../components/orbita/OrbitaIconos";
 import { colorEstela } from "../../data/orbitaCosmeticos";
 import { useAuth } from "../../hooks/useAuth";
@@ -103,7 +103,7 @@ export function Puerto({ estela, className }: { estela: string | null; className
             style={{ "--orb-estela-color": estela } as React.CSSProperties}
           />
         )}
-        <CharacterSkin kind="ship" className="block w-full orb-flota-a" alt="Tu nave" />
+        <NaveOrbita animada={false} className="orb-flota-a" />
       </div>
     </div>
   );
