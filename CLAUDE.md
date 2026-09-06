@@ -202,19 +202,36 @@ pair — do not introduce Quicksand.
 - **Mascots** flank the card from outside it, never cropped, never stretched,
   never on a white box. See "Login mascots" below for the shipped positioning.
 
-**The rest of the game's cards wear the light version: `.tarjeta-marca`.**
-Same tinted white glass, same sparkle pattern (as a CSS data-URI
-background, no markup) and a 3px iridescent fillet drawn as the
-`border-box` layer of the background — no gold, no corner ornaments, no
-pseudo-element and no `position` requirement, so it sits on any card. It is
-added as a class on top of `glass-card` / `glass-card-smooth` /
-`glass-surface` / `orb-vidrio` on real **cards and modals** (change
-password, the demo modal, rewards, missions, the account card, level-complete
-and skin-unlock modals, the Órbita hub/ranking/hangar cards). It does NOT go
-on pills, speech bubbles, menus or the HUD, and never on the Órbita upgrade
-cards (their rarity frame is the border). On a level screen only the
-end-of-level modals carry it: the lit gradient border stays the mission's
-(§6.5).
+### Every white container on a student screen is a brand card (structural rule)
+
+**There is no plain white card in the student's game. Anywhere.** Every
+white container — page cards, modals, HUD pills, popovers, toasts, the
+star counter, the skin bar, Órbita's glass, in every mode and every
+screen the `alumno` role can reach — wears the light version of the login
+card: the same tinted white glass (mint → lilac → pink), the same sparkle
+pattern (a CSS data-URI background, no markup) and a 3px iridescent fillet
+(2px on pills, so touch heights survive) drawn as the `border-box` layer of
+the background. No gold and no corner ornaments — those are the login's
+alone.
+
+**It is automatic, not opt-in.** The rule at the very END of `global.css`
+("REGLA ESTRUCTURAL") applies it to `glass`, `glass-strong`, `glass-card`,
+`glass-card-smooth`, `glass-surface`, `orb-vidrio`, `orb-pildora`,
+`orb-aviso`, `modal-card` and `skin-bar-panel`; `.tarjeta-marca` is the
+explicit synonym. It sits at the end on purpose so it wins the cascade over
+every glass rule above it — do not move it, and do not add a `bg-white/…`
+utility on top of a glass class (the rule wins anyway and the state is
+lost). **A new student card is built with one of those classes and is born
+a brand card.** A bare `bg-white/70 rounded-2xl` box on a student screen is
+a bug. `/gestion` uses none of these classes and is untouched.
+
+Deliberate exceptions, and only these: the mission (`.gp-mision`) shares
+the tinted fill but keeps its **lit gradient border, which stays exclusive**
+(§6.5); Órbita's upgrade cards (`.orb-carta`) carry rarity in their frame;
+keys, ice plates, inputs and buttons are not cards; the Órbita pill's
+active state (`.orb-pildora--activa`) keeps its mint fill. `.vidrio-liso`
+exists as an explicit escape for a future case that truly needs flat glass
+— using it is a decision to justify in a comment, not a default.
 
 The design was chosen on a three-direction canvas ("Tarjeta de login TYPELY",
 2026-09-05) against a keycap-styled card and a split indigo "portal" card. When
@@ -1217,6 +1234,11 @@ migración fallida corta el arranque a propósito.
   frames; no white boxes behind transparent assets.
 - Keep student UI immersive and minimal — never make it look like an admin
   dashboard. Gameplay must be real and keyboard-driven, never placeholder.
+- **No plain white card on any student screen.** Every white container is
+  the brand card (tinted glass + sparkles + iridescent fillet), applied
+  automatically by the rule at the end of `global.css` to the glass
+  classes. New cards use those classes; a bare `bg-white/…` box is a bug
+  (§5, "Every white container…").
 - **On a level screen, do not box what is already boxed**, and do not stack
   panels over the island — the art is the scene, not a backdrop (§6.5).
 - **The lit gradient border belongs to the mission alone.** Give it to another
