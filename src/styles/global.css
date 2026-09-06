@@ -673,34 +673,6 @@ a { color: inherit; text-decoration: none; }
   .login-subtitulo { font-size: 15px; }
 }
 
-/* ══════════════════════════════════════════════════════════════════
-   TARJETA DE MARCA — el vidrio del login, para el resto del juego
-   ------------------------------------------------------------------
-   La versión liviana de la tarjeta de login (CLAUDE.md §5): el mismo
-   vidrio blanco con tintes menta → lila → rosa, el mismo patrón de
-   destellos ✦ y el filete iridiscente de 3 px con los colores del juego.
-   SIN oro y SIN adornos de esquina: eso es sólo del login.
-
-   Se suma como clase a las TARJETAS y MODALES de las pantallas del alumno
-   (cambio de contraseña, logros, misiones, fin de nivel, celebración de
-   skin, Órbita) por encima de glass-card / glass-card-smooth / orb-vidrio,
-   que siguen existiendo para píldoras, globos y menús. No va en píldoras
-   ni en el HUD, y en la pantalla de nivel sólo la llevan los modales: el
-   borde de degradado encendido sigue siendo de la consigna (§6.5).
-
-   El filete es la cuarta capa del background, recortada al border-box,
-   detrás de tres capas recortadas al padding-box — sin pseudoelementos ni
-   `position`, así sirve en cualquier tarjeta, incluso fija o absoluta. */
-.tarjeta-marca {
-  border: 3px solid transparent;
-  background:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='104' height='104' viewBox='0 0 104 104'%3E%3Cpath d='M22 10 l2.4 6.4 6.4 2.4 -6.4 2.4 -2.4 6.4 -2.4 -6.4 -6.4 -2.4 6.4 -2.4z' fill='%239b7cff' fill-opacity='.45'/%3E%3Cpath d='M74 58 l1.8 4.8 4.8 1.8 -4.8 1.8 -1.8 4.8 -1.8 -4.8 -4.8 -1.8 4.8 -1.8z' fill='%2354e8c6' fill-opacity='.45'/%3E%3Ccircle cx='86' cy='18' r='2.2' fill='%23ff9fca' fill-opacity='.45'/%3E%3Ccircle cx='34' cy='80' r='1.8' fill='%23ffd552' fill-opacity='.45'/%3E%3Ccircle cx='60' cy='30' r='1.4' fill='%2333c7f0' fill-opacity='.45'/%3E%3C/svg%3E") padding-box,
-    linear-gradient(135deg, rgba(84, 232, 198, 0.10), rgba(255, 255, 255, 0) 38%, rgba(155, 124, 255, 0.07) 68%, rgba(255, 159, 202, 0.12) 100%) padding-box,
-    linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(244, 250, 255, 0.66)) padding-box,
-    linear-gradient(160deg, rgba(255, 255, 255, 0.98) 0%, rgba(84, 232, 198, 0.60) 22%, rgba(51, 199, 240, 0.50) 46%, rgba(155, 124, 255, 0.55) 72%, rgba(255, 159, 202, 0.62) 100%) border-box;
-  box-shadow: 0 24px 70px rgba(58, 89, 132, 0.22), 0 0 0 1px rgba(255, 255, 255, 0.55);
-}
-
 /* ── App-wide pretty scrollbars (replace the chunky default ones) ── */
 * {
   scrollbar-width: thin;
@@ -1098,10 +1070,13 @@ a { color: inherit; text-decoration: none; }
   border: 3px solid transparent;
   border-radius: 1.5rem;
   background-image:
+    linear-gradient(135deg, rgba(84, 232, 198, 0.10), rgba(255, 255, 255, 0) 38%, rgba(155, 124, 255, 0.07) 68%, rgba(255, 159, 202, 0.12) 100%),
     linear-gradient(rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.80)),
     linear-gradient(120deg, var(--color-mint), var(--color-accent-sky), var(--color-accent-strong), #9b7cff);
   background-origin: border-box;
-  background-clip: padding-box, border-box;
+  /* El relleno es el de la tarjeta de marca (tintes); el borde encendido
+     sigue siendo SÓLO de la consigna — ver la regla del final del archivo. */
+  background-clip: padding-box, padding-box, border-box;
   box-shadow: 0 0 0 6px rgba(51, 199, 240, 0.18), 0 14px 34px rgba(49, 89, 232, 0.26);
   transition: box-shadow 400ms ease, transform 400ms ease;
 }
@@ -2513,4 +2488,58 @@ a { color: inherit; text-decoration: none; }
 }
 @media (max-height: 560px) {
   .gp-key { height: 1.75rem; font-size: 0.8rem; }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   REGLA ESTRUCTURAL — TODA TARJETA BLANCA DEL ALUMNO ES DE MARCA
+   ------------------------------------------------------------------
+   Va al FINAL del archivo a propósito: gana la cascada sobre cualquier
+   regla de vidrio que esté más arriba (.orb-pildora, .modal-card, los
+   @utility glass-*). No la muevas.
+
+   Es el vidrio del login (CLAUDE.md §5), en su versión liviana: blanco
+   con tintes menta → lila → rosa, patrón de destellos ✦ y filete
+   iridiscente con los colores del juego. Sin oro y sin adornos de
+   esquina: eso es sólo del login.
+
+   No hay que acordarse de ponerla: cualquier contenedor que use las
+   utilidades de vidrio (glass, glass-strong, glass-card, glass-card-smooth,
+   glass-surface), .orb-vidrio, .orb-pildora, .orb-aviso, .modal-card o
+   .skin-bar-panel la recibe solo. Una tarjeta nueva del alumno se hace
+   con esas clases — nunca con un bg-white/… suelto — y ya nace de marca.
+   La clase .tarjeta-marca queda como sinónimo explícito.
+
+   Quedan afuera, y es deliberado: la consigna (.gp-mision) conserva su
+   borde encendido, que es exclusivo (§6.5) — sólo comparte el relleno;
+   las cartas de mejora de Órbita (.orb-carta) llevan la rareza en el
+   marco; teclas, placas, campos y botones no son tarjetas. Para un caso
+   nuevo que de verdad necesite vidrio liso, .vidrio-liso lo apaga.
+
+   Las píldoras (HUD, contador, barra de skin) llevan el filete de 2 px
+   para no perder alto de toque; el resto, 3 px.
+
+   El filete es la última capa del background, recortada al border-box,
+   detrás de tres capas al padding-box — sin pseudoelementos ni
+   `position`, así sirve en cualquier tarjeta, incluso fija o absoluta.
+   Gestión (/gestion) no usa estas clases, así que no la toca. */
+.tarjeta-marca,
+.glass, .glass-strong, .glass-card, .glass-card-smooth, .glass-surface,
+.orb-vidrio, .orb-pildora:not(.orb-pildora--activa), .orb-aviso, .modal-card, .skin-bar-panel {
+  border: 3px solid transparent;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='104' height='104' viewBox='0 0 104 104'%3E%3Cpath d='M22 10 l2.4 6.4 6.4 2.4 -6.4 2.4 -2.4 6.4 -2.4 -6.4 -6.4 -2.4 6.4 -2.4z' fill='%239b7cff' fill-opacity='.45'/%3E%3Cpath d='M74 58 l1.8 4.8 4.8 1.8 -4.8 1.8 -1.8 4.8 -1.8 -4.8 -4.8 -1.8 4.8 -1.8z' fill='%2354e8c6' fill-opacity='.45'/%3E%3Ccircle cx='86' cy='18' r='2.2' fill='%23ff9fca' fill-opacity='.45'/%3E%3Ccircle cx='34' cy='80' r='1.8' fill='%23ffd552' fill-opacity='.45'/%3E%3Ccircle cx='60' cy='30' r='1.4' fill='%2333c7f0' fill-opacity='.45'/%3E%3C/svg%3E") padding-box,
+    linear-gradient(135deg, rgba(84, 232, 198, 0.10), rgba(255, 255, 255, 0) 38%, rgba(155, 124, 255, 0.07) 68%, rgba(255, 159, 202, 0.12) 100%) padding-box,
+    linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(244, 250, 255, 0.66)) padding-box,
+    linear-gradient(160deg, rgba(255, 255, 255, 0.98) 0%, rgba(84, 232, 198, 0.60) 22%, rgba(51, 199, 240, 0.50) 46%, rgba(155, 124, 255, 0.55) 72%, rgba(255, 159, 202, 0.62) 100%) border-box;
+  box-shadow: 0 24px 70px rgba(58, 89, 132, 0.22), 0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+.glass-strong, .glass-surface, .orb-pildora, .skin-bar-panel {
+  border-width: 2px;
+  box-shadow: 0 10px 26px rgba(58, 89, 132, 0.16), 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+/* Escape explícito: vidrio liso, sin filete ni destellos. */
+.vidrio-liso {
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: none;
 }

@@ -1204,7 +1204,7 @@ function ScrollLevel({ activity }: { activity: Activity }) {
               </button>
               <button
                 type="button"
-                className="glass-surface rounded-xl w-10 h-10 grid place-items-center text-lg font-bold cursor-pointer border-0 bg-accent text-white"
+                className="rounded-xl w-10 h-10 grid place-items-center text-lg font-bold cursor-pointer border-0 bg-accent text-white shadow-btn"
                 onClick={onZoomIn}
                 aria-label="Acercar"
               >
