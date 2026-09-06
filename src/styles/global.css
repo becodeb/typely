@@ -1714,10 +1714,8 @@ a { color: inherit; text-decoration: none; }
    como en cualquier juego con este mecanismo, y la palabra que llega en ese
    rato rebota entera hacia arriba y se desvanece, con un destello blanco
    sobre la nave. Antes se desarmaba en gris y se leía como "desapareció". */
-.orb-nave--invulnerable img {
-  animation:
-    orbFlota 3.4s ease-in-out infinite,
-    orbParpadea 220ms steps(2, end) infinite;
+.orb-nave--invulnerable .orb-nave-sprite__casco {
+  animation: orbParpadea 220ms steps(2, end) infinite;
 }
 @keyframes orbParpadea {
   0%, 100% { opacity: 1; filter: none; }
@@ -1860,12 +1858,56 @@ a { color: inherit; text-decoration: none; }
 .orb-nave {
   position: absolute;
   left: 50%;
-  bottom: 3%;
+  bottom: 1.2%;
   transform: translateX(-50%);
-  width: clamp(120px, 16vh, 190px);
+  width: clamp(126px, 18vh, 190px);
   pointer-events: none;
 }
-.orb-nave img { display: block; width: 100%; animation: orbFlota 3.4s ease-in-out infinite; }
+.orb-nave-sprite { position: relative; width: 100%; aspect-ratio: 1; pointer-events: none; isolation: isolate; }
+.orb-nave-sprite__rotor, .orb-nave-sprite__casco, .orb-nave-sprite__pose {
+  position: absolute; inset: 0; transform-origin: 50% 54%;
+}
+.orb-nave-sprite__rotor { will-change: transform; }
+.orb-nave-sprite__pose { pointer-events: none; }
+.orb-nave-sprite__imagen {
+  position: relative; z-index: 1; display: block; width: 100%; height: 100%;
+  object-fit: contain; user-select: none; animation: none;
+  filter: drop-shadow(0 2px 4px rgba(5, 11, 30, .3));
+}
+.orb-nave-sprite__motor {
+  position: absolute; z-index: 0; width: 11%; height: 27%;
+  transform-origin: 50% 8%;
+}
+.orb-nave-sprite__motor i {
+  display: block; width: 100%; height: 100%; border-radius: 45% 45% 70% 70%;
+  background: radial-gradient(ellipse at 50% 12%, #fff 0%, #d4fcff 10%, var(--nave-motor-color, #55dfff) 28%, rgba(93, 112, 255, .55) 48%, transparent 73%);
+  transform-origin: 50% 0; opacity: .85;
+  animation: orbPropulsion 620ms ease-in-out infinite alternate;
+  animation-delay: var(--motor-retardo, 0s);
+}
+.orb-nave-sprite__emisor, .orb-nave-sprite__disparo {
+  position: absolute; z-index: 3; left: 50%; top: 5.25%;
+  transform: translate(-50%, -50%);
+}
+.orb-nave-sprite__emisor { width: 1px; height: 1px; }
+.orb-nave-sprite__disparo {
+  width: 25%; aspect-ratio: 1; opacity: 0;
+  background: radial-gradient(circle, #fff 0%, #effeff 10%, var(--nave-disparo-color, #25c8df) 25%, transparent 67%);
+}
+.orb-nave-sprite__disparo::after {
+  content: "✦"; position: absolute; inset: 0; display: grid; place-items: center;
+  color: #fff; font-size: clamp(18px, 3vh, 32px); line-height: 1;
+  text-shadow: 0 0 8px var(--nave-disparo-color, #25c8df);
+}
+.orb-nave-sprite[data-pausada="true"] *, .orb-nave-sprite[data-oculta="true"] * { animation-play-state: paused !important; }
+@keyframes orbPropulsion {
+  from { transform: scale(.92, .78); opacity: .7; }
+  to { transform: scale(1.05, 1.16); opacity: .98; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .orb-nave-sprite__motor i { animation: none; transform: scaleY(.7); opacity: .65; }
+  .orb-nave--invulnerable .orb-nave-sprite__casco { animation: none; filter: brightness(1.35); }
+}
 @keyframes orbFlota {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-7px); }
@@ -2366,7 +2408,7 @@ a { color: inherit; text-decoration: none; }
   transform-origin: 0 50%;
   animation: orbMiniDispara 1.6s ease-out infinite;
 }
-.orb-mini--rayo img { translate: -50% -50%; left: 22%; width: 26px; }
+.orb-mini--rayo img { translate: -50% -50%; left: 22%; width: 26px; transform: rotate(90deg); }
 @keyframes orbMiniLate { 50% { opacity: 0.55; scale: 0.85; } }
 /* El rayo se DISPARA y se queda: la primera versión lo mostraba 0,48 s de
    cada 1,6 s, así que siete de cada diez miradas caían sobre una caja

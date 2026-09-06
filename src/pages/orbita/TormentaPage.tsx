@@ -26,7 +26,7 @@
 import { ArrowLeft, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { CharacterSkin } from "../../components/common/CharacterSkin";
+import { NaveOrbita, type NaveOrbitaHandle } from "../../components/orbita/NaveOrbita";
 import {
   COLOR_DE_MEJORA,
   Gema,
@@ -327,6 +327,8 @@ export function TormentaPage() {
     { id: number; x: number; y: number; escala: number; texto: string }[]
   >([]);
   const naveRef = useRef<HTMLDivElement | null>(null);
+  const naveSpriteRef = useRef<NaveOrbitaHandle>(null);
+  const temporizadoresRayos = useRef(new Set<number>());
   const [nivelActual, setNivelActual] = useState(0);
   const [revelado, setRevelado] = useState<Revelado | null>(null);
   const [erroneaId, setErroneaId] = useState<number | null>(null);
@@ -344,6 +346,11 @@ export function TormentaPage() {
   const sonidoRef = useRef(sonido);
   sonidoRef.current = sonido;
   const efectoIds = useRef(1);
+
+  useEffect(() => {
+    const pendientes = temporizadoresRayos.current;
+    return () => { pendientes.forEach(id => window.clearTimeout(id)); pendientes.clear(); };
+  }, []);
 
   /* ---------------------------------------------------------------- */
   /* Cuenta regresiva → motor nuevo                                    */
@@ -379,6 +386,9 @@ export function TormentaPage() {
     });
     setChispas([]);
     setRayos([]);
+    temporizadoresRayos.current.forEach(id => window.clearTimeout(id));
+    temporizadoresRayos.current.clear();
+    naveSpriteRef.current?.reiniciar();
     setCadaveres([]);
     setCartas(null);
     cartasRef.current = null;
@@ -401,6 +411,34 @@ export function TormentaPage() {
       if (!eventos.length) return;
       const motor = motorRef.current;
       if (!motor) return;
+
+      const dispararA = (id: number, intenso: boolean) => {
+        const palabra = palabraEls.current.get(id);
+        const escena = escenaRef.current;
+        const nave = naveSpriteRef.current;
+        if (!palabra || !escena || !nave) return;
+        const r = palabra.getBoundingClientRect();
+        const e = escena.getBoundingClientRect();
+        const destino = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+        nave.atacar(destino, () => {
+        nave.disparar(intenso);
+        const origen = nave.origenDisparo();
+        if (!origen) return;
+        const idRayo = efectoIds.current++;
+        setRayos(prev => [...prev.slice(-11), {
+          id: idRayo,
+          x: (origen.x - e.left) / e.width * 100,
+          y: (origen.y - e.top) / e.height * 100,
+          largo: Math.hypot(destino.x - origen.x, destino.y - origen.y),
+          angulo: Math.atan2(destino.y - origen.y, destino.x - origen.x) * 180 / Math.PI,
+        }]);
+        const timer = window.setTimeout(() => {
+          setRayos(prev => prev.filter(rayo => rayo.id !== idRayo));
+          temporizadoresRayos.current.delete(timer);
+        }, 200);
+        temporizadoresRayos.current.add(timer);
+        });
+      };
 
       /* Deja un cadáver donde estaba la palabra: mismo lugar, misma
          escala, mismo texto, y las letras salen volando. Hay que llamarlo
@@ -432,6 +470,10 @@ export function TormentaPage() {
 
       for (const ev of eventos) {
         switch (ev.tipo) {
+          case "acierto":
+            // La última letra recibe el disparo fuerte de «destruida».
+            if (!eventos.some(e => e.tipo === "destruida" && e.id === ev.id)) dispararA(ev.id, false);
+            break;
           case "nace":
             setPalabras((prev) => [
               ...prev,
@@ -439,6 +481,7 @@ export function TormentaPage() {
             ]);
             break;
           case "destruida": {
+            dispararA(ev.id, true);
             /* Lo que cayó por bala se desarma en dorado, por crítico en
                violeta: se ve de qué murió sin leer nada. */
             const colorVia =
@@ -461,23 +504,6 @@ export function TormentaPage() {
                 () => setChispas((prev) => prev.filter((c) => c.id !== idBoom)),
                 460,
               );
-              /* El rayo sale de la nave hacia la palabra. */
-              const nx = 50;
-              const ny = NAVE_Y - 4;
-              const dx = ((x - nx) / 100) * e.width;
-              const dy = ((y - ny) / 100) * e.height;
-              const idRayo = efectoIds.current++;
-              setRayos((prev) => [
-                ...prev,
-                {
-                  id: idRayo,
-                  x: nx,
-                  y: ny,
-                  largo: Math.hypot(dx, dy),
-                  angulo: (Math.atan2(dy, dx) * 180) / Math.PI,
-                },
-              ]);
-              window.setTimeout(() => setRayos((prev) => prev.filter((l) => l.id !== idRayo)), 200);
             }
             palabraEls.current.delete(ev.id);
             setPalabras((prev) => prev.filter((p) => p.id !== ev.id));
@@ -605,6 +631,7 @@ export function TormentaPage() {
             break;
           }
           case "impacto":
+            naveSpriteRef.current?.impacto();
             enterrar(ev.id, "#ff8fa8", true);
             palabraEls.current.delete(ev.id);
             setPalabras((prev) => prev.filter((p) => p.id !== ev.id));
@@ -683,6 +710,16 @@ export function TormentaPage() {
       /* El rectángulo de la escena se lee UNA vez, antes de escribir
          estilos: leerlo dentro del bucle forzaría un layout por palabra. */
       const escenaRect = escenaRef.current?.getBoundingClientRect();
+      // Solo seguimos una palabra que el jugador ya empezó; la aparición
+      // de amenazas o el marcado automático de Foco no orientan la nave.
+      const palabraEnCurso = motor.vivas.find(p => p.id === enganche && p.escrito > 0 && p.texto.length > 1);
+      const seguimientoNave = palabraEnCurso ? posicionDe(palabraEnCurso.carril, palabraEnCurso.progreso) : null;
+      if (!motor.eligiendo) naveSpriteRef.current?.apuntar(
+        seguimientoNave && escenaRect
+          ? { x: escenaRect.left + escenaRect.width * seguimientoNave.x / 100, y: escenaRect.top + escenaRect.height * seguimientoNave.y / 100 }
+          : null,
+        dt,
+      );
       let hayPeligro = false;
       for (const p of motor.vivas) {
         const el = palabraEls.current.get(p.id);
@@ -1103,7 +1140,7 @@ export function TormentaPage() {
           />
         ))}
 
-        {/* La nave del chico — la que se ganó con estrellas. */}
+        {/* Nave exclusiva de Órbita, independiente de las estrellas. */}
         <div ref={naveRef} className="orb-nave">
           {estela && (
             <span
@@ -1114,7 +1151,8 @@ export function TormentaPage() {
           {escudo > 0 && (
             <span className={`orb-escudo-aro ${escudo > 1 ? "orb-escudo-aro--doble" : ""}`} />
           )}
-          <CharacterSkin kind="ship" alt="Tu nave" />
+          <NaveOrbita ref={naveSpriteRef} pausada={fase !== "jugando" || Boolean(cartas)}
+            colorMotor={estela} colorDisparo={rayoColor} />
           {/* Recién acá se sabe qué era: la gema explota sobre la nave. */}
           {revelado && (
             <span
