@@ -1,8 +1,16 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { GlassInput } from "../components/auth/GlassInput";
 import { AnimatedButton } from "../components/auth/AnimatedButton";
 import { useAuth } from "../hooks/useAuth";
+import { useAjusteAlViewport } from "../hooks/useAjusteAlViewport";
+import { ESQUINAS_ORDEN, LOGIN_ESQUINAS } from "../data/loginEsquinas";
+import {
+  editorLoginDisponible,
+  estiloEsquina,
+  useLoginEsquinasEditor,
+  type Esquinas,
+} from "../components/dev/LoginEsquinasEditor";
 import { assets } from "../utils/assets";
 import { routeForRole } from "../utils/storage";
 import { clearDemoProgressOnly } from "../utils/progress";
@@ -16,6 +24,17 @@ import {
   Sparkles,
   User,
 } from "lucide-react";
+/* ShieldCheck sigue en uso en el banner de error. */
+
+/** Gema chiquita a los lados del divisor, del estilo de las del adorno. */
+function GemaChica({ color }: { color: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <polygon points="8,1 15,8 8,15 1,8" fill="#ffffff" stroke="#7c71ff" strokeWidth="1.2" />
+      <polygon points="8,4 12,8 8,12 4,8" fill={color} />
+    </svg>
+  );
+}
 
 /* =====================================================================
    Login page — student-first design.
@@ -32,6 +51,29 @@ export function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  /* La tarjeta entra entera en cualquier ventana, sin scroll: se encoge
+     sola si el alto o el ancho no dan. Los 60 px de ancho extra son los
+     adornos de esquina, que asoman 30 px por cada lado. */
+  const shellRef = useRef<HTMLElement | null>(null);
+
+  /* Adornos de esquina: los datos del archivo son el estado inicial; el
+     editor de desarrollo (/login?editor=1) los mueve en vivo y los guarda
+     de vuelta en src/data/loginEsquinas.ts. En producción `editorOn` es
+     siempre false y esto es sólo leer el archivo. */
+  const [esquinas, setEsquinas] = useState<Esquinas>(() => ({ ...LOGIN_ESQUINAS }));
+  const [editorOn, setEditorOn] = useState(editorLoginDisponible);
+  const editor = useLoginEsquinasEditor({
+    activo: editorOn,
+    shellRef,
+    esquinas,
+    setEsquinas,
+    onCerrar: () => setEditorOn(false),
+  });
+
+  /* Lo que las esquinas asoman hacia afuera cuenta para el ancho que tiene
+     que entrar en la ventana: el mayor corrimiento negativo, de cada lado. */
+  const asomoEsquinas = Math.max(0, ...ESQUINAS_ORDEN.map((k) => -esquinas[k].x)) / 100;
+  useAjusteAlViewport(shellRef, { anchoExtraRelativo: asomoEsquinas * 2 });
   const [message, setMessage] = useState("");
   // Bumped on every error so the top red popup re-animates even if the
   // message text is identical to the previous attempt.
@@ -96,104 +138,141 @@ export function LoginPage() {
       {/* Mascots stand ON the green islands: lifted off the bottom edge and
           nudged inward so they read as "standing on" the painted platforms. */}
       <img
-        className="absolute bottom-[17.5vh] left-[5.5vw] w-auto max-h-[62vh] animate-mascot-float pointer-events-none select-none z-10"
+        className="login-mascota--ella absolute bottom-[17.5vh] left-[5.5vw] w-auto max-h-[62vh] animate-mascot-float pointer-events-none select-none z-10"
         src={assets.mascotFemaleWave}
         alt="Mascota saludando"
         decoding="async"
         fetchPriority="high"
       />
       <img
-        className="absolute bottom-[7.5vh] right-[8vw] w-auto max-h-[72vh] animate-mascot-float pointer-events-none select-none z-10"
+        className="login-mascota--el absolute bottom-[7.5vh] right-[8vw] w-auto max-h-[72vh] animate-mascot-float pointer-events-none select-none z-10"
         src={assets.mascotMaleWave}
         alt="Mascota saludando"
         decoding="async"
         fetchPriority="high"
       />
 
+      {/* La tarjeta "caramelo y gemas" (CLAUDE.md §5): el wordmark 3D y las
+          cuatro gemas se anclan al shell, por FUERA de .login-card, que
+          recorta su contenido para que el patrón de destellos no se salga
+          del vidrio. Estilos en el bloque .login-* de global.css. */}
       <section
-        className="liquid-glass glass-card-smooth relative w-[min(32rem,92vw)] mx-auto my-[7vh] p-8 pt-12 text-center flex flex-col items-center gap-6 animate-card-in z-20"
+        ref={shellRef}
+        className="login-shell mx-auto animate-card-in z-20"
         aria-label="Ingreso a TYPELY"
       >
         <span
           className="absolute -inset-8 -z-10 rounded-[2rem] bg-[radial-gradient(circle_at_50%_40%,rgba(51,199,240,0.22),transparent_60%)] blur-3xl animate-halo-drift pointer-events-none"
           aria-hidden="true"
         />
-        <span
-          className="absolute -left-4 top-1/3 text-2xl text-accent-pink/60 animate-sparkle-spin pointer-events-none select-none"
-          aria-hidden="true"
-        >
-          ✦
-        </span>
-        <span
-          className="absolute -right-4 top-1/2 text-xl text-mint/70 animate-sparkle-spin pointer-events-none select-none"
-          aria-hidden="true"
-        >
-          ✦
-        </span>
-        <span
-          className="absolute -top-3 left-1/2 -translate-x-1/2 text-2xl text-accent/60 animate-sparkle-spin pointer-events-none select-none"
-          aria-hidden="true"
-        >
-          ✧
-        </span>
 
-        <div className="text-center">
-          <h1 className="font-display text-4xl font-black mb-2 text-gradient-loop">
-            ¡Bienvenido a TYPELY!
-          </h1>
-          <p className="text-muted font-semibold">Aprendé a escribir jugando entre las nubes ✨</p>
+        <div className="login-rim">
+          <div className="login-card">
+            <svg className="login-destellos" aria-hidden="true">
+              <defs>
+                <pattern id="login-destellos" width="104" height="104" patternUnits="userSpaceOnUse">
+                  <path d="M22 10 l2.4 6.4 6.4 2.4 -6.4 2.4 -2.4 6.4 -2.4 -6.4 -6.4 -2.4 6.4 -2.4z" fill="#9b7cff" />
+                  <path d="M74 58 l1.8 4.8 4.8 1.8 -4.8 1.8 -1.8 4.8 -1.8 -4.8 -4.8 -1.8 4.8 -1.8z" fill="#54e8c6" />
+                  <circle cx="86" cy="18" r="2.2" fill="#ff9fca" />
+                  <circle cx="34" cy="80" r="1.8" fill="#ffd552" />
+                  <circle cx="60" cy="30" r="1.4" fill="#33c7f0" />
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#login-destellos)" />
+            </svg>
+
+            <div>
+              <h1 className="login-titulo">¡Bienvenido!</h1>
+              <p className="login-subtitulo">Aprendé a escribir jugando entre las nubes</p>
+            </div>
+
+            <div className="login-divisor" aria-hidden="true">
+              <GemaChica color="#54e8c6" />
+              <span>ENTRÁ A TU CUENTA</span>
+              <GemaChica color="#ff9fca" />
+            </div>
+
+            <form onSubmit={submit} className="login-form">
+              <GlassInput
+                icon={<User size={20} aria-hidden="true" />}
+                label="Código o usuario"
+                value={username}
+                onChange={setUsername}
+                autoComplete="username"
+                tone="menta"
+              />
+
+              <GlassInput
+                icon={<LockKeyhole size={20} aria-hidden="true" />}
+                label="Contraseña"
+                value={password}
+                onChange={setPassword}
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                tone="violeta"
+                action={
+                  <button
+                    type="button"
+                    className="grid w-9 h-9 shrink-0 place-items-center rounded-full bg-transparent border-0 cursor-pointer text-[#8a97bd] hover:text-text transition-colors"
+                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    onClick={() => setShowPassword((v) => !v)}
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                }
+              />
+
+              <AnimatedButton
+                type="submit"
+                iconLeft={<Sparkles size={22} aria-hidden="true" />}
+                iconRight={<ArrowRight size={24} aria-hidden="true" />}
+              >
+                Ingresar
+              </AnimatedButton>
+
+              <AnimatedButton
+                type="button"
+                variant="secondary"
+                onClick={openDemoModal}
+                iconLeft={<Rocket size={20} aria-hidden="true" />}
+              >
+                Entrar en modo demo
+              </AnimatedButton>
+            </form>
+
+            <p className="login-nota">
+              <LockKeyhole size={15} aria-hidden="true" />
+              Entorno seguro para aprender y enseñar
+            </p>
+          </div>
         </div>
 
-        <form onSubmit={submit} className="flex flex-col gap-4 w-full">
-          <GlassInput
-            icon={<User size={21} aria-hidden="true" />}
-            label="Código o usuario"
-            value={username}
-            onChange={setUsername}
-            autoComplete="username"
+        <img
+          className="login-wordmark"
+          src={assets.logoWordmark}
+          alt="TYPELY"
+          decoding="async"
+          fetchPriority="high"
+        />
+        {/* El mismo adorno generado, girado para cada esquina. Posición y
+            tamaño salen de src/data/loginEsquinas.ts, en % del ancho de la
+            tarjeta (unidades cqw: .login-shell es contenedor de consulta). */}
+        {ESQUINAS_ORDEN.map((clave) => (
+          <img
+            key={clave}
+            className={`login-esquina${editorOn ? " login-esquina--editable" : ""}${editor.seleccion === clave ? " login-esquina--seleccionada" : ""}`}
+            style={estiloEsquina(clave, esquinas[clave])}
+            src={assets.loginEsquina}
+            alt=""
+            decoding="async"
+            draggable={false}
+            onPointerDown={editorOn ? editor.onPointerDown(clave) : undefined}
+            onPointerMove={editorOn ? editor.onPointerMove : undefined}
+            onPointerUp={editorOn ? editor.onPointerUp : undefined}
+            onPointerCancel={editorOn ? editor.onPointerUp : undefined}
           />
-
-          <GlassInput
-            icon={<ShieldCheck size={21} aria-hidden="true" />}
-            label="Contraseña"
-            value={password}
-            onChange={setPassword}
-            type={showPassword ? "text" : "password"}
-            autoComplete="current-password"
-            action={
-              <button
-                type="button"
-                className="grid w-9 h-9 place-items-center rounded-full bg-transparent border-0 cursor-pointer text-text/60 hover:text-text transition-colors"
-                aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                onClick={() => setShowPassword((v) => !v)}
-              >
-                {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
-              </button>
-            }
-          />
-
-          <AnimatedButton
-            type="submit"
-            iconLeft={<Sparkles size={21} aria-hidden="true" />}
-            iconRight={<ArrowRight size={23} aria-hidden="true" />}
-          >
-            Ingresar
-          </AnimatedButton>
-
-          <AnimatedButton
-            type="button"
-            variant="secondary"
-            onClick={openDemoModal}
-            iconLeft={<Rocket size={19} aria-hidden="true" />}
-          >
-            Entrar en modo demo
-          </AnimatedButton>
-
-          <p className="flex items-center justify-center gap-1.5 text-xs text-muted/70 font-semibold mt-1">
-            <LockKeyhole size={15} aria-hidden="true" />
-            Entorno seguro para aprender y enseñar
-          </p>
-        </form>
+        ))}
+        {editor.panel}
       </section>
 
       {showDemoModal && (
@@ -204,7 +283,7 @@ export function LoginPage() {
           aria-labelledby="demo-modal-title"
         >
           <div className="modal-overlay" onClick={() => setShowDemoModal(false)} />
-          <div className="glass-card-smooth modal-card relative max-h-[88vh] overflow-y-auto p-8 w-[min(24rem,90vw)] flex flex-col items-center gap-5 animate-menu-reveal">
+          <div className="glass-card-smooth modal-card tarjeta-marca relative max-h-[88vh] overflow-y-auto p-8 w-[min(24rem,90vw)] flex flex-col items-center gap-5 animate-menu-reveal">
             <span className="text-4xl" aria-hidden="true"><Rocket size={26} /></span>
             <h2 id="demo-modal-title" className="font-display text-xl font-bold text-text">Modo demo</h2>
             <p className="text-muted text-sm text-center">¿Querés continuar con el progreso anterior o empezar desde cero?</p>

@@ -709,7 +709,7 @@ export function ShortcutLevelView({ activity }: { activity: Activity }) {
       {bloqueo.estado === "pendiente" && !prog.completed && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-text/45 backdrop-blur-sm" />
-          <div className="glass-card-smooth relative w-full max-w-md rounded-3xl p-7 text-center shadow-card animate-modal-in">
+          <div className="glass-card-smooth tarjeta-marca relative w-full max-w-md rounded-3xl p-7 text-center shadow-card animate-modal-in">
             <div className="text-5xl" aria-hidden="true">🔒</div>
             <h3 className="mt-3 font-display text-2xl text-text">Modo pantalla completa</h3>
             <p className="mt-2 text-sm text-muted">
@@ -774,7 +774,7 @@ export function ShortcutLevelView({ activity }: { activity: Activity }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-text/40 backdrop-blur-sm" />
           <div className="relative w-full max-w-md animate-modal-in">
-            <div className="glass-card-smooth relative overflow-hidden rounded-3xl p-8 text-center shadow-card">
+            <div className="glass-card-smooth tarjeta-marca relative overflow-hidden rounded-3xl p-8 text-center shadow-card">
               <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
                 {Array.from({ length: 18 }).map((_, i) => (
                   <span

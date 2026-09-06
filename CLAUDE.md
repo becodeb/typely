@@ -126,44 +126,100 @@ Cuatro roles: `superadmin` (la plataforma), `admin` (UNA sede), `docente`
   `0 24px 60px rgba(54,86,134,0.2)`.
 - Animations are soft and purposeful; honour `prefers-reduced-motion: reduce`.
 
-### Login card — reference spec
+### Login card — "caramelo y gemas" (shipped 2026-09-05)
 
-Target proportions for the login card, kept from the original design reference.
-Where a number here disagrees with what `LoginPage.tsx` actually ships, **the
-shipped value wins** — notably the card is fixed at `w-[min(32rem,92vw)]`, and
-the fonts are the shipped pair (see "Typography" above); do not introduce
-Quicksand, which the original reference also suggested.
+The card is made of the **same material as the logo**, so the brand and the
+form stop being two things. It has its own classes, `.login-*` in
+`global.css`, like `.gp-*`, `.nv-*` and `.orb-*` — it does **not** use
+`glass-surface` / `glass-card-smooth`, which half the app shares. The
+`GlassInput` and `AnimatedButton` components in `src/components/auth/` are
+login-only and carry these classes. Where a number here disagrees with what
+`LoginPage.tsx` ships, **the shipped value wins**; the card stays at
+`w-[min(32rem,92vw)]` with fixed (non-vmin) type, and the fonts are the shipped
+pair — do not introduce Quicksand.
 
-- **Card:** radius 34–44px, background `rgba(255,255,255,0.58)`, backdrop blur
-  22–30px, 1px border `rgba(255,255,255,0.85)`, outer shadow
-  `0 30px 90px rgba(80,70,180,0.28)`, soft turquoise/purple/pink glow on the top
-  and right edges. Never a flat blue/white rectangle.
-- **Vertical order:** wordmark → title → subtitle → "Tu rol" divider → 2×2 role
-  selector → user input → password input → primary button → demo button → safety
-  note.
-- **Wordmark** dominates the top of the card at 48–58px. Never a small square
-  icon as the brand.
-- **Type:** title 40–48px weight 800–900 `#18325f`; subtitle 17–20px `#52658f`;
-  labels 14–16px weight 700 `#596994`.
-- **Role selector:** 2×2 pills, gap 14–16px, height 62–68px, radius 18–22px.
-  Inactive `rgba(255,255,255,0.72)`; active
-  `linear-gradient(135deg, rgba(255,255,255,0.9), rgba(220,245,255,0.65))` with a
-  2px `#5ff3d4`/`#9b7cff` border and `0 0 22px rgba(118,92,255,0.25)` glow.
-- **Inputs:** height 58–64px, radius 18–22px, `rgba(255,255,255,0.72)`, border
-  `rgba(130,140,190,0.22)`, focus border `#73f3dc` with
-  `0 0 0 4px rgba(115,243,220,0.25)`. Left icon; eye toggle on password.
-- **Primary button:** height 62–68px, radius 22px,
-  `linear-gradient(90deg, #54e8c6, #25c8df, #536bff)`, shadow
-  `0 14px 30px rgba(35,190,210,0.35)`, sparkle left + arrow right, hover
-  `translateY(-2px) brightness(1.03)`, active `scale(0.98)`.
-- **Demo button:** height 56–62px, `rgba(255,255,255,0.78)`, text `#405083` or
-  `#5e4edb`, rocket icon, soft border.
+- **Card:** `.login-shell` (512px) → `.login-rim` (4px **gold** fillet,
+  radius 44, its tones sampled from the corner ornament — shadow `#e48a12`,
+  mid `#f9d22b`, light `#ffdc3c` — so card and corners read as one piece;
+  it was iridescent before the ornaments arrived) → `.login-card` (radius 40,
+  white glass `0.78→0.66` with faint mint/lilac/pink tints, blur 28px, shadow
+  `0 30px 90px rgba(80,70,180,0.28)`). Never a flat blue/white rectangle.
+- **Wordmark:** the real 3D logo (`assets.logoWordmark`, preloaded in
+  `index.html`) at `min(360px, 72%)`, straddling the top edge (`top: -84px`)
+  and anchored to the shell, outside the clipping card. Never a small square
+  icon, never text with a gradient as the brand.
+- **Corner ornaments:** generated art, not CSS. `login-esquina.webp` is a
+  jeweled gold rail with gems and cloud puffs drawn for the **top-left**
+  corner; the other three are the same image rotated 90/180/270. **Where
+  each one sits lives in `src/data/loginEsquinas.ts`**, one row per corner:
+  `x`/`y` offset from its own corner, `ancho`, and an extra `giro`, all in
+  **% of the card's width** (also vertically — `.login-shell` is a
+  `container-type: inline-size` and the values render as `cqw`), so the
+  piece keeps its proportion at every height and under the fit-to-viewport
+  zoom. Never pixels. Place them with the **visual editor**: set
+  `localStorage.typely_dev_editor = "1"` once, open `/login?editor=1`, drag
+  a corner (arrows nudge, `S` = width, `Z` = spin, Shift ×10, Alt fine,
+  "Espejar a las 4" copies one corner to all), and `Ctrl/Cmd + S` writes
+  the file through `scripts/vite-plugin-login-esquinas.ts` — the same
+  dev-only endpoint pattern as the level editor (§6.1). The wordmark stacks
+  above the ornaments (`z-index: 2`) so the logo reads as resting on the
+  crest. Source `Images/brand/login/esquina-source.png` (with
+  `guia-esquina.png`, the placement guide used to generate it); regenerate
+  the web copy with `node scripts/import-login-esquina.mjs`. Flat SVG gems
+  were tried first and rejected: solid fills with white outlines do not
+  match the logo's material. Two tiny SVG diamonds still flank the
+  "ENTRÁ A TU CUENTA" divider.
+- **Pattern:** an SVG `<pattern>` of four-point sparkles at 45% opacity fills
+  the card behind everything (`.login-destellos`). It replaced three spinning
+  ✦ text glyphs.
+- **Vertical order:** wordmark → "¡Bienvenido!" (Baloo 2, 42px, `#18325f`) →
+  subtitle (17px, `#52658f`) → divider → user input → password input → primary
+  button → demo button → safety note. There is **no role selector** (§4: one
+  form for all four roles).
+- **Inputs (`.login-campo`):** 60px, radius 20, white `0.82`, border
+  `rgba(130,140,190,0.24)`; the icon sits in a 36px gradient bubble (mint for
+  the user, violet for the password); focus border `#73f3dc` with
+  `0 0 0 4px rgba(115,243,220,0.25)`. Eye toggle on the password.
+- **Primary (`.login-boton--primario`):** 64px, radius 22,
+  `linear-gradient(90deg, #54e8c6, #25c8df, #536bff)`, a candy gloss on the
+  top half (`::before`), shadow `0 14px 30px rgba(35,190,210,0.35)`, sparkle
+  left + arrow right, hover `translateY(-2px) brightness(1.03)`, active
+  `scale(0.98)`.
+- **Demo (`.login-boton--demo`):** 58px, white `0.84`, text `#5e4edb`, 2px
+  lilac border, rocket icon.
+- **It never scrolls, on any screen.** Three layers, in order: short windows
+  (`max-height: 700px`) pull the wordmark in and shrink the controls a notch;
+  narrow windows (`max-width: 1180px`) shrink the mascots so they stop
+  hiding behind the card, and phones (`max-width: 480px`) tighten the side
+  padding and the title; and as the last resort `useAjusteAlViewport`
+  (`src/hooks/`) measures the shell at scale 1 and applies a CSS `zoom` ≤ 1
+  so the whole card, wordmark overhang and margins included, fits the
+  viewport in both axes. It uses `zoom`, not `transform`, because zoom is
+  layout (centring stays exact) and a transformed ancestor can kill the
+  card's backdrop blur in Chrome. Verified 2026-09-05 at 1920×1080,
+  1366×912, 1366×768, 1366×560, 1280×600, 1024×768, 375×812, 375×667 and
+  812×375 with no scroll. Nothing changes the card's width.
 - **Mascots** flank the card from outside it, never cropped, never stretched,
   never on a white box. See "Login mascots" below for the shipped positioning.
 
-When you change this screen, screenshot it and compare against the reference
-before calling it done; fix spacing, proportions, blur, radius and shadows and
-repeat. One pass is rarely enough.
+**The rest of the game's cards wear the light version: `.tarjeta-marca`.**
+Same tinted white glass, same sparkle pattern (as a CSS data-URI
+background, no markup) and a 3px iridescent fillet drawn as the
+`border-box` layer of the background — no gold, no corner ornaments, no
+pseudo-element and no `position` requirement, so it sits on any card. It is
+added as a class on top of `glass-card` / `glass-card-smooth` /
+`glass-surface` / `orb-vidrio` on real **cards and modals** (change
+password, the demo modal, rewards, missions, the account card, level-complete
+and skin-unlock modals, the Órbita hub/ranking/hangar cards). It does NOT go
+on pills, speech bubbles, menus or the HUD, and never on the Órbita upgrade
+cards (their rarity frame is the border). On a level screen only the
+end-of-level modals carry it: the lit gradient border stays the mission's
+(§6.5).
+
+The design was chosen on a three-direction canvas ("Tarjeta de login TYPELY",
+2026-09-05) against a keycap-styled card and a split indigo "portal" card. When
+you change this screen, screenshot it at 1366×768 and 375×812 and compare
+before calling it done. One pass is rarely enough.
 
 ### Keyboard (GameplayPage)
 - Five rows (`num`, `top`, `home`, `bot`, `mod`). Keys are frosted crystal
@@ -1090,8 +1146,9 @@ edge.
   center % coords in `src/data/levelPositions.ts`. Compact floating HUD
   (`.island-hud`) + popover beside the selected node. **Dev-only** position editor
   (`?editor=1`, gated by `import.meta.env.DEV`, stripped from prod).
-- **Login card**: glass card with halo, shimmering "TYPELY" wordmark, role-aware
-  form. Card width `min(32rem, …)`.
+- **Login card**: the "caramelo y gemas" card of §5 — iridescent fillet, the
+  3D wordmark straddling the top, corner gems, sparkle pattern, one form for
+  every role. Card width `min(32rem, …)`.
 
 ## 13. Deployment
 
