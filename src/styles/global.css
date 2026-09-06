@@ -1864,7 +1864,7 @@ a { color: inherit; text-decoration: none; }
   pointer-events: none;
 }
 .orb-nave-sprite { position: relative; width: 100%; aspect-ratio: 1; pointer-events: none; isolation: isolate; }
-.orb-nave-sprite__rotor, .orb-nave-sprite__casco, .orb-nave-sprite__pose {
+.orb-nave-sprite__rotor, .orb-nave-sprite__alabeo, .orb-nave-sprite__casco, .orb-nave-sprite__pose {
   position: absolute; inset: 0; transform-origin: 50% 54%;
 }
 .orb-nave-sprite__rotor { will-change: transform; }

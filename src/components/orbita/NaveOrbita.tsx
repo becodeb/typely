@@ -28,6 +28,8 @@ export const NaveOrbita = forwardRef<NaveOrbitaHandle, Props>(function NaveOrbit
 }, ref) {
   const raiz = useRef<HTMLDivElement>(null);
   const rotor = useRef<HTMLDivElement>(null);
+  const alabeo = useRef<HTMLDivElement>(null);
+  const inclinacion = useRef(0);
   const casco = useRef<HTMLDivElement>(null);
   const emisor = useRef<HTMLSpanElement>(null);
   const flash = useRef<HTMLSpanElement>(null);
@@ -35,7 +37,6 @@ export const NaveOrbita = forwardRef<NaveOrbitaHandle, Props>(function NaveOrbit
   const tiempo = useRef(0);
   const ataque = useRef<{ objetivo: { x: number; y: number }; restante: number; disparar: (() => void) | null } | null>(null);
   const poseActual = useRef<PoseNave>("neutra");
-  const pesos = useRef<Record<PoseNave, number>>({ neutra: 1, izquierda: 0, derecha: 0 });
   const reducido = useRef(false);
   const efectos = useRef(new Map<string, Animation>());
 
@@ -107,29 +108,24 @@ export const NaveOrbita = forwardRef<NaveOrbitaHandle, Props>(function NaveOrbit
         const deseado = objetivo
           ? Math.max(-65, Math.min(65, Math.atan2(objetivo.x - centro.x, centro.y - objetivo.y) * 180 / Math.PI))
           : 0;
-        angulo.current += (deseado - angulo.current) * factor;
+        const giroPendiente = deseado - angulo.current;
+        angulo.current += giroPendiente * factor;
         tiempo.current += dt;
         const balanceo = reducido.current ? 0 : Math.sin(tiempo.current / 620) * 0.6;
         rotor.current.style.transform = `rotate(${angulo.current.toFixed(2)}deg) translateY(${balanceo.toFixed(2)}%)`;
-        // La perspectiva se elige con histéresis; la transición dura 120 ms.
-        // Vincular la opacidad al ángulo dejaba dos cascos superpuestos
-        // indefinidamente cuando el objetivo permanecía a medio giro.
+        // El movimiento lo hacen el giro y el alabeo, nunca un fundido de
+        // siluetas. El eje longitudinal queda fijo para conservar el emisor.
+        const banco = reducido.current ? 0 : Math.max(-24, Math.min(24, giroPendiente * 0.8 + angulo.current * 0.15));
+        inclinacion.current = reducido.current ? 0
+          : inclinacion.current + (banco - inclinacion.current) * (1 - Math.exp(-dt / 55));
+        if (alabeo.current) alabeo.current.style.transform = `rotateY(${inclinacion.current.toFixed(2)}deg)`;
+        // La histéresis evita alternar poses ante pequeñas variaciones.
         const a = angulo.current;
         if (a < -16) poseActual.current = "izquierda";
         else if (a > 16) poseActual.current = "derecha";
         else if (Math.abs(a) < 10) poseActual.current = "neutra";
-        const elegida = poseActual.current;
-        const restante = 1 - pesos.current[elegida];
-        const avance = reducido.current ? restante : Math.min(restante, dt / 120);
-        if (restante > 0) {
-          for (const pose of poses) {
-            pesos.current[pose] = pose === elegida
-              ? Math.min(1, pesos.current[pose] + avance)
-              : pesos.current[pose] * Math.max(0, 1 - avance / restante);
-          }
-        }
         for (const pose of poses) {
-          raiz.current.style.setProperty(`--nave-${pose}`, String(pesos.current[pose]));
+          raiz.current.style.setProperty(`--nave-${pose}`, pose === poseActual.current ? "1" : "0");
         }
         emitir?.();
       },
@@ -168,7 +164,8 @@ export const NaveOrbita = forwardRef<NaveOrbitaHandle, Props>(function NaveOrbit
         tiempo.current = 0;
         ataque.current = null;
         poseActual.current = "neutra";
-        pesos.current = { neutra: 1, izquierda: 0, derecha: 0 };
+        inclinacion.current = 0;
+        if (alabeo.current) alabeo.current.style.transform = "rotateY(0deg)";
         if (rotor.current) rotor.current.style.transform = "rotate(0deg)";
         raiz.current?.style.setProperty("--nave-neutra", "1");
         raiz.current?.style.setProperty("--nave-izquierda", "0");
@@ -182,6 +179,7 @@ export const NaveOrbita = forwardRef<NaveOrbitaHandle, Props>(function NaveOrbit
       role="img" aria-label={nave.nombre}
       style={{ "--nave-motor-color": colorMotor ?? "#55dfff", "--nave-disparo-color": colorDisparo } as CSSProperties}>
       <div ref={rotor} className="orb-nave-sprite__rotor">
+        <div ref={alabeo} className="orb-nave-sprite__alabeo">
         <div ref={casco} className="orb-nave-sprite__casco">
           {poses.map(pose => {
             const vista = nave.vistas[pose];
@@ -201,6 +199,7 @@ export const NaveOrbita = forwardRef<NaveOrbitaHandle, Props>(function NaveOrbit
           })}
           <span ref={emisor} className="orb-nave-sprite__emisor" aria-hidden="true" />
           <span ref={flash} className="orb-nave-sprite__disparo" aria-hidden="true" />
+        </div>
         </div>
       </div>
     </div>
