@@ -944,8 +944,10 @@ sube) y exige `R̂ × (1 + margen(t))` con un margen que va de **−15 % al
 arrancar a +35 % a los 120 s** y sigue creciendo (exponente 2) — la partida
 BASE dura ~2:00 PARA CUALQUIERA por construcción; las mejoras permanentes
 (más abajo) la estiran. No existe corte por tiempo: solo termina al perder
-el último corazón, respetando Segunda oportunidad. La API tampoco excluye
-partidas por ser largas. `node scripts/verificar-tormenta-sin-limite.mjs`
+el último corazón, respetando Segunda oportunidad — y el TECHO BLANDO (ver
+mejoras) garantiza que eso pase sí o sí, alrededor de los cinco minutos
+hasta para un tipeador perfecto. La API tampoco excluye partidas por ser
+largas. `node scripts/verificar-tormenta-sin-limite.mjs`
 verifica 30 minutos con vidas y el cierre al perder la última.
 Los primeros 4-10 s son un **vuelo de prueba**: llueven
 palabras cada vez más rápido (tres en pantalla, sin asomo de banda, intervalo
@@ -995,8 +997,19 @@ estrategia), imán, racha blindada (perdones que se renuevan por nivel) y
 teclas difíciles (×1,5/2/2,5 por mayúsculas, tildes y símbolos). Topes
 duros salen del sorteo; los blandos (bala, vida) quedan con peso chico —
 con suerte pueden tocar igual. Se fue el impuesto por poder
-(`margenPorAuxilio`): las mejoras VALEN; la curva del margen aumenta la
-presión, pero quien conserva vidas puede seguir jugando sin límite. Los
+(`margenPorAuxilio`): las mejoras VALEN, y no hay corte por duración — la
+partida termina solo al perder el último corazón. Lo que sí hay es un
+**techo blando** (decisión de Ezequiel, 2026-09-07): la amenaza está
+topeada en 100 y las perillas tienen pisos (vida 2,8 s, intervalo 0,55 s),
+así que un tipeador perfecto con Viento e Imán las saturaba y no perdía
+nunca (846 s en el banco). Pasados `techoBlandoDesde: 210` s de partida
+real, esos pisos bajan un escalón cada `techoBlandoCada: 45` s (hacia
+`techoBlandoVidaMin: 0.7` s y `techoBlandoIntervaloMin: 0.2` s): las
+palabras llegan más rápido de lo que nadie puede tipearlas y hasta la
+máquina perfecta cae, alrededor de los cinco minutos. Los perfiles
+humanos terminan antes de que muerda, así que para ellos "una buena build
+estira" sigue siendo verdad. El HUD lo anuncia como SOBRECARGA ×N
+(`motor.sobrecargaNivel`). Los
 cristales se acuñan sobre lo TIPEADO (`palabrasTipeadas`), nunca sobre lo
 que cayó por bala o crítico; el servidor recibe nivel y build (migración
 `0004`, columnas `words_typed`, `level`, `upgrades`) y `validarCoherencia`

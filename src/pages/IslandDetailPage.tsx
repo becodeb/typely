@@ -1288,8 +1288,10 @@ export function IslandDetailPage() {
                 }}
               >
                 <div
-                  className="animate-popover-in p-4 rounded-2xl min-w-[14rem] relative backdrop-blur-xl border border-white/70 shadow-[0_20px_50px_rgba(40,70,120,0.28)]"
-                  style={{ background: "rgba(255,255,255,0.9)" }}
+                  /* glass-surface: la tarjeta de marca (regla estructural al final
+                     de global.css). Antes tenía un fondo blanco inline, que le
+                     ganaba a cualquier clase y lo dejaba fuera del estilo. */
+                  className="glass-surface animate-popover-in p-4 rounded-2xl min-w-[14rem] relative backdrop-blur-xl shadow-[0_20px_50px_rgba(40,70,120,0.28)]"
                 >
                   {/* Tail — rotated square pointing toward the node */}
                   <span
