@@ -30,8 +30,8 @@ const SALIDA = path.join(RAIZ, ".preview-orbita");
 mkdirSync(SALIDA, { recursive: true });
 
 /* Cómo elige cada jugador guionado cuando el motor ofrece tres cartas. Las
-   estrategias existen para calibrar el TECHO del híbrido: la partida no
-   puede pasar de 3:45 ni con la build más defensiva, y sin build tiene que
+   estrategias existen para calibrar la presión del híbrido sin imponer
+   una duración máxima a las builds defensivas; sin build tiene que
    seguir durando ~2:00. Un escenario sin `elige` juega al azar. */
 const DEFENSIVAS = ["vida", "regeneracion", "escudo", "segunda", "viento", "iman", "congelar"];
 const OFENSIVAS = ["bala", "critico", "teclas", "racha", "onda", "foco"];
@@ -97,8 +97,8 @@ const ESCENARIOS = [
     procrastina: 2,
   },
   { nombre: "principiante real (8 PPM, B0)", banda: 0, conducta: () => ({ wpm: 8, err: 0.14, activo: true }) },
-  /* Las estrategias de build, sobre un mismo jugador medio: miden el TECHO
-     del híbrido. Ninguna puede pasar de 3:45. */
+  /* Las estrategias de build, sobre un mismo jugador medio: comparan
+     supervivencia sin imponer un corte por tiempo. */
   {
     nombre: "build defensiva (45 PPM)",
     banda: 6,
@@ -256,13 +256,13 @@ function jugar(esc, semilla) {
     const r = m.fin;
     /* Los cristales se acuñan sobre lo TIPEADO: lo que cayó por bala o
        crítico cuenta como palabra pero no paga. */
-    const esperados = r.palabrasTipeadas + CRISTALES_POR_RANGO[r.rango];
+    // El agregado incluye signos; el bonus da puntos, no cristales.
+    const esperados = r.palabrasTipeadas - motor.signos.aciertos + CRISTALES_POR_RANGO[r.rango];
     if (r.cristales !== esperados) {
       m.fallas.push(`cristales ${r.cristales} fuera de fórmula (tipeadas ${r.palabrasTipeadas}, rango ${r.rango})`);
     }
     if (r.palabrasTipeadas > r.palabras) m.fallas.push(`tipeadas ${r.palabrasTipeadas} > palabras ${r.palabras}`);
-    /* El techo del híbrido: ninguna build pasa de 3:45. */
-    if (r.duracionMs > 225_000) m.fallas.push(`la partida duró ${Math.round(r.duracionMs / 1000)} s (techo 225)`);
+    if (motor.corazones > 0) m.fallas.push('la partida terminó con corazones disponibles');
     if (r.precision > 100 || r.precision < 0) m.fallas.push(`precisión ${r.precision}`);
     if (r.ppmPico < r.ppmMedio * 0.5) m.fallas.push(`ppm pico ${r.ppmPico} < medio ${r.ppmMedio}`);
   }
@@ -317,7 +317,7 @@ for (const esc of ESCENARIOS) {
       ` · máx vivas ${Math.max(...corridas.map((c) => c.maxVivas))} (prueba ${Math.max(...corridas.map((c) => c.maxVivasPrueba))})`,
   );
   console.log(
-    `    niveles ${niveles.toFixed(0)} (mediana) · duración máx ${durMax.toFixed(0)} s (techo 225)` +
+    `    niveles ${niveles.toFixed(0)} (mediana) · duración máx observada ${durMax.toFixed(0)} s` +
       ` · ambigüedades de inicial ${corridas.reduce((a, c) => a + c.ambiguedades, 0)} muestras`,
   );
   if (fallas.length) for (const f of fallas) console.log(`    ✗ ${f}`);

@@ -1,0 +1,9 @@
+{
+  "nombre": "Botito",
+  "rareza": "comun",
+  "precioPropuesto": 400,
+  "aprobada": true,
+  "herramienta": "image_gen (integrada)",
+  "prompt": "Use case: stylized-concept. Asset type: one transparent-background companion pet sprite for TYPELY Órbita, a premium cozy space typing game for children. Polished soft 3D collectible toy render, pearly ceramic, candy gloss, beautifully modeled rounded volume and expressive large eyes, crisp clean silhouette readable at 60px, soft studio highlights upper left. ONE single cute floating character, entire body and accessories inside centered square framing with 15% clear margin, facing slightly upward and three-quarter toward viewer, suitable hovering to the side of a spaceship. No spaceship, no weapons, no text or labels, no ground, no base, no cast ground shadow, no surrounding scene. Genuine transparent alpha background, no checkerboard pattern, no opaque background. Do not draw an icon, emoji or flat illustration. A simple charming tiny round helper robot. Ivory pearl spherical body, mint green oval face-screen with two big friendly purple eyes and smile, one short mint glowing antenna, little floating lavender mitten hands, small cyan hover light underneath. Modest simple common-tier design in the original game's ivory, mint, lavender palette. No legs.",
+  "precio": 400
+}

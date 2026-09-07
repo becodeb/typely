@@ -211,13 +211,14 @@ export function App() {
             }
           />
           <Route
-            path="/orbita/hangar"
+            path="/orbita/tienda"
             element={
               <Suspense fallback={<PageFallback />}>
                 <HangarPage />
               </Suspense>
             }
           />
+          <Route path="/orbita/hangar" element={<Navigate to="/orbita/tienda" replace />} />
         </Route>
 
         {/* Gestión — superadmin y admin. Las dos comparten pantallas: el

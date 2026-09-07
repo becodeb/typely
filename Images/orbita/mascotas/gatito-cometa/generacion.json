@@ -1,0 +1,9 @@
+{
+  "nombre": "Gatito cometa",
+  "rareza": "rara",
+  "precioPropuesto": 1000,
+  "aprobada": true,
+  "herramienta": "image_gen (integrada)",
+  "prompt": "Use case: stylized-concept. Asset type: one transparent-background companion pet sprite for TYPELY Órbita, a premium cozy space typing game for children. Polished soft 3D collectible toy render, pearly ceramic, candy gloss, beautifully modeled rounded volume and expressive large eyes, crisp clean silhouette readable at 60px, soft studio highlights upper left. ONE single cute floating character, entire body and accessories inside centered square framing with 15% clear margin, facing slightly upward and three-quarter toward viewer, suitable hovering to the side of a spaceship. No spaceship, no weapons, no text or labels, no ground, no base, no cast ground shadow, no surrounding scene. Genuine transparent alpha background, no checkerboard pattern, no opaque background. Do not draw an icon, emoji or flat illustration. A tiny cream kitten astronaut with big violet eyes, mint ears, plump paws tucked for floating, a clear rounded space helmet with lavender rim, small teal harness and a long curled fluffy tail that transitions to translucent mint and lavender comet-like crystal at the tip. Cute friendly animal proportions, upgraded rare collectible.",
+  "precio": 1000
+}

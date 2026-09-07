@@ -34,6 +34,7 @@ import { db, schema, sql as pg } from "../db/index.js";
 import { and, eq, sql } from "drizzle-orm";
 import { requireActor, requireRole } from "../authContext.js";
 import { audit } from "../audit.js";
+import { cristalesInfinitosLocales } from "../localDevelopment.js";
 
 const GAME_IDS = ["tormenta"] as const;
 
@@ -59,7 +60,25 @@ const MEJORAS_IDS = [
 
 /* Catálogo del hangar — ESPEJO de src/data/orbitaCosmeticos.ts. El precio
    que vale es ESTE: el cliente muestra el suyo, el servidor cobra el suyo. */
-const CATALOGO: Record<string, { tipo: "estela" | "rayo"; precio: number }> = {
+const CATALOGO: Record<string, { tipo: "estela" | "rayo" | "impacto" | "nave" | "mascota"; precio: number }> = {
+  "mascota-botito": { tipo: "mascota", precio: 400 },
+  "mascota-lunita": { tipo: "mascota", precio: 600 },
+  "mascota-gatito-cometa": { tipo: "mascota", precio: 1000 },
+  "mascota-medusa-burbuja": { tipo: "mascota", precio: 1400 },
+  "mascota-pulpito-dj": { tipo: "mascota", precio: 2000 },
+  "mascota-dino-patinador": { tipo: "mascota", precio: 2600 },
+  "mascota-capibara-astronauta": { tipo: "mascota", precio: 3400 },
+  "mascota-dragon-gelatina": { tipo: "mascota", precio: 4200 },
+  "estela-burbujas": { tipo: "estela", precio: 850 },
+  "estela-pixeles": { tipo: "estela", precio: 1600 },
+  "estela-arcoiris": { tipo: "estela", precio: 1800 },
+  "rayo-relampago": { tipo: "rayo", precio: 900 },
+  "rayo-caramelo": { tipo: "rayo", precio: 1600 },
+  "rayo-burbujas": { tipo: "rayo", precio: 1800 },
+  "impacto-rosa": { tipo: "impacto", precio: 300 },
+  "impacto-burbujas": { tipo: "impacto", precio: 850 },
+  "impacto-confeti": { tipo: "impacto", precio: 1500 },
+  "impacto-palomitas": { tipo: "impacto", precio: 1800 },
   "estela-menta": { tipo: "estela", precio: 120 },
   "estela-violeta": { tipo: "estela", precio: 180 },
   "estela-rosa": { tipo: "estela", precio: 260 },
@@ -67,6 +86,21 @@ const CATALOGO: Record<string, { tipo: "estela" | "rayo"; precio: number }> = {
   "rayo-violeta": { tipo: "rayo", precio: 100 },
   "rayo-rosa": { tipo: "rayo", precio: 200 },
   "rayo-dorado": { tipo: "rayo", precio: 350 },
+  "estela-estrellas": { tipo: "estela", precio: 650 },
+  "estela-aurora": { tipo: "estela", precio: 1400 },
+  "rayo-pulso": { tipo: "rayo", precio: 700 },
+  "rayo-espiral": { tipo: "rayo", precio: 1500 },
+  "impacto-anillos": { tipo: "impacto", precio: 600 },
+  "impacto-cristales": { tipo: "impacto", precio: 1200 },
+  "nave-aurora": { tipo: "nave", precio: 2400 },
+  "nave-prisma": { tipo: "nave", precio: 3600 },
+  "nave-fenix": { tipo: "nave", precio: 4800 },
+  "nave-eclipse": { tipo: "nave", precio: 6000 },
+  "nave-zapatilla-cohete": { tipo: "nave", precio: 7200 },
+  "nave-tiburon-galactico": { tipo: "nave", precio: 8400 },
+  "nave-dragon-caramelo": { tipo: "nave", precio: 9600 },
+  "nave-ovni-gelatina": { tipo: "nave", precio: 10800 },
+  "nave-ajolote-espacial": { tipo: "nave", precio: 12000 },
 };
 
 /* ------------------------------------------------------------------ */
@@ -162,9 +196,8 @@ const runSchema = z.union([
  *  arbitra el récord mundial, se filtra al que abrió la consola. */
 function validarCoherencia(it: RunItem): boolean {
   if (!RANGOS_VALIDOS.includes(it.rankId)) return false;
-  /* El motor corta a los 225 s (el techo del híbrido de mejoras); 240 deja
-     aire para el redondeo del cliente. */
-  if (it.durationMs < 15_000 || it.durationMs > 240_000) return false;
+  /* La partida termina al perder las vidas, sin duración máxima. */
+  if (it.durationMs < 15_000) return false;
   if (it.wpmPeak > 250 || it.wpmAvg > 200) return false;
   const segundos = it.durationMs / 1000;
   if (it.charsTyped > segundos * 25) return false; // 25 pulsaciones/s sostenidas: no
@@ -224,7 +257,7 @@ function perfilPublico(p: typeof schema.arcadeProfile.$inferSelect) {
     bestThreat: p.bestThreat,
     bestRank: p.bestRank,
     owned,
-    equipped: { trail: p.equippedTrail, beam: p.equippedBeam },
+    equipped: { trail: p.equippedTrail, beam: p.equippedBeam, impact: p.equippedImpact, ship: p.equippedShip, pet: p.equippedPet },
   };
 }
 
@@ -383,7 +416,7 @@ export async function arcadeRoutes(app: FastifyInstance) {
     const semana = claveSemana(new Date());
     const semanal = await posicionEn(actor.id, "tormenta", semana, {});
     return reply.send({
-      profile: perfilPublico(perfil),
+      profile: { ...perfilPublico(perfil), crystalsInfinite: cristalesInfinitosLocales(req) },
       week: { key: semana, best: semanal?.score ?? null, pos: semanal?.pos ?? null },
     });
   });
@@ -524,13 +557,15 @@ export async function arcadeRoutes(app: FastifyInstance) {
 
     const item = CATALOGO[parsed.data.id];
     if (!item) return reply.code(404).send({ error: "Ese artículo no existe." });
+    const infinitos = cristalesInfinitosLocales(req);
+    const precioCobrado = infinitos ? 0 : item.precio;
 
     const perfil = await asegurarPerfil(actor.id);
     const publico = perfilPublico(perfil);
     if (publico.owned.includes(parsed.data.id)) {
       return reply.code(409).send({ error: "Ya lo tenés." });
     }
-    if (perfil.crystalsBalance < item.precio) {
+    if (perfil.crystalsBalance < precioCobrado) {
       return reply.code(409).send({ error: "No te alcanzan los cristales todavía." });
     }
 
@@ -540,23 +575,25 @@ export async function arcadeRoutes(app: FastifyInstance) {
     const actualizadas = await db
       .update(schema.arcadeProfile)
       .set({
-        crystalsBalance: sql`${schema.arcadeProfile.crystalsBalance} - ${item.precio}`,
+        crystalsBalance: sql`${schema.arcadeProfile.crystalsBalance} - ${precioCobrado}`,
         ownedCosmetics: owned,
         updatedAt: new Date(),
       })
       .where(
         and(
           eq(schema.arcadeProfile.userId, actor.id),
-          sql`${schema.arcadeProfile.crystalsBalance} >= ${item.precio}`,
+          sql`${schema.arcadeProfile.crystalsBalance} >= ${precioCobrado}`,
+          // Una segunda compra no puede sobrescribir una colección más nueva.
+          eq(schema.arcadeProfile.ownedCosmetics, perfil.ownedCosmetics),
         ),
       )
       .returning({ balance: schema.arcadeProfile.crystalsBalance });
     const actualizada = actualizadas[0];
     if (!actualizada) {
-      return reply.code(409).send({ error: "No te alcanzan los cristales todavía." });
+      return reply.code(409).send({ error: "Tu saldo o colección cambió. Actualizá la tienda y volvé a intentar." });
     }
 
-    await audit({ actor, action: "arcade_buy", entityType: "user", entityId: actor.id, meta: { id: parsed.data.id, precio: item.precio } });
+    await audit({ actor, action: "arcade_buy", entityType: "user", entityId: actor.id, meta: { id: parsed.data.id, precio: precioCobrado, ...(infinitos ? { desarrolloLocal: true } : {}) } });
     return reply.send({ ok: true, balance: actualizada.balance });
   });
 
@@ -564,7 +601,7 @@ export async function arcadeRoutes(app: FastifyInstance) {
   app.post("/api/arcade/equip", async (req, reply) => {
     const actor = requireRole(req, "alumno");
     const parsed = z
-      .object({ slot: z.enum(["trail", "beam"]), id: z.string().nullable() })
+      .object({ slot: z.enum(["trail", "beam", "impact", "ship", "pet"]), id: z.string().nullable() })
       .safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "Datos inválidos." });
 
@@ -573,7 +610,7 @@ export async function arcadeRoutes(app: FastifyInstance) {
     const { slot, id } = parsed.data;
     if (id !== null) {
       const item = CATALOGO[id];
-      const tipoEsperado = slot === "trail" ? "estela" : "rayo";
+      const tipoEsperado = { trail: "estela", beam: "rayo", impact: "impacto", ship: "nave", pet: "mascota" }[slot];
       if (!item || item.tipo !== tipoEsperado) {
         return reply.code(400).send({ error: "Ese artículo no va en ese lugar." });
       }
@@ -585,9 +622,7 @@ export async function arcadeRoutes(app: FastifyInstance) {
     await db
       .update(schema.arcadeProfile)
       .set(
-        slot === "trail"
-          ? { equippedTrail: id, updatedAt: new Date() }
-          : { equippedBeam: id, updatedAt: new Date() },
+        { [{ trail: "equippedTrail", beam: "equippedBeam", impact: "equippedImpact", ship: "equippedShip", pet: "equippedPet" }[slot]]: id, updatedAt: new Date() },
       )
       .where(eq(schema.arcadeProfile.userId, actor.id));
     return reply.send({ ok: true });

@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  readonly VITE_ORBITA_CRISTALES_INFINITOS?: string;
   /** Internal backend endpoint for sending invitation emails. Never a key. */
   readonly VITE_INVITE_API_URL?: string;
   /** "true" habilita el Developer Layout Editor (sólo se evalúa en `vite dev`;

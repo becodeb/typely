@@ -14,6 +14,17 @@ if (!/^[a-z0-9-]+$/.test(shipId)) throw new Error('Identificador de nave inváli
 const source = path.join(root, 'Images/orbita/naves', shipId);
 const output = path.join(root, 'public/assets/orbita/naves', shipId);
 const preview = path.join(root, '../work/orbita', shipId);
+let saturacionMaxima = 5;
+let huecoMinimoPx = false;
+try {
+  const ajustes = JSON.parse(await fs.readFile(path.join(source, 'recorte.json'), 'utf8'));
+  if (!Number.isFinite(ajustes.saturacionMaxima) || ajustes.saturacionMaxima < 1 || ajustes.saturacionMaxima > 5) throw new Error('Saturación de recorte inválida.');
+  saturacionMaxima = ajustes.saturacionMaxima;
+  if (ajustes.huecoMinimoPx !== undefined) {
+    if (!Number.isInteger(ajustes.huecoMinimoPx) || ajustes.huecoMinimoPx < 900) throw new Error('Área de hueco inválida.');
+    huecoMinimoPx = ajustes.huecoMinimoPx;
+  }
+} catch (error) { if (error.code !== 'ENOENT') throw error; }
 await fs.mkdir(output, { recursive: true });
 await fs.mkdir(preview, { recursive: true });
 const files = (await fs.readdir(source)).filter(f => /-source\.png$/.test(f));
@@ -29,8 +40,21 @@ for (const file of files) {
   if (transparent < width * height * 0.05) {
     // The reference has warm ivory panels; only nearly neutral white/gray
     // pixels connected to the image border are background, never the cabin.
-    const bg = keyBackground(data, width, height, channels, [250, 250, 250], false,
-      { duroDist: 47, duroSat: 5, blandoDist: 0 });
+    const bg = keyBackground(data, width, height, channels, [250, 250, 250], huecoMinimoPx,
+      { duroDist: 47, duroSat: saturacionMaxima, blandoDist: 0 });
+    if (saturacionMaxima === 1) {
+      // El recorte estricto preserva el casco neutro, pero deja puntos grises
+      // en el borde. Conservamos su interior y usamos el recorte normal para
+      // el contorno coloreado. Los RGB originales nunca se alteran.
+      const contorno = keyBackground(data, width, height, channels, [250, 250, 250], false,
+        { duroDist: 47, duroSat: 5, blandoDist: 0 });
+      const mascara = Buffer.from(bg.map(valor => valor ? 0 : 255));
+      // En el operador morfológico de sharp el negro es el primer plano:
+      // dilate expande el fondo negro y elimina el fleco exterior blanco.
+      const interior = await sharp(mascara, { raw: { width, height, channels: 1 } })
+        .median(9).dilate(6).toColourspace('b-w').raw().toBuffer();
+      for (let i = 0; i < bg.length; i++) bg[i] = contorno[i] && !interior[i] ? 1 : 0;
+    }
     for (let i = 0; i < bg.length; i++) if (bg[i]) data[i * channels + 3] = 0;
     // Some generations leave isolated colored specks on the backdrop.
     // Keep the connected ship, including its crystal and both thrusters.

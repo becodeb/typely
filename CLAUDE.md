@@ -208,11 +208,11 @@ pair — do not introduce Quicksand.
 white container — page cards, modals, HUD pills, popovers, toasts, the
 star counter, the skin bar, Órbita's glass, in every mode and every
 screen the `alumno` role can reach — wears the light version of the login
-card: the same tinted white glass (mint → lilac → pink), the same sparkle
-pattern (a CSS data-URI background, no markup) and a 3px iridescent fillet
-(2px on pills, so touch heights survive) drawn as the `border-box` layer of
-the background. No gold and no corner ornaments — those are the login's
-alone.
+card: the same tinted white glass (mint → lilac → pink) and a 3px
+iridescent fillet (2px on pills, so touch heights survive) drawn as the
+`border-box` layer of the background. **No sparkle pattern** — repeated on
+every card it overloaded the screen, so it stays on the login only — and no
+gold and no corner ornaments, which are the login's alone.
 
 **It is automatic, not opt-in.** The rule at the very END of `global.css`
 ("REGLA ESTRUCTURAL") applies it to `glass`, `glass-strong`, `glass-card`,
@@ -912,7 +912,30 @@ código sin romper sus reglas.
 selector de ORBES DE CRISTAL — Aventura (las islas), Órbita, y un orbe dormido
 para modos futuros. Las rutas: `/orbita` (hub), `/orbita/tormenta` (el juego,
 con `SoloEnComputadora` igual que los niveles), `/orbita/ranking`,
-`/orbita/hangar`. Todo lazy.
+`/orbita/tienda` (la antigua `/orbita/hangar` redirige). Todo lazy.
+
+**Bonus Tormenta de signos.** `tormentaSignos.ts` controla una única oleada
+por partida, sin mirar el progreso de Aventura ni exigir precisión. Se
+habilita con seis intervalos dentro de palabras que promedien como máximo
+un segundo; se ofrece desde los 30 s, con 2–6 s aleatorios de espera.
+Primero deja de generar palabras y espera a que la pantalla se vacíe.
+La frase `tormenta de signos`, incluidos sus espacios, viaja sola hacia la nave como cualquier palabra (28 s de recorrido, con
+retroceso al acertar). Usa los mismos disparos, seguimiento y prefijo escrito.
+Completarla inicia signos individuales: uno al principio y hasta
+dos o tres según el ritmo de respuesta. La presión crece sin techo desde
+los 30 s, hasta ser casi imposible alrededor de los 40 s; no hay cierre por
+temporizador. El primer impacto cierra el bonus sin gastar vidas ni escudos.
+Cada signo da tres veces los puntos base de una palabra de cinco letras
+(90 con los ajustes actuales). El cierre desvanece el tinte durante
+3 s y retoma la partida. Entrada, oleada y cierre congelan el reloj normal,
+la adaptación, las rachas y los tiempos de mejoras. Las cartas obtenidas
+por esos puntos se ofrecen al volver. El bonus no aumenta los cristales.
+`EscenaSignos.tsx` solo tiñe suavemente el fondo después de completar la
+frase; no hay núcleo, carteles ni contador adicional. Los signos usan una
+tipografía monoespaciada sin brillo ni subrayado para distinguir sus trazos;
+el guion bajo queda excluido del bonus.
+Verificación: `node scripts/verificar-tormenta-signos.mjs` y
+`node scripts/simular-tormenta.mjs` (distingue tiempo normal y bonus).
 
 **El motor es puro y la promesa se verifica por simulación.**
 `src/utils/orbita/motor.ts` no toca DOM: un controlador de lazo cerrado mide
@@ -920,7 +943,11 @@ PPM×precisión^1.7 en ventana de 10 s, estima el techo del jugador (R̂, solo
 sube) y exige `R̂ × (1 + margen(t))` con un margen que va de **−15 % al
 arrancar a +35 % a los 120 s** y sigue creciendo (exponente 2) — la partida
 BASE dura ~2:00 PARA CUALQUIERA por construcción; las mejoras permanentes
-(más abajo) la estiran, con un corte duro a los 3:45. Los primeros 4-10 s son un **vuelo de prueba**: llueven
+(más abajo) la estiran. No existe corte por tiempo: solo termina al perder
+el último corazón, respetando Segunda oportunidad. La API tampoco excluye
+partidas por ser largas. `node scripts/verificar-tormenta-sin-limite.mjs`
+verifica 30 minutos con vidas y el cierre al perder la última.
+Los primeros 4-10 s son un **vuelo de prueba**: llueven
 palabras cada vez más rápido (tres en pantalla, sin asomo de banda, intervalo
 ≤ 2,5 s) y nada lastima. El vuelo corta cuando el tope de tres queda lleno
 1,5 s seguidos, cuando una palabra casi impacta, cuando el chico lleva 2,5 s
@@ -941,7 +968,7 @@ banda de símbolos dejaba la pantalla vacía todo su intervalo y R̂ pasaba de
 50 a 102 en cinco segundos). Dos exámenes, y hay que correr los dos después
 de tocar cualquier valor de `AJUSTES`: `node scripts/simular-tormenta.mjs`
 (seis tipeadores sintéticos de 8 a 85 PPM que eligen cartas al azar; los
-seis tienen que caer en 90–180 s de mediana y NINGUNA partida pasa de 225 s)
+seis tienen que caer en 90–180 s de mediana, sin imponer duración máxima)
 y `node scripts/jugar-tormenta.mjs` (trece jugadores guionados — el que
 arranca mal y termina brillante, el que se distrae, el que no toca nada, y
 tres builds fijas: defensiva, ofensiva y cazador de balas — con métricas de
@@ -968,9 +995,8 @@ estrategia), imán, racha blindada (perdones que se renuevan por nivel) y
 teclas difíciles (×1,5/2/2,5 por mayúsculas, tildes y símbolos). Topes
 duros salen del sorteo; los blandos (bala, vida) quedan con peso chico —
 con suerte pueden tocar igual. Se fue el impuesto por poder
-(`margenPorAuxilio`): las mejoras VALEN, y el techo lo ponen la curva del
-margen y `duracionTopeSegundos: 225` — la amenaza está topeada en 100, así
-que un tipeador perfecto con Viento e Imán la sostenía indefinidamente. Los
+(`margenPorAuxilio`): las mejoras VALEN; la curva del margen aumenta la
+presión, pero quien conserva vidas puede seguir jugando sin límite. Los
 cristales se acuñan sobre lo TIPEADO (`palabrasTipeadas`), nunca sobre lo
 que cayó por bala o crítico; el servidor recibe nivel y build (migración
 `0004`, columnas `words_typed`, `level`, `upgrades`) y `validarCoherencia`
@@ -1021,8 +1047,73 @@ cada tecla, porque el nivel sube dentro de `tecla()`.
 (`typely_orbita_*`), cola con reintento a `POST /api/arcade/run`, cache de
 perfil. Ranking semanal por `week_key` ISO calculada con huso argentino.
 Tablas `arcade_profile` / `arcade_runs` (migración `0003_arcade.sql`); el
-catálogo del hangar está duplicado a propósito cliente/servidor y manda el
+catálogo de la tienda está duplicado a propósito cliente/servidor y manda el
 del servidor.
+
+**Tienda:** cinco secciones (Estelas, Rayos, Naves, Impactos, Mascotas), con probador
+local que no modifica el equipo de la cuenta. Comprar y equipar son acciones
+separadas. Se mantienen los ids y precios de los colores anteriores; se suman
+efectos animados y las naves aprobadas Aurora (2400), Prisma (3600),
+Fénix (4800) y Eclipse (6000). Fénix y Eclipse tienen propulsión original
+ámbar y fucsia, respectivamente; una estela equipada conserva su propio color.
+La colección divertida suma Zapatilla cohete (7200), Tiburón galáctico (8400),
+Dragón de caramelo (9600), Ovni gelatina (10800) y Ajolote espacial (12000).
+Rarezas de naves en `orbitaCosmeticos.ts`: Común (original, Aurora, Prisma),
+Rara (Fénix, Eclipse), Épica (Zapatilla, Tiburón, Dragón) y Legendaria
+(Gelatina, Ajolote). Las tarjetas y el probador muestran la etiqueta; el
+catálogo usa tintes menta, lila, dorado y rosa sobre el vidrio de marca.
+Todas las secciones usan esas cuatro rarezas: colores y originales Comunes;
+estrellas, pulso y anillos Raros; aurora, espiral y cristales Épicos.
+La colección de efectos suma estelas Burbujas (850, Rara), Píxeles (1600,
+Épica) y Arcoíris (1800, Legendaria); rayos Relámpago (900, Rara), Caramelo
+(1600, Épica) y Pompas (1800, Legendaria); impactos Rosa (300, Común),
+Burbujas (850, Rara), Confeti (1500, Épica) y Pochoclos (1800, Legendaria).
+Son efectos CSS/SVG en `EfectosCosmeticos.tsx`, compartidos por catálogo,
+probador y partida. Las miniaturas quedan quietas para no animar todo el
+catálogo a la vez; las partículas tienen cantidad fija y respetan pausa
+y movimiento reducido. La rareza es obligatoria en cada cosmético.
+Cada nave de la colección divertida tiene tres perspectivas generadas (neutra, izquierda y derecha),
+con anclajes propios para el cristal y los dos propulsores.
+`NaveOrbita`, `RayoCosmetico` e `ImpactoCosmetico` se comparten entre partida y
+vista previa. El registro `orbitaNaves.ts` mide anclajes por pose; nunca se
+mezclan las siluetas con transparencia. PNG originales en
+`Images/orbita/naves/<id-de-nave>`, derivados WebP en `public/assets/orbita/naves/`.
+Importación: `node scripts/import-orbita-naves.mjs aurora` (o el id de carpeta);
+`recorte.json` conserva los blancos de Prisma y elimina el fondo encerrado
+entre las alas y conexiones de Eclipse. La migración `0005` añade
+`equipped_impact` y `equipped_ship`, nulos para el aspecto original.
+La compra condiciona saldo y colección en la misma actualización para evitar
+dobles compras o pérdida de objetos simultáneos. Prueba local de contratos:
+`cd api` y `node --env-file=.env --import tsx src/scripts/verificar-tienda.ts`.
+
+**Mascotas:** ocho diseños aprobados con rarezas y precios: Botito (400) y
+Lunita (600), Comunes; Gatito cometa (1000) y Medusa burbuja (1400), Raras;
+Pulpito DJ (2000) y Dino patinador (2600), Épicas; Capibara astronauta (3400)
+y Dragón de gelatina (4200), Legendarias. Slot `pet`, columna `equipped_pet`
+(migración 0006); null permite volar sin acompañante. `MascotaOrbita` se
+comparte entre inicio, probador y partida. `orbitaPersonalidades.ts` define
+gestos y frases propias (8/12/16/20 por mascota según rareza). Anima los WebP
+con transformaciones CSS y hasta seis partículas; no carga GIF ni video.
+Saluda, alienta y observa rachas/corazones del HUD para festejar o acompañar
+un tropiezo, sin acceso al motor, daño, objetivos ni puntaje. El mensaje usa
+texto lavanda sin fondo, borde ni globo: en el inicio aparece temporalmente
+bajo el título (sin subtítulo fijo ni nombre de nave), en la tienda ocupa una línea fuera del probador, y en partida
+queda al costado del acompañante. Los destinos externos se conectan por ref
+y portal; no superponen la ilustración ni cambian su altura al hablar. Un solo mensaje
+dura 6,5 s; hay al menos 11 s entre reacciones y 26 s entre mensajes de ánimo
+en partida. Respeta pausa, pestaña oculta y movimiento reducido. PNG y prompts en
+`Images/orbita/mascotas/<id>/`, WebP transparentes de 512px en
+`public/assets/orbita/mascotas/<id>/`. Importador:
+`node scripts/import-orbita-mascotas.mjs <id>`. No modifica los PNG.
+
+**Cristales infinitos en local:** `ORBITA_CRISTALES_INFINITOS=true` en
+`api/.env` hace que las compras cuesten cero sin modificar el saldo guardado.
+Solo se activa con base local, socket y origen localhost/loopback y fuera de
+`NODE_ENV=production`. El perfil informa `crystalsInfinite` y la UI muestra ∞.
+`VITE_ORBITA_CRISTALES_INFINITOS=true` en `.env.local` habilita lo mismo para
+la demo, solo en Vite dev y localhost: compras/equipo en una clave separada,
+sin llamadas a la API. Reiniciar API/Vite al cambiar las variables. Ambas
+opciones vienen desactivadas en la plantilla.
 
 **Estética: el mismo cuento de las islas, de noche, visto desde arriba.**
 Índigo (`#141b4d`) en vez de negro; el tinte de la amenaza va de pervinca a
@@ -1041,8 +1132,9 @@ nada rota salvo las letras de una palabra que ya murió. Lo que se ve grande (in
 del resultado y del podio, gemas de las cartas y de la build, cristal del
 saldo) son objetos 3D generados en `public/assets/orbita/{insignias,gemas}/`
 que `InsigniaRango tamano="grande"` y `Gema` cargan con respaldo SVG; el
-horizonte de las islas (`fondo/horizonte.webp`) y la estación del hub
-(`hub/estacion.webp`) se ocultan solos hasta que existan. Las fichas y los
+horizonte de las islas (`fondo/horizonte.webp`) se oculta si falta. El inicio
+de Órbita usa una escena de vuelo (`EscenaVuelo`) con la nave, sus motores,
+la estela equipada y su mascota; ya no usa `hub/estacion.webp`. Las fichas y los
 prompts de esas piezas están en `Images/orbita/ORBITA.md` §7; el importador
 las mide (`node scripts/import-orbita-art.mjs`) y `preview-orbita-fondo.mjs`
 apila el horizonte con palabras encima para aprobarlo. Ojo Chrome:
@@ -1235,7 +1327,7 @@ migración fallida corta el arranque a propósito.
 - Keep student UI immersive and minimal — never make it look like an admin
   dashboard. Gameplay must be real and keyboard-driven, never placeholder.
 - **No plain white card on any student screen.** Every white container is
-  the brand card (tinted glass + sparkles + iridescent fillet), applied
+  the brand card (tinted glass + iridescent fillet, no sparkles), applied
   automatically by the rule at the end of `global.css` to the glass
   classes. New cards use those classes; a bare `bg-white/…` box is a bug
   (§5, "Every white container…").
