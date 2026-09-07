@@ -88,7 +88,11 @@ const ESCENARIOS = [
     conducta: (t) => ({ wpm: 45, err: 0.05, activo: t % 9 < 5 }),
   },
   { nombre: "no toca nada", banda: 3, conducta: () => ({ wpm: 0, err: 0, activo: false }) },
-  { nombre: "máquina perfecta (130 PPM)", banda: 10, conducta: () => ({ wpm: 130, err: 0, activo: true }) },
+  /* Sin corte por duración (a8dfece) y con la amenaza topeada en 100, un
+     tipeador perfecto no pierde nunca: seguir viva a los 30 min es lo
+     ESPERADO para este escenario, no una falla. Para cualquier perfil
+     humano sí lo es. */
+  { nombre: "máquina perfecta (130 PPM)", banda: 10, conducta: () => ({ wpm: 130, err: 0, activo: true }), infinitaEsperable: true },
   { nombre: "rápido y torpe (55 PPM, 30 % err)", banda: 6, conducta: () => ({ wpm: 55, err: 0.3, activo: true }) },
   {
     nombre: "procrastinador (espera 2 vivas)",
@@ -172,7 +176,10 @@ function jugar(esc, semilla) {
     reaccionando = 0.6 + rng() * 0.6; // mirar las cartas lleva un momento
   };
 
-  for (let paso = 0; paso < 330 / PASO && !m.fin; paso++) {
+  /* Horizonte del ensayo, no límite del juego: desde que se quitó el corte por
+     duración (a8dfece) la partida termina solo al perder el último corazón.
+     30 minutos, igual que simular-tormenta.mjs. */
+  for (let paso = 0; paso < 1800 / PASO && !m.fin; paso++) {
     const antes = { corazones: motor.corazones, escudo: motor.escudo, vivas: motor.vivas.length };
     const eventos = motor.tick(PASO * 1000);
     const t = motor.t;
@@ -251,7 +258,9 @@ function jugar(esc, semilla) {
     if (motor.eligiendo) elegirPendiente();
   }
 
-  if (!m.fin) m.fallas.push("la partida NUNCA terminó (330 s)");
+  if (!m.fin) {
+    if (!esc.infinitaEsperable) m.fallas.push("la partida sigue viva al terminar los 30 minutos del ensayo");
+  }
   else {
     const r = m.fin;
     /* Los cristales se acuñan sobre lo TIPEADO: lo que cayó por bala o
