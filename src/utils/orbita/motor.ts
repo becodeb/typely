@@ -158,6 +158,20 @@ export const AJUSTES = {
   //                          palabras de tres letras más seguido de lo que su
   //                          demanda pedía: moría a los 67 s)
   simultaneasMax: 8, //       techo duro de palabras vivas (legibilidad)
+
+  /* TECHO BLANDO (2026-09-07). No hay corte por duración: la partida termina
+     solo al perder el último corazón. Pero la amenaza está topeada en 100 y
+     las perillas tienen pisos (vida 2,8 s, intervalo 0,55 s), así que un
+     tipeador perfecto con Viento e Imán las saturaba y no perdía nunca (846 s
+     en el banco de escenarios). Pasado `techoBlandoDesde` los PISOS bajan
+     un escalón cada `techoBlandoCada` segundos — las palabras llegan más
+     rápido de lo que nadie puede tipearlas — hasta que hasta el perfecto
+     cae. Los perfiles humanos ya terminaron antes de que esto empiece a
+     morder; para ellos "una buena build estira" sigue siendo verdad. */
+  techoBlandoDesde: 210, //   s de partida real (tras el vuelo de prueba)
+  techoBlandoCada: 45, //     s por escalón de sobrecarga
+  techoBlandoVidaMin: 0.7, // s: piso de la vida al que se tiende
+  techoBlandoIntervaloMin: 0.2, // s: piso de la cadencia al que se tiende
   empujeRetroceso: 0.045, //  cuánto retrocede una palabra por letra correcta
 
   /* Asomo de la banda siguiente ("lo aprendido y un poco más allá").
@@ -462,6 +476,8 @@ export class MotorTormenta {
 
   /* — internos del controlador — */
   private demanda: number;
+  /** Escalones de techo blando ya alcanzados (0 = todavía no muerde). */
+  private sobrecarga = 0;
   private rhat = 0;
   /** Segundos OCUPADOS desde el último máximo de R (meseta del vuelo). */
   private ocupadoDesdeMax = 0;
@@ -557,6 +573,12 @@ export class MotorTormenta {
    *  La página la hace parpadear: lo que llegue en este rato rebota. */
   get invulnerable(): boolean {
     return this.t < this.invulnerableHasta;
+  }
+
+  /** Escalones de techo blando (0 = la partida todavía va "normal"). El HUD
+   *  lo muestra como SOBRECARGA cuando pasa de 0. */
+  get sobrecargaNivel(): number {
+    return this.sobrecarga;
   }
 
   /** Elegir una de las cartas ofrecidas. Devuelve [] si no había nada que
@@ -807,6 +829,8 @@ export class MotorTormenta {
       const margen =
         aj.margenInicio +
         (aj.margenMax - aj.margenInicio) * Math.pow(tPartida / 120, aj.margenExponente);
+      /* Techo blando: cuántos escalones de sobrecarga pasaron. */
+      this.sobrecarga = Math.max(0, (tPartida - aj.techoBlandoDesde) / aj.techoBlandoCada);
       if (this.fase === "persecucion" && margen > aj.margenColapso) {
         this.fase = "colapso";
       }
@@ -837,7 +861,12 @@ export class MotorTormenta {
        la demanda actual — su largo real dividido por los caracteres por
        segundo. Así la tasa ofrecida es la demanda, palabra por palabra. */
     const largoRef = this.largoUltimo > 0 ? this.largoUltimo : (LARGO_MEDIO_BANDA[banda] ?? 4);
-    let intervalo = Math.min(aj.intervaloMax, Math.max(aj.intervaloMin, largoRef / Math.max(cps, 0.5)));
+    /* Techo blando: los pisos de vida y cadencia bajan con la sobrecarga.
+       Antes de `techoBlandoDesde` el escalón es 1 y no cambia nada. */
+    const escalon = 1 + this.sobrecarga;
+    const pisoVida = Math.max(aj.techoBlandoVidaMin, aj.vidaMin / escalon);
+    const pisoIntervalo = Math.max(aj.techoBlandoIntervaloMin, aj.intervaloMin / escalon);
+    let intervalo = Math.min(aj.intervaloMax, Math.max(pisoIntervalo, largoRef / Math.max(cps, 0.5)));
     if (enCalibracion) intervalo = Math.min(intervalo, aj.calIntervaloMax);
     this.intervaloActual = intervalo;
     /* Durante la calibración no hay presión que medir (el techo todavía
@@ -847,7 +876,7 @@ export class MotorTormenta {
     const presion = enCalibracion ? 1 : this.demanda / Math.max(this.rhat, aj.rhatMinimo);
     const vida = Math.min(
       aj.vidaMax,
-      Math.max(aj.vidaMin, aj.vidaMax / Math.pow(Math.max(presion, 1), aj.vidaPresionExp)),
+      Math.max(pisoVida, aj.vidaMax / Math.pow(Math.max(presion, 1), aj.vidaPresionExp)),
     );
     /* Después de calibrar siempre pueden convivir al menos TRES — con dos,
        el tipeador lento jugaba de a una palabra, nunca acumulaba cola y la

@@ -307,6 +307,8 @@ export function TormentaPage() {
     mejoras: { id: MejoraId; nivel: number }[];
     /** Segundos hasta que Congelar vuelva a estar listo (0 = listo). */
     congelarRestante: number;
+    /** Escalones de techo blando (0 = partida normal). */
+    sobrecarga: number;
   }>({
     ppm: 0,
     racha: 0,
@@ -317,6 +319,7 @@ export function TormentaPage() {
     progresoNivel: 0,
     mejoras: [],
     congelarRestante: 0,
+    sobrecarga: 0,
   });
   const [chispas, setChispas] = useState<Chispa[]>([]);
   const [rayos, setRayos] = useState<Rayo[]>([]);
@@ -390,6 +393,7 @@ export function TormentaPage() {
       progresoNivel: 0,
       mejoras: [],
       congelarRestante: 0,
+      sobrecarga: 0,
     });
     setChispas([]);
     setRayos([]);
@@ -807,6 +811,7 @@ export function TormentaPage() {
           progresoNivel: umbral > 0 ? Math.min(1, pts / umbral) : 0,
           mejoras: motor.mejorasLista,
           congelarRestante: motor.congelarRestante,
+          sobrecarga: motor.sobrecargaNivel,
         });
         const fondo = fondoRef.current;
         if (fondo) {
@@ -1328,6 +1333,16 @@ export function TormentaPage() {
         >
           amenaza {hud.amenaza}
         </div>
+        {/* Techo blando: pasados los 3:30 la amenaza no sube de 100, pero las
+            palabras llegan cada vez más rápido. Se dice, y late. */}
+        {hud.sobrecarga > 0 && (
+          <div
+            className="orb-dato orb-sobrecarga right-7 bottom-[6%] text-xs font-bold tracking-widest uppercase"
+            style={{ writingMode: "vertical-rl" }}
+          >
+            sobrecarga ×{(1 + hud.sobrecarga).toFixed(1)}
+          </div>
+        )}
         {bandaForzada !== null && (
           <div className="orb-dato left-4 bottom-3 text-[11px] font-bold tracking-widest uppercase opacity-70">
             dev · banda forzada {bandaForzada}

@@ -92,7 +92,10 @@ const ESCENARIOS = [
      tipeador perfecto no pierde nunca: seguir viva a los 30 min es lo
      ESPERADO para este escenario, no una falla. Para cualquier perfil
      humano sí lo es. */
-  { nombre: "máquina perfecta (130 PPM)", banda: 10, conducta: () => ({ wpm: 130, err: 0, activo: true }), infinitaEsperable: true },
+  /* Con el TECHO BLANDO (pisos de vida y cadencia que bajan desde los 210 s)
+     hasta la máquina perfecta tiene que caer: seguir viva a los 30 min
+     vuelve a ser falla para TODOS los escenarios. */
+  { nombre: "máquina perfecta (130 PPM)", banda: 10, conducta: () => ({ wpm: 130, err: 0, activo: true }) },
   { nombre: "rápido y torpe (55 PPM, 30 % err)", banda: 6, conducta: () => ({ wpm: 55, err: 0.3, activo: true }) },
   {
     nombre: "procrastinador (espera 2 vivas)",
