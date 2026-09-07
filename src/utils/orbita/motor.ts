@@ -28,6 +28,7 @@
  */
 
 import { CORPUS_BANDAS, LARGO_MEDIO_BANDA } from "../../data/orbitaCorpus";
+import { SIGNOS, TormentaSignos, type EstadoSignos } from "./tormentaSignos";
 
 /* ==================================================================== */
 /* Ajustes                                                              */
@@ -122,7 +123,7 @@ export const AJUSTES = {
   //                          ~2:00), pero después crece más empinado — a los
   //                          180 s exige casi el doble del techo, a los 210
   //                          s el 2,5×. Con 1.5 una buena build llegaba a
-  //                          257 s; el techo del híbrido es 3:45
+  //                          257 s. No hay corte obligatorio por duración.
   margenColapso: 0.15, //     de acá en más la fase se llama "colapso"
   /* Acá vivía `margenPorAuxilio`: un impuesto por cada poder cobrado para
      que la partida no se estirara. Se fue con las mejoras permanentes
@@ -219,14 +220,6 @@ export const AJUSTES = {
   rachaSalto: 0.5,
   rachaTope: 4,
 
-  /* Tope absoluto de seguridad: si algo del lazo fallara, la partida
-     igual termina. La simulación nunca se acerca a esto. */
-  /* El techo del HÍBRIDO (mejoras permanentes): la partida base dura ~2:00,
-     una buena build estira, y a los 3:45 se termina sí o sí. No es un
-     parche: la amenaza está topeada en 100 y todas las perillas salen de
-     ella, así que un tipeador perfecto con Viento e Imán sostenía amenaza
-     100 indefinidamente — con 300 s llegaba a los cinco minutos. */
-  duracionTopeSegundos: 225,
 } as const;
 
 export type Ajustes = typeof AJUSTES;
@@ -372,6 +365,8 @@ export interface ResultadoPartida {
 }
 
 export type EventoMotor =
+  | { tipo: "signos"; estado: EstadoSignos }
+  | { tipo: "retira"; id: number }
   | { tipo: "nace"; palabra: PalabraViva }
   | { tipo: "engancha"; id: number }
   | { tipo: "suelta"; id: number }
@@ -421,6 +416,10 @@ interface Pulsacion {
 }
 
 export class MotorTormenta {
+  readonly signos: TormentaSignos;
+  private signosProgramados = Infinity;
+  private ritmoSignos: number[] = [];
+  private teclaSignosAnterior: { id: number; t: number } | null = null;
   readonly aj: Ajustes;
   private readonly rng: () => number;
   private readonly bandaMax: number;
@@ -520,6 +519,9 @@ export class MotorTormenta {
     this.corazonesMax = this.aj.corazones;
     this.demanda = this.aj.calDemanda0;
     this.puntajeUmbral = this.aj.nivelUmbral0;
+    this.signos = new TormentaSignos(this.rng, () => this.proximoId++,
+      SIGNOS.multiplicador * (this.aj.puntosBase + this.aj.puntosPorLetra * SIGNOS.puntosReferenciaLetras),
+      this.aj.empujeRetroceso);
   }
 
   /* ------------------------------------------------------------------ */
@@ -703,6 +705,19 @@ export class MotorTormenta {
     /* Un frame monstruoso (pestaña que vuelve del fondo) no puede
        convertirse en una lluvia de impactos: se recorta. */
     const dt = Math.min(Math.max(dtMs, 0), 100) / 1000;
+    if (this.signos.enCurso) {
+      const eventos = this.signos.tick(dt, this.vivas);
+      if (this.signos.fase === "terminada") {
+        this.acumuladorSpawn = 0;
+        this.engancheId = null;
+        eventos.push(...this.revisarNivel());
+      }
+      return eventos;
+    }
+    if (this.signos.fase === "inactiva" && this.t >= this.signosProgramados && !this.vivas.length) {
+      this.engancheId = null;
+      return this.signos.iniciar(this.vivas);
+    }
     this.t += dt;
 
     const eventos: EventoMotor[] = [];
@@ -787,8 +802,8 @@ export class MotorTormenta {
       this.rhat = Math.min(aj.rhatTope, empujado);
       const tPartida = Math.max(0, this.t - this.tInicioPartida);
       /* La curva no se aplana a los 120 s: (t/120)^1.5 sigue creciendo, y a
-         los 210 s ya exige el doble del techo. Ese es el techo de duración
-         de una buena build — nada de impuesto por mejora. */
+         los 210 s ya exige el doble del techo. La presión aumenta, pero
+         la partida solo termina al perder el último corazón. */
       const margen =
         aj.margenInicio +
         (aj.margenMax - aj.margenInicio) * Math.pow(tPartida / 120, aj.margenExponente);
@@ -849,7 +864,8 @@ export class MotorTormenta {
 
     /* ---- Nacimientos ---- */
     this.acumuladorSpawn += avance;
-    if (this.acumuladorSpawn >= intervalo && this.vivas.length < tope) {
+    if (this.acumuladorSpawn >= intervalo && this.vivas.length < tope &&
+      !(this.signos.fase === "inactiva" && this.t >= this.signosProgramados)) {
       this.acumuladorSpawn = 0;
       const palabra = this.nacer(banda, vida);
       eventos.push({ tipo: "nace", palabra });
@@ -924,7 +940,6 @@ export class MotorTormenta {
       }
     }
 
-    if (this.t >= aj.duracionTopeSegundos) eventos.push(this.finalizar());
     return eventos;
   }
 
@@ -935,6 +950,14 @@ export class MotorTormenta {
   /** Un carácter ya compuesto por el sistema (á, ñ, ¿ llegan enteros). */
   tecla(ch: string): EventoMotor[] {
     if (this.terminada || !ch || this.eligiendo) return [];
+    if (this.signos.enCurso) {
+      const antes = this.signos.puntos;
+      const eventos = this.signos.tecla(ch, this.vivas);
+      this.engancheId = this.signos.fase === "entrada" && this.signos.escrito > 0
+        ? this.vivas[0]?.id ?? null : null;
+      this.puntaje += this.signos.puntos - antes;
+      return eventos;
+    }
     this.ultimaTecla = this.t;
     const eventos: EventoMotor[] = [];
     const aj = this.aj;
@@ -974,6 +997,19 @@ export class MotorTormenta {
     }
 
     this.registrar(true);
+    // Solo intervalos dentro de palabras; ni precisión ni avance de Aventura.
+    if (objetivo.texto.length > 1) {
+      const anterior = this.teclaSignosAnterior;
+      if (anterior?.id === objetivo.id) {
+        this.ritmoSignos.push(this.t - anterior.t);
+        this.ritmoSignos = this.ritmoSignos.slice(-12);
+        if (this.signosProgramados === Infinity && this.ritmoSignos.length >= SIGNOS.muestras &&
+          this.ritmoSignos.reduce((a, b) => a + b, 0) / this.ritmoSignos.length <= SIGNOS.segundosEntreLetras) {
+          this.signosProgramados = Math.max(SIGNOS.desde, this.t) + this.entre(2, 6);
+        }
+      }
+      this.teclaSignosAnterior = { id: objetivo.id, t: this.t };
+    }
     objetivo.escrito += 1;
     if (this.fase === "calibracion") this.medirRitmo(objetivo);
     objetivo.progreso = Math.max(0, objetivo.progreso - aj.empujeRetroceso);
@@ -1221,7 +1257,7 @@ export class MotorTormenta {
 
   private finalizar(): EventoMotor {
     this.terminada = true;
-    const duracionMs = Math.round(this.t * 1000);
+    const duracionMs = Math.round((this.t + this.signos.totalSegundos) * 1000);
     const rango = rangoPorAmenaza(this.amenazaMax);
     const minutos = Math.max(this.t / 60, 1 / 60);
     const resultado: ResultadoPartida = {
@@ -1231,13 +1267,13 @@ export class MotorTormenta {
       rango,
       ppmMedio: Math.round(this.aciertosTotal / 5 / minutos),
       ppmPico: Math.round(this.ppmPico),
-      precision: this.aciertosTotal + this.erroresTotal
-        ? Math.round((this.aciertosTotal / (this.aciertosTotal + this.erroresTotal)) * 100)
+      precision: this.aciertosTotal + this.erroresTotal + this.signos.caracteres + this.signos.errores
+        ? Math.round(((this.aciertosTotal + this.signos.caracteres) / (this.aciertosTotal + this.erroresTotal + this.signos.caracteres + this.signos.errores)) * 100)
         : 100,
-      palabras: this.palabrasTotal,
-      caracteres: this.aciertosTotal,
-      errores: this.erroresTotal,
-      palabrasTipeadas: this.palabrasTipeadas,
+      palabras: this.palabrasTotal + this.signos.aciertos,
+      caracteres: this.aciertosTotal + this.signos.caracteres,
+      errores: this.erroresTotal + this.signos.errores,
+      palabrasTipeadas: this.palabrasTipeadas + this.signos.aciertos,
       cristales: this.palabrasTipeadas + CRISTALES_POR_RANGO[rango],
       nivel: this.nivel,
       mejoras: this.mejorasLista,

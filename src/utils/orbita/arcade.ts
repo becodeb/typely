@@ -19,9 +19,12 @@ import {
 } from "../api";
 import { isDemoMode } from "../storage";
 import type { ResultadoPartida } from "./motor";
+import { cristalesInfinitosDemo } from "./desarrolloLocal";
 
 const COLA_KEY = "typely_orbita_cola_v1";
 const PERFIL_KEY = "typely_orbita_perfil_v1";
+const PERFIL_DEMO_KEY = "typely_orbita_demo_local_v1";
+const clavePerfil = () => isDemoMode() ? PERFIL_DEMO_KEY : PERFIL_KEY;
 const RECORD_KEY = "typely_orbita_record_v1";
 
 /* ------------------------------------------------------------------ */
@@ -126,8 +129,9 @@ if (typeof window !== "undefined") {
 /* ------------------------------------------------------------------ */
 
 export function perfilLocal(): ArcadePerfil | null {
+  if (isDemoMode() && !cristalesInfinitosDemo()) return null;
   try {
-    const raw = localStorage.getItem(PERFIL_KEY);
+    const raw = localStorage.getItem(clavePerfil());
     return raw ? (JSON.parse(raw) as ArcadePerfil) : null;
   } catch {
     return null;
@@ -145,7 +149,7 @@ export function actualizarPerfilLocal(parche: Partial<ArcadePerfil>) {
     equipped: { trail: null, beam: null },
   };
   try {
-    localStorage.setItem(PERFIL_KEY, JSON.stringify({ ...base, ...parche }));
+    localStorage.setItem(clavePerfil(), JSON.stringify({ ...base, ...parche }));
   } catch {
     /* sin espacio — el valor del servidor vuelve en la próxima carga */
   }
@@ -154,6 +158,10 @@ export function actualizarPerfilLocal(parche: Partial<ArcadePerfil>) {
 /** Trae el perfil del servidor y lo deja en cache. Silencioso sin red:
  *  se sigue con lo último que se supo, que es lo que el juego necesita. */
 export async function hidratarPerfil(rol: string | undefined): Promise<ArcadePerfil | null> {
+  if (isDemoMode() && cristalesInfinitosDemo()) {
+    actualizarPerfilLocal({ crystalsInfinite: true });
+    return perfilLocal();
+  }
   if (!sincronizaArcade(rol)) return perfilLocal();
   try {
     const res = await api.arcadeMe();
@@ -167,6 +175,7 @@ export async function hidratarPerfil(rol: string | undefined): Promise<ArcadePer
 export function limpiarPerfilLocal() {
   try {
     localStorage.removeItem(PERFIL_KEY);
+    localStorage.removeItem(PERFIL_DEMO_KEY);
   } catch {
     /* ignorar */
   }

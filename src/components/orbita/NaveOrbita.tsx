@@ -1,5 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, type CSSProperties } from "react";
 import { NAVE_ORBITA_BASE, geometriaVista, type NaveOrbitaDef, type PoseNave } from "../../data/orbitaNaves";
+import type { EfectoCosmetico } from "../../data/orbitaCosmeticos";
+import { ParticulasMotor } from "./EfectosCosmeticos";
 
 export interface NaveOrbitaHandle {
   atacar: (objetivo: { x: number; y: number }, alDisparar: () => void) => void;
@@ -15,6 +17,7 @@ interface Props {
   animada?: boolean;
   colorMotor?: string | null;
   colorDisparo?: string;
+  efectoEstela?: EfectoCosmetico;
   className?: string;
 }
 const poses: PoseNave[] = ["neutra", "izquierda", "derecha"];
@@ -24,7 +27,7 @@ const poses: PoseNave[] = ["neutra", "izquierda", "derecha"];
  * sigue al objetivo y los motores/emisor conservan sus anclajes reales. */
 export const NaveOrbita = forwardRef<NaveOrbitaHandle, Props>(function NaveOrbita({
   nave = NAVE_ORBITA_BASE, pausada = false, animada = true,
-  colorMotor, colorDisparo = "#25c8df", className = "",
+  colorMotor, colorDisparo = "#25c8df", efectoEstela = "color", className = "",
 }, ref) {
   const raiz = useRef<HTMLDivElement>(null);
   const rotor = useRef<HTMLDivElement>(null);
@@ -177,7 +180,7 @@ export const NaveOrbita = forwardRef<NaveOrbitaHandle, Props>(function NaveOrbit
   return (
     <div ref={raiz} className={`orb-nave-sprite ${className}`} data-pausada={pausada || !animada}
       role="img" aria-label={nave.nombre}
-      style={{ "--nave-motor-color": colorMotor ?? "#55dfff", "--nave-disparo-color": colorDisparo } as CSSProperties}>
+      style={{ "--nave-motor-color": colorMotor ?? nave.colorMotor ?? "#55dfff", "--nave-disparo-color": colorDisparo } as CSSProperties}>
       <div ref={rotor} className="orb-nave-sprite__rotor">
         <div ref={alabeo} className="orb-nave-sprite__alabeo">
         <div ref={casco} className="orb-nave-sprite__casco">
@@ -193,6 +196,7 @@ export const NaveOrbita = forwardRef<NaveOrbitaHandle, Props>(function NaveOrbit
               {animada && vista.motores.map((motor, i) => <span key={i} className="orb-nave-sprite__motor"
                 style={{ left: `${motor.x}%`, top: `${motor.y}%`, transform: `translate(-50%, -8%) rotate(${g.angulo}deg)`, "--motor-retardo": `${i * -0.29}s` } as CSSProperties}>
                 <i />
+                <ParticulasMotor efecto={efectoEstela} />
               </span>)}
               <img className="orb-nave-sprite__imagen" src={vista.imagen} alt="" draggable={false} decoding="async" />
             </div>;

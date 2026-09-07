@@ -265,11 +265,12 @@ export interface ArcadeRunResponse {
 export interface ArcadePerfil {
   alias: string | null;
   crystals: number;
+  crystalsInfinite?: boolean;
   bestScore: number;
   bestThreat: number;
   bestRank: string | null;
   owned: string[];
-  equipped: { trail: string | null; beam: string | null };
+  equipped: { trail: string | null; beam: string | null; impact?: string | null; ship?: string | null; pet?: string | null };
 }
 
 export interface ArcadeBoardRow {
@@ -476,7 +477,7 @@ export const api = {
     call<{ ok: true; alias: string }>("/arcade/alias", { method: "POST", json: { alias } }),
   buyArcadeItem: (id: string) =>
     call<{ ok: true; balance: number }>("/arcade/buy", { method: "POST", json: { id } }),
-  equipArcadeItem: (slot: "trail" | "beam", id: string | null) =>
+  equipArcadeItem: (slot: "trail" | "beam" | "impact" | "ship" | "pet", id: string | null) =>
     call<{ ok: true }>("/arcade/equip", { method: "POST", json: { slot, id } }),
 
   health: () => call<{ ok: boolean; service: string; ts: string }>("/health", { retry: false }),

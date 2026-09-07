@@ -229,6 +229,9 @@ export const arcadeProfile = pgTable("arcade_profile", {
   ownedCosmetics: text("owned_cosmetics").notNull().default("[]"),
   equippedTrail: text("equipped_trail"),
   equippedBeam: text("equipped_beam"),
+  equippedImpact: text("equipped_impact"),
+  equippedShip: text("equipped_ship"),
+  equippedPet: text("equipped_pet"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

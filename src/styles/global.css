@@ -1853,6 +1853,40 @@ a { color: inherit; text-decoration: none; }
   position: absolute; z-index: 0; width: 11%; height: 27%;
   transform-origin: 50% 8%;
 }
+.orb-motor-estrellas, .orb-motor-aurora { position: absolute; inset: 0; pointer-events: none; }
+.orb-motor-estrellas b {
+  position: absolute; left: calc(15% + var(--particula) * 15%); top: 18%; font-size: 9px; color: #fff0b5;
+  text-shadow: 0 0 5px #ffd552; opacity: 0;
+  animation: orbPolvoMotor 950ms linear infinite; animation-delay: calc(var(--particula) * -190ms);
+}
+@keyframes orbPolvoMotor { 0% { opacity: 0; transform: translateY(0) scale(.3); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(45px) scale(.1) rotate(70deg); } }
+.orb-motor-aurora b {
+  position: absolute; width: 50%; height: 120%; left: 5%; top: 9%; border-radius: 50%; transform-origin: 50% 0;
+  background: linear-gradient(#efffff, #54e8c6 25%, #9b7cff 55%, transparent 95%);
+  animation: orbAuroraMotor 1200ms ease-in-out infinite alternate; opacity: .8;
+}
+.orb-motor-aurora b:nth-child(2) { left: 35%; background: linear-gradient(#fff, #ff9fca 25%, #9b7cff 60%, transparent); animation-delay: -.4s; }
+.orb-motor-aurora b:nth-child(3) { left: 65%; width: 35%; animation-delay: -.8s; }
+@keyframes orbAuroraMotor { from { transform: skewX(-12deg) scaleY(.8); } to { transform: skewX(12deg) scaleY(1.15); } }
+.orb-rayo[data-efecto="pulso"], .orb-rayo[data-efecto="espiral"] { animation-duration: 190ms; }
+.orb-rayo-pulso { position: absolute; left: 0; top: -4px; width: 22px; height: 12px; border-radius: 50%; background: #fff; box-shadow: 0 0 12px 4px var(--orb-rayo-color); animation: orbPulsoViaja 150ms linear forwards; }
+@keyframes orbPulsoViaja { to { left: calc(100% - 22px); transform: scale(.6); } }
+.orb-rayo-espiral { position: absolute; inset: -8px 0 auto; width: 100%; height: 20px; overflow: visible; }
+.orb-rayo-espiral path { fill: none; stroke: #b7a2ff; stroke-width: 2; vector-effect: non-scaling-stroke; stroke-dasharray: 8 2; animation: orbEspiralCorre 190ms linear forwards; }
+.orb-rayo-espiral path:nth-child(2) { stroke: #7effdf; animation-direction: reverse; }
+@keyframes orbEspiralCorre { to { stroke-dashoffset: -30; } }
+.orb-impacto { position: absolute; width: 1px; height: 1px; pointer-events: none; }
+.orb-impacto[data-efecto="anillos"] i { position: absolute; width: 50px; height: 50px; left: -25px; top: -25px; border: 2px solid var(--orb-boom-color); border-radius: 50%; box-shadow: 0 0 8px var(--orb-boom-color); animation: orbEcoEstelar 450ms ease-out both; animation-delay: calc(var(--particula) * 65ms); }
+@keyframes orbEcoEstelar { from { opacity: 1; transform: scale(.15); } to { opacity: 0; transform: scale(1.65); } }
+.orb-impacto[data-efecto="cristales"] i { position: absolute; width: 10px; height: 16px; left: -5px; top: -8px; background: linear-gradient(110deg, #fff 10%, #80f6ef 40%, #ad89ff 60%, #ffbbdf); clip-path: polygon(50% 0, 100% 40%, 65% 100%, 0 65%); animation: orbGemasSalen 520ms ease-out both; }
+@keyframes orbGemasSalen { from { opacity: 1; transform: rotate(calc(var(--particula) * 45deg)) translateY(0) scale(.3); } to { opacity: 0; transform: rotate(calc(var(--particula) * 45deg + 30deg)) translateY(-48px) scale(.8); } }
+@media (prefers-reduced-motion: reduce) {
+  .orb-motor-estrellas b, .orb-motor-aurora b { animation: none; opacity: .65; }
+  .orb-motor-estrellas b { top: calc(20% + var(--particula) * 15%); }
+  .orb-rayo-pulso { animation: none; left: calc(100% - 22px); }
+  .orb-rayo-espiral path { animation: none; }
+  .orb-impacto i { animation: orbRayoFade 200ms linear forwards !important; }
+}
 .orb-nave-sprite__motor i {
   display: block; width: 100%; height: 100%; border-radius: 45% 45% 70% 70%;
   background: radial-gradient(ellipse at 50% 12%, #fff 0%, #d4fcff 10%, var(--nave-motor-color, #55dfff) 28%, rgba(93, 112, 255, .55) 48%, transparent 73%);
@@ -1979,6 +2013,76 @@ a { color: inherit; text-decoration: none; }
   0%   { opacity: 0; transform: translate(0, 0) rotate(0deg) scale(0.4); }
   20%  { opacity: 1; }
   100% { opacity: 0; transform: translate(var(--orb-dx), var(--orb-dy)) rotate(45deg) scale(1.1); }
+}
+
+/* Colección divertida: partículas acotadas, sin otro reloj de JavaScript. */
+.orb-motor-fiesta, .orb-motor-arcoiris { position: absolute; inset: 0; pointer-events: none; }
+.orb-motor-fiesta b {
+  position: absolute; left: calc(-30% + var(--particula) * 23%); top: 8%; width: 9px; height: 9px;
+  animation: orbFiestaMotor 1150ms ease-out infinite; animation-delay: calc(var(--particula) * -190ms);
+}
+.orb-motor-fiesta[data-efecto="burbujas"] b, .orb-rayo-burbujas b, .orb-impacto[data-efecto="burbujas"] i {
+  border-radius: 50%; border: 1px solid #c9faff;
+  background: radial-gradient(circle at 28% 25%, #fff 0 8%, transparent 18%), radial-gradient(circle at 65% 75%, #ff9ed670, transparent 65%);
+  box-shadow: inset -2px -2px 3px #a190ff9e, 0 0 3px #85e9ff80;
+}
+.orb-motor-fiesta[data-efecto="pixeles"] b { width: 6px; height: 6px; background: var(--fiesta-color); box-shadow: 0 0 4px var(--fiesta-color); animation-timing-function: steps(6); }
+@keyframes orbFiestaMotor { 0% { opacity: 0; transform: translateY(0) scale(.4); } 18% { opacity: .95; } 100% { opacity: 0; transform: translateY(58px) scale(1.15); } }
+.orb-motor-arcoiris { width: 155%; left: -27%; }
+.orb-motor-arcoiris b {
+  position: absolute; top: 8%; left: calc(var(--particula) * 16%); width: 19%; height: 190%; border-radius: 40%; transform-origin: 50% 0;
+  background: linear-gradient(#fff9, var(--fiesta-color) 18%, var(--fiesta-color) 62%, transparent);
+  animation: orbCintaArcoiris 1400ms ease-in-out infinite alternate; animation-delay: calc(var(--particula) * -70ms);
+}
+@keyframes orbCintaArcoiris { from { transform: skewX(-7deg) scaleY(.85); } to { transform: skewX(9deg) scaleY(1); } }
+.orb-rayo[data-efecto="relampago"], .orb-rayo[data-efecto="burbujas"] { background: none; box-shadow: none; animation-duration: 210ms; }
+.orb-rayo-relampago { position: absolute; width: 100%; height: 24px; top: -10px; overflow: visible; filter: drop-shadow(0 0 3px var(--orb-rayo-color)); }
+.orb-rayo-relampago path { fill: none; stroke: #d9faff; stroke-width: 2.5; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.orb-rayo-relampago path + path { stroke: var(--orb-rayo-color); stroke-width: 1.5; }
+.orb-rayo[data-efecto="caramelo"] { height: 6px; background: repeating-linear-gradient(120deg, #fff8fc 0 6px, #ff8cbd 6px 12px); box-shadow: 0 0 7px #ff8cbd; animation-duration: 210ms; }
+.orb-rayo-caramelo { position: absolute; width: 30px; height: 20px; top: -7px; left: 0; animation: orbDulceViaja 180ms ease-out forwards; }
+.orb-rayo-caramelo svg { width: 100%; height: 100%; }
+@keyframes orbDulceViaja { from { left: 0; transform: scale(.6) rotate(-15deg); } to { left: calc(100% - 26px); transform: scale(1) rotate(15deg); } }
+.orb-rayo-burbujas { position: absolute; inset: -10px 0; }
+.orb-rayo-burbujas b { position: absolute; width: 14px; height: 14px; top: calc(3px + var(--particula) * 1px); left: calc(var(--particula) * 13%); animation: orbPompasViajan 190ms ease-out both; }
+@keyframes orbPompasViajan { from { opacity: .3; transform: translateX(-12px) scale(.3); } 55% { opacity: 1; } to { opacity: .7; transform: translateX(8px) scale(1.05); } }
+.orb-impacto[data-efecto="burbujas"] i, .orb-impacto[data-efecto="confeti"] i, .orb-impacto[data-efecto="palomitas"] i {
+  position: absolute; left: -7px; top: -7px; width: 14px; height: 14px;
+  animation: orbFiestaExplota 540ms ease-out both;
+}
+.orb-impacto[data-efecto="confeti"] i { width: 7px; height: 12px; left: -3px; top: -6px; border-radius: 2px; background: var(--fiesta-color); }
+.orb-impacto[data-efecto="confeti"] i:nth-child(3n) { border-radius: 50%; width: 8px; height: 8px; }
+.orb-impacto[data-efecto="palomitas"] i { width: 21px; height: 21px; left: -10px; top: -10px; }
+.orb-impacto[data-efecto="palomitas"] svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 1px 2px #82582380); }
+@keyframes orbFiestaExplota {
+  0% { opacity: 0; transform: translate(0, 0) scale(.2); }
+  18% { opacity: 1; }
+  65% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--fiesta-x), calc(var(--fiesta-y) + 14px)) rotate(calc(var(--particula) * 35deg)) scale(1); }
+}
+/* Los destellos de color respetan también el color comprado. */
+.orb-explosion[data-efecto="color"] i { color: var(--orb-boom-color); }
+
+/* Miniaturas de catálogo: el mismo efecto, detenido en un fotograma útil. */
+.orb-muestra-efecto { position: relative; display: block; width: 100%; height: 88px; overflow: hidden; border-radius: 12px; background: radial-gradient(ellipse, #18294fe6, #263559d9); }
+.orb-muestra-efecto *, .orb-muestra-efecto *::before, .orb-muestra-efecto *::after { animation-play-state: paused !important; }
+.orb-muestra-efecto__motor { position: absolute; left: 34%; top: 8%; width: 13px; height: 35px; }
+.orb-muestra-efecto__motor + .orb-muestra-efecto__motor { left: 60%; }
+.orb-muestra-efecto__motor > i { display: block; height: 130%; border-radius: 50%; background: linear-gradient(#fff, var(--nave-motor-color) 30%, transparent); }
+.orb-muestra-efecto .orb-motor-fiesta b { animation-delay: calc(-220ms - var(--particula) * 130ms); }
+.orb-muestra-efecto .orb-rayo { animation: none; opacity: 1; }
+.orb-muestra-efecto .orb-rayo-caramelo, .orb-muestra-efecto .orb-rayo-pulso { animation: none; left: 50%; }
+.orb-muestra-efecto .orb-rayo-burbujas b { animation-delay: -130ms; }
+.orb-muestra-efecto .orb-impacto > i, .orb-muestra-efecto .orb-explosion > i, .orb-muestra-efecto .orb-explosion::before { animation-delay: -250ms; }
+.orb-muestra-efecto .orb-impacto > i, .orb-muestra-efecto .orb-explosion > i { opacity: 1 !important; }
+.orb-muestra-efecto .orb-impacto[data-efecto="anillos"] > i { animation-delay: calc(-250ms + var(--particula) * 100ms); }
+@media (prefers-reduced-motion: reduce) {
+  .orb-motor-fiesta b { animation: none; top: calc(var(--particula) * 20%); opacity: .7; }
+  .orb-motor-arcoiris b { animation: none; height: 140%; opacity: .7; }
+  .orb-rayo-caramelo { animation: none; left: calc(100% - 26px); }
+  .orb-rayo-burbujas b { animation: none; }
+  .orb-impacto[data-efecto] i { transform: translate(calc(var(--fiesta-x) * .5), calc(var(--fiesta-y) * .5)); }
+  .orb-muestra-efecto .orb-impacto > i { animation: none !important; opacity: .9; }
 }
 
 /* ---- HUD ---- */
@@ -2249,58 +2353,70 @@ a { color: inherit; text-decoration: none; }
 .orb-campo:focus { outline: none; border-color: #73f3dc; box-shadow: 0 0 0 4px rgba(115, 243, 220, 0.3); }
 .orb-campo::placeholder { color: #8d9bbd; font-weight: 600; }
 
-/* ---- La estación orbital: la isla del hub y del hangar ----
-   La imagen es 3:2 (ORBITA.md §7.2) con la plataforma un poco por encima
-   del centro; la nave se apoya ahí por CSS. Hasta que la imagen exista, el
-   aro de luz de la plataforma sostiene solo a la nave; después queda como
-   resplandor sobre la plataforma real. */
-/* La ALTURA la pone la imagen, no el CSS: si algún día la estación se
-   regenera y el importador la recorta distinto, la nave sigue cayendo en su
-   plataforma. Por eso `height: auto` y nada de aspect-ratio acá — el único
-   que la necesita es el respaldo, que no tiene imagen que lo sostenga. */
-.orb-puerto {
-  position: relative;
-  width: min(52vh, 34rem, 92vw);
+/* ---- Inicio de Órbita: vuelo sobre la atmósfera ---- */
+.orb-hub { background: #080e32; isolation: isolate; }
+.orb-hub__fondo {
+  position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: #080e32 url("/assets/orbita/hub/vuelo-v1.webp") center / cover no-repeat;
 }
-.orb-estacion {
-  display: block;
-  width: 100%;
-  height: auto;
-  filter: drop-shadow(0 24px 40px rgba(5, 11, 30, 0.55));
+.orb-hub__fondo::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, #080d2810 40%, #080d2810 60%, #080d2870);
 }
-.orb-puerto--sin-estacion { aspect-ratio: 1125 / 938; }
-/* Aro de luz de respaldo: solo mientras la estación no exista. Con la
-   estación puesta sobraría — su plataforma ya trae el aro pintado. */
-.orb-plataforma {
-  position: absolute;
-  left: 48.5%;
-  top: 41%;
-  width: 46%;
-  aspect-ratio: 2.4;
-  translate: -50% -50%;
-  border-radius: 50%;
-  border: 2px solid rgba(84, 232, 198, 0.6);
-  box-shadow: 0 0 26px rgba(84, 232, 198, 0.4), inset 0 0 28px rgba(84, 232, 198, 0.28);
-  animation: orbCapsulaLate 2.6s ease-in-out infinite;
+.orb-hub__contenido {
+  position: relative; z-index: 1; min-height: 100dvh;
+  display: grid; align-content: center; justify-items: center;
+  gap: 20px; padding: 32px 16px 24px;
 }
-/* Apoyada en la plataforma pintada, que está en el 48,5 % / 41 % de la
-   imagen de la estación.
-   El 48,5 % no es un 50 % mal escrito: la isla está dibujada en tres
-   cuartos y su plataforma no cae en el centro exacto del cuadro.
-   Y el `bottom` no apunta a la plataforma sino más abajo, porque la caja
-   de la nave NO termina donde termina la nave: su PNG cuadrado trae un
-   17,2 % de aire transparente abajo (medido sobre el canal alfa). Con el
-   valor "obvio" la nave quedaba flotando cinco puntos por encima de su
-   plataforma. La base dibujada cae en el 44 %, apenas delante del centro
-   de la elipse, que es donde se apoyaría algo posado ahí. */
-.orb-puerto__nave {
-  position: absolute;
-  left: 48.5%;
-  bottom: 48.5%;
-  width: 36%;
-  translate: -50% 0;
+.orb-hub__titulo h1 {
+  line-height: 1.1; letter-spacing: -.025em;
+  text-shadow: 0 3px 0 #55519e70, 0 0 40px #9187ff60;
 }
-.orb-puerto__nave .orb-estela { bottom: -6%; }
+.orb-hub__titulo, .orb-hub__datos, .orb-hub__acciones, .orb-hub__demo { position: relative; z-index: 2; }
+.orb-hub__escena { display: grid; justify-items: center; gap: 16px; width: 100%; }
+.orb-vuelo {
+  position: relative; margin: 0; width: min(620px, 100%);
+  height: clamp(260px, 38dvh, 350px); isolation: isolate; z-index: 0; pointer-events: none;
+}
+.orb-vuelo__luz {
+  position: absolute; inset: 0 -12% -8%; z-index: -1;
+  background: radial-gradient(ellipse at 50% 48%, #6577ef2e, #6151d21a 32%, transparent 65%);
+}
+.orb-vuelo__escuadra {
+  position: absolute; width: min(310px, 43dvh, 67vw);
+  left: 50%; top: 44%; translate: -50% -50%;
+}
+.orb-vuelo__escuadra[data-acompanada="true"] { translate: -62% -50%; }
+.orb-vuelo__nave { position: relative; animation: orbVueloSuave 6s ease-in-out infinite; }
+.orb-vuelo__nave > .orb-nave-sprite { filter: drop-shadow(0 0 15px #b2b9ff33); }
+.orb-vuelo__nave .orb-mascota { left: 95%; top: 36%; width: 35%; }
+.orb-vuelo__particulas { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: -1; }
+.orb-vuelo__particulas i {
+  position: absolute; left: calc(9% + var(--i) * 12%); top: 20%;
+  width: 1px; height: 24px; border-radius: 50%; opacity: 0;
+  background: linear-gradient(transparent, #a5cdff90, transparent);
+  animation: orbVueloEstrella 3.8s linear infinite;
+  animation-delay: calc(var(--i) * -.63s);
+}
+.orb-hub__demo { color: #c0c6e9; opacity: .8; }
+@keyframes orbVueloSuave {
+  0%, 100% { transform: translate3d(-3px, 3px, 0) rotate(-1.5deg); }
+  50% { transform: translate3d(3px, -7px, 0) rotate(1.5deg); }
+}
+@keyframes orbVueloEstrella {
+  0% { transform: translateY(-30px); opacity: 0; }
+  25%, 65% { opacity: .5; }
+  100% { transform: translateY(260px); opacity: 0; }
+}
+.orb-vuelo[data-oculta="true"] * { animation-play-state: paused !important; }
+@media (max-height: 760px) and (min-width: 601px) {
+  .orb-hub__contenido { gap: 14px; padding-top: 24px; }
+  .orb-vuelo { height: 260px; }
+  .orb-hub__titulo h1 { font-size: 3.5rem !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .orb-vuelo__nave, .orb-vuelo__particulas i { animation: none; }
+}
 
 /* ---- Insignias y gemas: SVG chico, imagen 3D grande ---- */
 .orb-insignia-grande, .orb-gema { display: inline-grid; place-items: center; }
@@ -2425,7 +2541,7 @@ a { color: inherit; text-decoration: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .orb-estrellas, .orb-tinte, .orb-polvo, .orb-horizonte, .orb-horizonte-tinte, .orb-nave img,
-  .orb-orbe__mundo, .orb-orbe__brillo, .orb-escudo-aro, .orb-plataforma,
+  .orb-orbe__mundo, .orb-orbe__brillo, .orb-escudo-aro,
   .orb-vineta, .orb-flota-a, .orb-flota-b, .orb-flota-c, .orb-amenaza-nube--tormenta,
   .orb-mini--estela::before, .orb-mini--rayo::before, .orb-confeti i, .orb-cuenta-halo::after,
   .orb-palabra--poder, .orb-palabra--poder::before, .orb-palabra--poder::after {
@@ -2490,6 +2606,153 @@ a { color: inherit; text-decoration: none; }
   .gp-key { height: 1.75rem; font-size: 0.8rem; }
 }
 
+/* Tienda de Órbita: colección a la derecha, vuelo de prueba a la izquierda. */
+.orb-tienda { position: relative; min-height: 100dvh; overflow-x: clip; color: #fff; background: #141b4d; }
+.orb-tienda__contenido { position: relative; z-index: 1; width: min(1100px, calc(100% - 48px)); margin: auto; padding: 28px 0 40px; }
+.orb-tienda__cabecera { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.orb-tienda__cabecera > div { text-align: center; }
+.orb-tienda__cabecera h1 { font-family: var(--font-display); font-size: clamp(32px, 4vw, 48px); margin: 0; line-height: 1.25; text-shadow: 0 3px 14px #17164d; }
+.orb-tienda__kicker { font-size: 10px; letter-spacing: .12em; font-weight: 800; color: #c8f5ed; }
+.orb-tienda__secciones { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); width: min(780px, 100%); gap: 5px; padding: 5px; margin: 23px auto; border-radius: 20px; background: #111945a6; border: 1px solid #ffffff30; }
+.orb-tienda__secciones button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; background: transparent; border: 0; color: #d4d9fa; border-radius: 14px; cursor: pointer; font-weight: 800; font-size: 15px; }
+.orb-tienda__secciones button[aria-pressed="true"] { background: #d2fff1; color: #244b65; box-shadow: 0 3px 10px #061f3540; }
+.orb-tienda__cuerpo { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.3fr); align-items: start; gap: 28px; }
+.orb-tienda__probador.orb-vidrio { display: grid; justify-items: center; gap: 12px; padding: 18px; border-radius: 28px; background: linear-gradient(145deg, #ffffffde, #e5eef8d9); color: #314f70; }
+.orb-tienda__probador-titulo { width: 100%; display: flex; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 700; }
+.orb-tienda__probador-titulo button { color: #326b76; font: inherit; background: none; border: none; text-decoration: underline; cursor: pointer; }
+.orb-tienda__probador .orb-tienda__kicker { color: #587091; }
+.orb-tienda-prueba { width: 100%; height: 260px; position: relative; overflow: hidden; border-radius: 18px; color: white; background: radial-gradient(circle at 72% 15%, #58448b 0, transparent 50%), linear-gradient(#111746, #142467); }
+.orb-tienda-prueba__horizonte { position: absolute; bottom: -20%; width: 100%; height: 65%; object-fit: cover; opacity: .75; }
+.orb-tienda-prueba__etiqueta { position: absolute; left: 14px; top: 13px; font-size: 9px; letter-spacing: .15em; color: #c1c9ed; }
+.orb-tienda-prueba__palabra { position: absolute; left: 62%; top: 18%; font-size: 25px; letter-spacing: .08em; font-family: var(--font-display); font-weight: 800; text-shadow: 0 0 14px #c4baff; }
+.orb-tienda-prueba__palabra b { color: #72ffdb; }
+.orb-tienda-prueba__nave { width: 135px; position: absolute; left: 23%; bottom: 52px; }
+.orb-tienda__seleccion { display: grid; width: 100%; gap: 9px; }
+.orb-tienda__seleccion h2 { margin: 0; font: 800 25px/1.2 var(--font-display); }
+.orb-tienda__seleccion p { margin: 0; font-size: 14px; line-height: 1.5; color: #455c7c; min-height: 42px; }
+.orb-tienda__seleccion small { font-size: 12px; color: #566886; line-height: 1.4; }
+.orb-tienda__seleccion .orb-boton-primario { width: 100%; margin-top: 3px; }
+.orb-tienda__precio { display: flex; align-items: center; gap: 7px; font-size: 17px; color: #755ca8; }
+.orb-tienda__intro { margin: 0 0 17px; text-shadow: 0 2px 8px #14174b; }
+.orb-tienda__intro h2 { margin: 0 0 4px; font: 800 27px var(--font-display); }
+.orb-tienda__intro p { margin: 0 0 5px; font-size: 14px; }
+.orb-tienda__intro small { color: #ced9fa; }
+.orb-tienda__articulos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.orb-tienda-articulo { position: relative; min-width: 0; min-height: 172px; display: flex; flex-direction: column; align-items: center; justify-content: end; gap: 6px; padding: 13px 10px; border: 1px solid #ffffffb0; background: linear-gradient(145deg, #ffffffd9, #e5e8f4c9); color: #314f70; border-radius: 21px; cursor: pointer; box-shadow: 0 8px 20px #10113d20; transition: border-color .15s, background .15s; backdrop-filter: blur(12px); }
+.orb-tienda-articulo:hover { background: linear-gradient(145deg, #fff, #e4eff8e8); border-color: #ecffff; }
+.orb-tienda-articulo[aria-pressed="true"] { border: 2px solid #a6ffe2; padding: 12px 9px; box-shadow: 0 0 0 3px #68f4c440; background: linear-gradient(145deg, #e1fff4, #e4e9faed); }
+.orb-tienda-articulo strong { font-size: 13px; line-height: 1.2; text-align: center; font-family: var(--font-display); }
+.orb-tienda-articulo__nivel { align-self: start; font-size: 9px; text-transform: uppercase; letter-spacing: .09em; font-weight: 800; color: #587091; }
+/* Rarezas de cosméticos: tinte sobre el vidrio de marca y etiqueta legible,
+   incluso con la tarjeta seleccionada. Comparte lila/dorado con Tormenta. */
+.orb-tienda [data-rareza="comun"] { --rareza-tinta: #285f66; --rareza-suave: #d5f4ec; --rareza-tinte: #54e8c61c; }
+.orb-tienda [data-rareza="rara"] { --rareza-tinta: #5941a4; --rareza-suave: #e7ddff; --rareza-tinte: #9b7cff38; }
+.orb-tienda [data-rareza="epica"] { --rareza-tinta: #79500c; --rareza-suave: #fff0bb; --rareza-tinte: #ffd55240; }
+.orb-tienda [data-rareza="legendaria"] { --rareza-tinta: #95245c; --rareza-suave: #ffd9ed; --rareza-tinte: #ff73b947; }
+.orb-tienda-articulo[data-rareza] {
+  background:
+    linear-gradient(145deg, transparent, var(--rareza-tinte)) padding-box,
+    linear-gradient(135deg, #fffffff0, #f4faffdb) padding-box,
+    linear-gradient(160deg, #fffffffa, #54e8c699 22%, #33c7f080 46%, #9b7cff8c 72%, #ff9fca9e) border-box;
+}
+.orb-tienda-articulo[data-rareza]:hover { box-shadow: 0 8px 28px #10113d40, 0 0 0 2px var(--rareza-suave); }
+.orb-tienda-articulo[data-rareza][aria-pressed="true"] { box-shadow: 0 0 0 3px #68f4c4a6, 0 8px 24px #10113d30; }
+.orb-tienda-articulo__nivel[data-rareza] {
+  display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 8px;
+  color: var(--rareza-tinta); background: var(--rareza-suave); border: 1px solid currentColor;
+}
+.orb-tienda__calidad { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.orb-tienda-articulo__estado { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 750; color: #755ca8; }
+.orb-tienda-articulo__nave { display: block; height: 103px; width: 100%; object-fit: contain; }
+.orb-tienda-articulo__sin-mascota { display: grid; place-items: center; height: 103px; width: 100%; color: #668998; opacity: .6; }
+.orb-mascota { position: absolute; left: 104%; top: 42%; width: 43%; aspect-ratio: 1; pointer-events: none; z-index: 2; }
+.orb-mascota img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 3px 4px #09183c55); }
+.orb-mascota__viaje, .orb-mascota__gesto { display: block; width: 100%; height: 100%; }
+.orb-mascota__viaje { position: relative; animation: orbMascotaFlota 4.5s ease-in-out infinite; }
+.orb-mascota[data-movimiento="rebota"] .orb-mascota__viaje { animation-name: orbMascotaRebota; animation-duration: 3.2s; }
+.orb-mascota[data-movimiento="planea"] .orb-mascota__viaje { animation-name: orbMascotaPlanea; animation-duration: 5s; }
+.orb-mascota[data-contexto="partida"] .orb-mascota__viaje { animation-duration: 6s; }
+.orb-mascota[data-gesto="robot"] img { animation: orbMascotaRobot 5s ease-in-out infinite; }
+.orb-mascota[data-gesto="luna"] img { animation: orbMascotaLuna 6s ease-in-out infinite; }
+.orb-mascota[data-gesto="gato"] img { animation: orbMascotaGato 5s ease-in-out infinite; }
+.orb-mascota[data-gesto="medusa"] img { animation: orbMascotaMedusa 2.8s ease-in-out infinite; }
+.orb-mascota[data-gesto="dj"] img { animation: orbMascotaDJ 1.6s ease-in-out infinite; }
+.orb-mascota[data-gesto="dino"] img { animation: orbMascotaDino 4s ease-in-out infinite; }
+.orb-mascota[data-gesto="capibara"] img { animation: orbMascotaCapi 7s ease-in-out infinite; }
+.orb-mascota[data-gesto="dragon"] img { animation: orbMascotaDragon 3s ease-in-out infinite; }
+.orb-mascota__gesto[data-reaccion] { animation: orbMascotaSaluda 900ms ease-in-out; }
+.orb-mascota__gesto[data-reaccion="celebrar"] { animation: orbMascotaFiesta 1100ms ease-in-out; }
+.orb-mascota[data-rareza="legendaria"] .orb-mascota__gesto[data-reaccion="celebrar"] { animation-name: orbMascotaVuelta; }
+.orb-mascota__gesto[data-reaccion="reintentar"] { animation-name: orbMascotaAbrazo; }
+.orb-mascota__chispas { position: absolute; inset: 0; }
+.orb-mascota__chispas i {
+  position: absolute; left: calc(8% + var(--i) * 15%); top: 75%;
+  color: var(--mascota-acento); font: 700 clamp(9px, 1vw, 14px)/1 sans-serif;
+  opacity: 0; animation: orbMascotaChispa 3.6s ease-out infinite;
+  animation-delay: calc(var(--i) * -.7s); font-style: normal;
+}
+.orb-mascota__voz { position: absolute; right: 0; bottom: calc(100% + 14px); width: 190px; max-width: 60vw; z-index: 5; }
+.orb-mascota__mensaje {
+  display: block; color: #d7d3ef;
+  font: 500 13px/1.5 var(--font-body); text-align: left;
+  text-wrap: balance;
+  text-shadow: 0 1px 3px #090f32, 0 0 8px #090f32a6;
+  animation: orbMascotaMensaje 250ms ease-out;
+}
+.orb-mascota[data-contexto="partida"] .orb-mascota__voz { left: calc(100% + 14px); right: auto; bottom: auto; top: 50%; transform: translateY(-50%); width: 200px; }
+.orb-mascota__voz[data-en-linea="true"] { position: static; display: block; width: 100%; max-width: none; pointer-events: none; }
+.orb-mascota__voz[data-en-linea="true"] .orb-mascota__mensaje { text-align: center; }
+/* La voz ocupa texto de la interfaz, nunca el lienzo de la nave. */
+.orb-hub__saludo { position: relative; width: min(420px, 86vw); min-height: 42px; margin-top: 9px; display: grid; place-items: center; }
+.orb-hub__saludo .orb-mascota__voz[data-en-linea="true"] { position: absolute; inset: 0; display: grid; place-items: center; }
+.orb-tienda__voz { width: 100%; }
+.orb-tienda__voz[data-con-mascota="true"] { min-height: 39px; display: grid; place-items: center; }
+.orb-tienda__voz[data-con-mascota="false"] { display: none; }
+.orb-tienda__voz .orb-mascota__mensaje { color: #605b7b; text-shadow: none; font-size: 12px; }
+.orb-mascota[data-pausada="true"] *, .orb-mascota[data-oculta="true"] * { animation-play-state: paused !important; }
+@keyframes orbMascotaFlota { 0%, 100% { transform: translate(-3%, 5%); } 50% { transform: translate(3%, -14%); } }
+@keyframes orbMascotaRebota { 0%, 100% { transform: translateY(3%); } 45% { transform: translateY(-19%); } 75% { transform: translateY(0); } }
+@keyframes orbMascotaPlanea { 0%, 100% { transform: translate(-6%, 5%); } 35% { transform: translate(5%, -14%); } 70% { transform: translate(-4%, -5%); } }
+@keyframes orbMascotaRobot { 0%, 55%, 100% { transform: rotate(0); } 65%, 85% { transform: rotate(-9deg); } 75% { transform: rotate(8deg); } }
+@keyframes orbMascotaLuna { 0%, 100% { transform: rotate(-10deg); } 50% { transform: rotate(10deg); } }
+@keyframes orbMascotaGato { 0%, 65%, 100% { transform: rotate(-3deg); } 75% { transform: rotate(-13deg) scale(1.06); } 88% { transform: rotate(8deg); } }
+@keyframes orbMascotaMedusa { 0%, 100% { transform: scale(.96, 1.04); } 48% { transform: scale(1.09, .9); } 70% { transform: scale(.98, 1.06); } }
+@keyframes orbMascotaDJ { 0%, 100% { transform: rotate(-7deg) scaleY(.97); } 50% { transform: rotate(7deg) scaleY(1.03); } }
+@keyframes orbMascotaDino { 0%, 100% { transform: rotate(-8deg); } 45% { transform: rotate(9deg); } 65% { transform: rotate(-12deg) translateY(-6%); } }
+@keyframes orbMascotaCapi { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(6deg) scale(1.04); } }
+@keyframes orbMascotaDragon { 0%, 100% { transform: scale(1.04, .96) rotate(-5deg); } 50% { transform: scale(.96, 1.07) rotate(6deg); } }
+@keyframes orbMascotaSaluda { 0%, 100% { transform: rotate(0); } 25%, 65% { transform: rotate(-12deg); } 45%, 80% { transform: rotate(10deg); } }
+@keyframes orbMascotaFiesta { 0%, 100% { transform: translateY(0) scale(1); } 35% { transform: translateY(-22%) scale(1.12) rotate(-12deg); } 65% { transform: translateY(-10%) rotate(10deg); } }
+@keyframes orbMascotaVuelta { 0% { transform: rotate(0); } 40% { transform: translateY(-20%) rotate(-15deg); } 100% { transform: rotate(360deg); } }
+@keyframes orbMascotaAbrazo { 0%, 100% { transform: scale(1); } 40% { transform: scale(1.12) rotate(-5deg); } 70% { transform: scale(1.05) rotate(5deg); } }
+@keyframes orbMascotaChispa { 0% { transform: translateY(0) scale(.5); opacity: 0; } 25% { opacity: .65; } 100% { transform: translateY(-35px) scale(.2) rotate(35deg); opacity: 0; } }
+@keyframes orbMascotaMensaje { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .orb-mascota[data-movimiento] *, .orb-mascota[data-movimiento] img, .orb-mascota__mensaje { animation: none !important; }
+  .orb-mascota__chispas { display: none; }
+}
+
+.orb-tienda__mensaje { margin: 16px 0 0; min-height: 22px; text-align: center; font-size: 14px; font-weight: 700; }
+.orb-tienda__piloto { max-width: 500px; margin: 12px auto; font-size: 13px; text-align: center; }
+.orb-tienda__piloto summary { cursor: pointer; margin-bottom: 10px; }
+.orb-tienda__piloto form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; }
+.orb-tienda button:focus-visible { outline: 3px solid #fff1aa; outline-offset: 3px; }
+
+/* RESPONSIVE PASS — Tienda: catálogo primero en celulares. */
+@media (max-width: 700px) {
+  .orb-tienda__contenido { width: calc(100% - 28px); padding-top: 16px; }
+  .orb-tienda__cabecera { gap: 8px; }
+  .orb-tienda__cabecera .orb-tienda__kicker { display: none; }
+  .orb-tienda__cabecera .orb-pildora { font-size: 13px; padding: 8px; }
+  .orb-tienda__secciones { margin: 16px 0; }
+  .orb-tienda__secciones button { font-size: 12px; gap: 4px; flex-direction: column; padding: 8px 2px; }
+  .orb-tienda__cuerpo { grid-template-columns: 1fr; gap: 20px; }
+  .orb-tienda__catalogo { order: -1; }
+  .orb-tienda__articulos { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .orb-tienda-articulo { min-height: 152px; }
+  .orb-tienda__probador { scroll-margin-top: 10px; }
+}
+
 /* ══════════════════════════════════════════════════════════════════
    REGLA ESTRUCTURAL — TODA TARJETA BLANCA DEL ALUMNO ES DE MARCA
    ------------------------------------------------------------------
@@ -2521,13 +2784,19 @@ a { color: inherit; text-decoration: none; }
    El filete es la última capa del background, recortada al border-box,
    detrás de tres capas al padding-box — sin pseudoelementos ni
    `position`, así sirve en cualquier tarjeta, incluso fija o absoluta.
-   Gestión (/gestion) no usa estas clases, así que no la toca. */
+   Gestión (/gestion) no usa estas clases, así que no la toca.
+
+   Incluye también los botones de vidrio de Órbita (.orb-boton-vidrio) y
+   las tarjetas de la Tienda (.orb-tienda__probador, .orb-tienda-articulo):
+   la Tienda define su propio fondo blanco más arriba, y esta regla lo
+   reemplaza; su estado apretado y el hover, que tienen más especificidad,
+   siguen mandando. */
 .tarjeta-marca,
 .glass, .glass-strong, .glass-card, .glass-card-smooth, .glass-surface,
-.orb-vidrio, .orb-pildora:not(.orb-pildora--activa), .orb-aviso, .modal-card, .skin-bar-panel {
+.orb-vidrio, .orb-pildora:not(.orb-pildora--activa), .orb-aviso, .orb-boton-vidrio, .modal-card, .skin-bar-panel,
+.orb-tienda__probador.orb-vidrio, .orb-tienda-articulo {
   border: 3px solid transparent;
   background:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='104' height='104' viewBox='0 0 104 104'%3E%3Cpath d='M22 10 l2.4 6.4 6.4 2.4 -6.4 2.4 -2.4 6.4 -2.4 -6.4 -6.4 -2.4 6.4 -2.4z' fill='%239b7cff' fill-opacity='.45'/%3E%3Cpath d='M74 58 l1.8 4.8 4.8 1.8 -4.8 1.8 -1.8 4.8 -1.8 -4.8 -4.8 -1.8 4.8 -1.8z' fill='%2354e8c6' fill-opacity='.45'/%3E%3Ccircle cx='86' cy='18' r='2.2' fill='%23ff9fca' fill-opacity='.45'/%3E%3Ccircle cx='34' cy='80' r='1.8' fill='%23ffd552' fill-opacity='.45'/%3E%3Ccircle cx='60' cy='30' r='1.4' fill='%2333c7f0' fill-opacity='.45'/%3E%3C/svg%3E") padding-box,
     linear-gradient(135deg, rgba(84, 232, 198, 0.10), rgba(255, 255, 255, 0) 38%, rgba(155, 124, 255, 0.07) 68%, rgba(255, 159, 202, 0.12) 100%) padding-box,
     linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(244, 250, 255, 0.66)) padding-box,
     linear-gradient(160deg, rgba(255, 255, 255, 0.98) 0%, rgba(84, 232, 198, 0.60) 22%, rgba(51, 199, 240, 0.50) 46%, rgba(155, 124, 255, 0.55) 72%, rgba(255, 159, 202, 0.62) 100%) border-box;
@@ -2537,9 +2806,64 @@ a { color: inherit; text-decoration: none; }
   border-width: 2px;
   box-shadow: 0 10px 26px rgba(58, 89, 132, 0.16), 0 0 0 1px rgba(255, 255, 255, 0.5);
 }
-/* Escape explícito: vidrio liso, sin filete ni destellos. */
+/* Escape explícito: vidrio liso, sin filete ni tintes. */
 .vidrio-liso {
   border: 1px solid rgba(255, 255, 255, 0.8);
   background: rgba(255, 255, 255, 0.7);
   box-shadow: none;
+}
+
+/* Cartas de mejora de Tormenta: llevan el mismo filete iridiscente que
+   toda tarjeta del alumno, pero el RELLENO es el color de su rareza —
+   sutil, para que la carta se lea distinta de un vistazo sin pelear con
+   la gema ni con el texto. Común: celeste-menta apenas. Rara: lila.
+   Épica: dorado. Los resplandores de rareza (box-shadow) siguen siendo
+   de las reglas de .orb-carta--rara / --epica, más arriba. Va después de
+   la regla estructural porque .orb-carta no es de vidrio blanco liso. */
+.orb-carta {
+  --carta-tinte-a: rgba(51, 199, 240, 0.10);
+  --carta-tinte-b: rgba(84, 232, 198, 0.16);
+  border: 3px solid transparent;
+  background:
+    linear-gradient(135deg, var(--carta-tinte-a), var(--carta-tinte-b)) padding-box,
+    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(244, 250, 255, 0.86)) padding-box,
+    linear-gradient(160deg, rgba(255, 255, 255, 0.98) 0%, rgba(84, 232, 198, 0.60) 22%, rgba(51, 199, 240, 0.50) 46%, rgba(155, 124, 255, 0.55) 72%, rgba(255, 159, 202, 0.62) 100%) border-box;
+}
+.orb-carta--rara  { --carta-tinte-a: rgba(155, 124, 255, 0.22); --carta-tinte-b: rgba(124, 113, 255, 0.32); }
+.orb-carta--epica { --carta-tinte-a: rgba(255, 213, 82, 0.28);  --carta-tinte-b: rgba(255, 171, 64, 0.34); }
+
+/* Inicio de Órbita — ajuste móvil del vuelo. */
+@media (max-width: 600px) {
+  .orb-hub__contenido { padding-top: 76px; gap: 18px; }
+  .orb-vuelo { height: clamp(230px, 33dvh, 285px); }
+  .orb-hub__escena { gap: 18px; }
+  .orb-hub__escena .orb-pildora { font-size: .8rem; padding: .5rem .65rem; }
+}
+
+/* Mensajes de la mascota: mantenerlos dentro de ventanas angostas. */
+@media (max-width: 1000px) {
+  .orb-mascota[data-contexto="partida"] .orb-mascota__voz { width: min(200px, calc(50vw - clamp(126px, 18vh, 190px) * .97 - 30px)); }
+}
+
+/* Bonus Tormenta de signos: solo un tinte suave detrás de la escena. */
+.orb-signos { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, #743ab836, #78359822); opacity: 0; transition: opacity 900ms ease; }
+.orb-signos[data-activa="true"] { opacity: 1; }
+/* Una tipografía de teclado conserva la forma de signos pequeños. Sin halo
+   de color ni subrayado, que pueden confundirse con otra puntuación. */
+[data-signos="activa"] .orb-palabra__cuerpo {
+  font-family: "Consolas", "Liberation Mono", monospace;
+  font-size: 1.3em;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #fff8e8;
+  text-decoration: none;
+  text-shadow: 0 2px 3px #050b1e, 0 0 4px #050b1e;
+  animation: none;
+}
+[data-signos="activa"] .orb-palabra__cola { opacity: .16; }
+[data-signos="activa"] .orb-escena--peligro { animation: none; }
+/* Mantener los espacios al pasar del prefijo escrito al resto de la frase. */
+[data-signos="entrada"] .orb-palabra__cuerpo { white-space: pre; }
+@media (prefers-reduced-motion: reduce) {
+  .orb-signos { transition: none; }
 }

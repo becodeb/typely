@@ -84,7 +84,7 @@ function simular(perfil, semilla) {
   let capsulas = 0;
 
   const PASO = 0.05; // 50 ms — granularidad sobrada para ritmos de tipeo
-  for (let pasos = 0; pasos < 320 / PASO && !resultado; pasos++) {
+  for (let pasos = 0; pasos < 1800 / PASO && !resultado; pasos++) {
     for (const ev of motor.tick(PASO * 1000)) {
       if (ev.tipo === "fin") resultado = ev.resultado;
       if (ev.tipo === "impacto") impactos++;
@@ -117,6 +117,10 @@ function simular(perfil, semilla) {
     esperaTecla = (1 / cps) * (0.75 + rng() * 0.5);
 
     /* ¿Qué tecla aprieta? */
+    if (motor.signos.fase === "entrada") {
+      motor.tecla("tormenta de signos"[motor.signos.escrito]);
+      continue;
+    }
     const vivas = motor.vivas;
     if (!vivas.length) continue;
 
@@ -140,9 +144,9 @@ function simular(perfil, semilla) {
     }
   }
 
-  /* Si el bucle agotó los 320 s sin `fin`, el lazo está roto: eso es
-     exactamente lo que este script existe para detectar. */
-  return { resultado, impactos, capsulas, colgada: !resultado };
+  /* Horizonte del ensayo, no límite del juego: un perfil aún vivo a los
+     30 minutos requiere revisar el equilibrio y no se fuerza a perder. */
+  return { resultado, impactos, capsulas, normalMs: Math.round(motor.t * 1000), bonusMs: Math.round(motor.signos.totalSegundos * 1000), colgada: !resultado };
 }
 
 /* ------------------------------------------------------------------ */
@@ -179,10 +183,11 @@ for (const perfil of PERFILES) {
   }
   if (colgadas) {
     todoBien = false;
-    console.log(`${perfil.nombre}  ⚠ ${colgadas}/${N} partidas NUNCA terminaron — lazo roto`);
+    console.log(`${perfil.nombre}  ⚠ ${colgadas}/${N} partidas siguen vivas al finalizar los 30 minutos del ensayo`);
     continue;
   }
-  const dur = corridas.map((c) => c.resultado.duracionMs);
+  // El bonus pausa la dificultad: la promesa de duración se mide sin él.
+  const dur = corridas.map((c) => c.normalMs);
   const durMed = mediana(dur);
   const amenaza = Math.round(mediana(corridas.map((c) => c.resultado.amenazaMax)));
   const rango = corridas[Math.floor(corridas.length / 2)].resultado.rango;
@@ -190,29 +195,26 @@ for (const perfil of PERFILES) {
   const palabras = Math.round(mediana(corridas.map((c) => c.resultado.palabras)));
   const poderes = Math.round(mediana(corridas.map((c) => c.capsulas)));
 
-  /* La promesa del HÍBRIDO (mejoras permanentes, 2026-09-04): la partida
-     base sigue en ~2:00, una buena build estira, y NADA pasa de 3:45. Por
-     eso dos topes: la mediana entre 1:30 y 3:00, y el máximo de las 20
-     partidas en 225 s o menos (el motor corta ahí). */
+  /* Objetivo de equilibrio para perfiles humanos, sin máximo obligatorio:
+     una buena build puede seguir mientras conserve corazones. */
   const durMax = Math.max(...dur);
   const medianaOk = durMed >= 90_000 && durMed <= 180_000;
-  const techoOk = durMax <= 225_000;
-  const dentro = medianaOk && techoOk;
+  const dentro = medianaOk;
   if (!dentro) todoBien = false;
   console.log(
     `${perfil.nombre}   B${String(perfil.banda).padEnd(4)}` +
       ` ${seg(durMed).padStart(5)} · ${seg(Math.min(...dur))}–${seg(durMax)}`.padEnd(28) +
       `${String(amenaza).padStart(5)}    ${rango.padEnd(10)}` +
       ` ${String(ppm).padStart(4)}   ${String(palabras).padStart(6)}  ${String(poderes).padStart(6)}` +
-      (medianaOk ? "" : "   ← mediana FUERA de 90–180 s") +
-      (techoOk ? "" : "   ← máximo PASA el techo de 225 s"),
+      (medianaOk ? "" : "   ← mediana FUERA de 90–180 s"),
   );
+  console.log(`  Bonus jugados: ${corridas.filter(c => c.bonusMs > 0).length}/${N}; tiempo adicional mediano: ${seg(mediana(corridas.map(c => c.bonusMs)))}`);
 }
 
 console.log("");
 console.log(
   todoBien
-    ? "La promesa se cumple: mediana de todos los perfiles entre 1:30 y 3:00, y ninguna partida pasa de 3:45."
+    ? "Tiempo normal mediano entre 1:30 y 3:00; sin corte por tiempo. El bonus suma su propio tiempo."
     : "Hay perfiles fuera del objetivo — tocar AJUSTES en src/utils/orbita/motor.ts y volver a correr.",
 );
 process.exitCode = todoBien ? 0 : 1;

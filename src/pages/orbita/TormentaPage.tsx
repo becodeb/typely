@@ -34,7 +34,12 @@ import {
   InsigniaRango,
 } from "../../components/orbita/OrbitaIconos";
 import { bandaMaxDesbloqueada } from "../../data/orbitaCorpus";
-import { colorEstela, colorRayo } from "../../data/orbitaCosmeticos";
+import { colorEstela, colorRayo, efectoCosmetico, cosmeticoPorId } from "../../data/orbitaCosmeticos";
+import { DURACION_IMPACTO_MS, DURACION_RAYO_MS, ImpactoCosmetico, RayoCosmetico } from "../../components/orbita/EfectosCosmeticos";
+import { MascotaOrbita } from "../../components/orbita/MascotaOrbita";
+import { EscenaSignos } from "../../components/orbita/EscenaSignos";
+import type { EstadoSignos } from "../../utils/orbita/tormentaSignos";
+import { navePorId } from "../../data/orbitaNaves";
 import { getWorldStarRequirements, WORLD_PEDAGOGY_ORDER } from "../../data/worlds";
 import { useAuth } from "../../hooks/useAuth";
 import type { ArcadeRunResponse } from "../../utils/api";
@@ -328,11 +333,12 @@ export function TormentaPage() {
   >([]);
   const naveRef = useRef<HTMLDivElement | null>(null);
   const naveSpriteRef = useRef<NaveOrbitaHandle>(null);
-  const temporizadoresRayos = useRef(new Set<number>());
+  const temporizadoresEfectos = useRef(new Set<number>());
   const [nivelActual, setNivelActual] = useState(0);
   const [revelado, setRevelado] = useState<Revelado | null>(null);
   const [erroneaId, setErroneaId] = useState<number | null>(null);
   const [resultado, setResultado] = useState<ResultadoPartida | null>(null);
+  const [signos, setSignos] = useState<EstadoSignos | null>(null);
   const [respuestaServidor, setRespuestaServidor] = useState<ArcadeRunResponse | null>(null);
   const [sonido, setSonido] = useState(() => localStorage.getItem(SONIDO_KEY) === "1");
 
@@ -348,7 +354,7 @@ export function TormentaPage() {
   const efectoIds = useRef(1);
 
   useEffect(() => {
-    const pendientes = temporizadoresRayos.current;
+    const pendientes = temporizadoresEfectos.current;
     return () => { pendientes.forEach(id => window.clearTimeout(id)); pendientes.clear(); };
   }, []);
 
@@ -367,6 +373,7 @@ export function TormentaPage() {
   }, [fase, cuenta, bandaMax]);
 
   function otraVez() {
+    setSignos(null);
     motorRef.current = null;
     palabraEls.current.clear();
     setPalabras([]);
@@ -386,8 +393,8 @@ export function TormentaPage() {
     });
     setChispas([]);
     setRayos([]);
-    temporizadoresRayos.current.forEach(id => window.clearTimeout(id));
-    temporizadoresRayos.current.clear();
+    temporizadoresEfectos.current.forEach(id => window.clearTimeout(id));
+    temporizadoresEfectos.current.clear();
     naveSpriteRef.current?.reiniciar();
     setCadaveres([]);
     setCartas(null);
@@ -434,9 +441,9 @@ export function TormentaPage() {
         }]);
         const timer = window.setTimeout(() => {
           setRayos(prev => prev.filter(rayo => rayo.id !== idRayo));
-          temporizadoresRayos.current.delete(timer);
-        }, 200);
-        temporizadoresRayos.current.add(timer);
+          temporizadoresEfectos.current.delete(timer);
+        }, DURACION_RAYO_MS);
+        temporizadoresEfectos.current.add(timer);
         });
       };
 
@@ -470,6 +477,18 @@ export function TormentaPage() {
 
       for (const ev of eventos) {
         switch (ev.tipo) {
+          case "signos":
+            setSignos(ev.estado);
+            if (ev.estado.fase === "cierre") {
+              naveSpriteRef.current?.reiniciar();
+              setRayos([]);
+              if (sonidoRef.current) blip(880, 440, .18);
+            } else if (ev.estado.fase === "activa" && sonidoRef.current) blip(220, 1100, .2);
+            break;
+          case "retira":
+            palabraEls.current.delete(ev.id);
+            setPalabras(prev => prev.filter(p => p.id !== ev.id));
+            break;
           case "acierto":
             // La última letra recibe el disparo fuerte de «destruida».
             if (!eventos.some(e => e.tipo === "destruida" && e.id === ev.id)) dispararA(ev.id, false);
@@ -497,13 +516,14 @@ export function TormentaPage() {
               ultimaPos.current.set(ev.id, { x, y });
               const idBoom = efectoIds.current++;
               setChispas((prev) => [
-                ...prev,
+                ...prev.slice(-15),
                 { id: idBoom, x, y, color: ev.via === "tipeo" ? rayoColor : colorVia },
               ]);
-              window.setTimeout(
-                () => setChispas((prev) => prev.filter((c) => c.id !== idBoom)),
-                460,
-              );
+              const timer = window.setTimeout(() => {
+                setChispas(prev => prev.filter(c => c.id !== idBoom));
+                temporizadoresEfectos.current.delete(timer);
+              }, DURACION_IMPACTO_MS);
+              temporizadoresEfectos.current.add(timer);
             }
             palabraEls.current.delete(ev.id);
             setPalabras((prev) => prev.filter((p) => p.id !== ev.id));
@@ -775,6 +795,7 @@ export function TormentaPage() {
       acumuladorHud += dt;
       if (acumuladorHud > 350) {
         acumuladorHud = 0;
+        if (motor.signos.enCurso) setSignos(motor.signos.estado);
         const { puntaje: pts, umbral } = motor.progresoNivel;
         setHud({
           ppm: Math.round(motor.ppmInstantaneo),
@@ -982,7 +1003,7 @@ export function TormentaPage() {
   const sincroniza = sincronizaArcade(user?.role);
 
   return (
-    <main className="relative h-dvh overflow-hidden select-none" aria-label="Tormenta de palabras">
+    <main className="relative h-dvh overflow-hidden select-none" aria-label="Tormenta de palabras" data-signos={signos?.fase}>
       {/* Fondo por capas — el tinte lo maneja el rAF con la amenaza. */}
       <div
         ref={fondoRef}
@@ -1014,6 +1035,7 @@ export function TormentaPage() {
         <img className="orb-polvo" src="/assets/orbita/fondo/polvo.webp" alt="" />
       </div>
 
+      <EscenaSignos estado={signos} />
       {/* Input oculto: el mismo truco de GameplayPage para teclas muertas. */}
       <input
         ref={captureInputRef}
@@ -1113,21 +1135,17 @@ export function TormentaPage() {
 
         {/* Fogonazo + cuatro chispas de cuatro puntas (los <i> son las chispas). */}
         {chispas.map((c) => (
-          <span
+          <ImpactoCosmetico
             key={c.id}
-            className="orb-explosion"
+            efecto={efectoCosmetico(perfil?.equipped.impact)}
+            color={cosmeticoPorId(perfil?.equipped.impact)?.color ?? c.color}
             style={{ left: `${c.x}%`, top: `${c.y}%`, "--orb-boom-color": c.color } as React.CSSProperties}
-          >
-            <i />
-            <i />
-            <i />
-            <i />
-          </span>
+          />
         ))}
         {rayos.map((l) => (
-          <span
+          <RayoCosmetico
             key={l.id}
-            className="orb-rayo"
+            efecto={efectoCosmetico(perfil?.equipped.beam)} color={rayoColor}
             style={
               {
                 left: `${l.x}%`,
@@ -1152,7 +1170,10 @@ export function TormentaPage() {
             <span className={`orb-escudo-aro ${escudo > 1 ? "orb-escudo-aro--doble" : ""}`} />
           )}
           <NaveOrbita ref={naveSpriteRef} pausada={fase !== "jugando" || Boolean(cartas)}
+            nave={navePorId(perfil?.equipped.ship)} efectoEstela={efectoCosmetico(perfil?.equipped.trail)}
             colorMotor={estela} colorDisparo={rayoColor} />
+          <MascotaOrbita id={perfil?.equipped.pet} contexto="partida" racha={hud.racha} corazones={corazones}
+            pausada={fase !== "jugando" || Boolean(cartas)} />
           {/* Recién acá se sabe qué era: la gema explota sobre la nave. */}
           {revelado && (
             <span
@@ -1525,8 +1546,8 @@ export function TormentaPage() {
                 <RotateCcw size={19} /> Otra vez
               </button>
               <div className="grid grid-cols-2 gap-2">
-                <Link to="/orbita/hangar" className="orb-boton-vidrio text-sm">
-                  Hangar
+                <Link to="/orbita/tienda" className="orb-boton-vidrio text-sm">
+                  Tienda
                 </Link>
                 <Link to="/orbita" className="orb-boton-vidrio text-sm">
                   Volver a Órbita
