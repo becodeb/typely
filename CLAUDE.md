@@ -926,9 +926,17 @@ Se conserva la selección en `typely_orbita_galaxia_v1`. La estación con
 la nave posada pasó a `Puerto.tsx`, fondo de la tienda.
 
 La distribución vertical se ajustó con autorización de Ezequiel para que
-arte, nombres y nave no se tapen a 1366×768 y 1366×912; se conservan radio,
-perspectiva, tamaño de las piezas y giro del brief. Los nombres laterales
-miran al lector aunque el disco se vea de canto. Celular: explorar solamente.
+arte, nombres y nave no se tapen a 1366×768 y 1366×912. En la revisión del
+07/09 pidió reemplazar explícitamente el efecto de láminas vistas de canto:
+se conservan el recorrido del anillo, su radio y la perspectiva, pero cada
+ilustración compensa el giro y solo inclina 13° por puesto (máximo 26°).
+Las laterales se ven al 66 % y las del fondo al 43 %, más elevadas, para
+mostrar distancia sin perder la cara de la galaxia. Los nombres miran al
+lector. Hay flotación suave, aura, polvo orbital y rastros luminosos durante
+el viaje; la nave acompaña con desplazamiento y estelas desde los motores
+reales de cada pose, del color equipado. Solo se animan transform y opacity;
+con movimiento reducido se apagan estos adornos y se conserva el fundido.
+Celular: explorar solamente.
 **Todavía no está implementada la Carrera:** su entrada muestra un aviso
 temporal. El ranking con pestañas y los récords por juego pertenecen a los
 siguientes hitos. No continuar con el motor hasta que Ezequiel apruebe el

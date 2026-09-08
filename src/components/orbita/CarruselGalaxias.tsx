@@ -18,6 +18,18 @@ interface Props {
   alEntrar: (galaxia: GalaxiaDef) => void;
 }
 
+const TINTES_GALAXIAS = ["#b68aff", "#63efd6", "#baa3dc", "#bfe7ff", "#b7afda"];
+// Un puñado de motas viaja por una órbita común; no hay un reloj por estrella.
+const MOTAS = Array.from({ length: 9 }, (_, i) => ({
+  x: 50 + Math.cos(i * Math.PI * 2 / 9) * 48,
+  y: 50 + Math.sin(i * Math.PI * 2 / 9) * 48,
+  tamano: i % 3 === 0 ? 5 : 3,
+}));
+const RASTROS = [
+  [12, 18, -24], [19, 38, -15], [8, 64, 12], [25, 77, 24],
+  [88, 20, 24], [80, 42, 15], [93, 67, -12], [76, 82, -24],
+];
+
 /** El destino nunca se reduce al rango 0–4: después de dar una vuelta el
  * anillo continúa, sin rebobinar 360°. React cambia solo en cada gesto;
  * la interpolación entre puestos la hace el compositor del navegador. */
@@ -100,6 +112,7 @@ export function CarruselGalaxias({ perfil, records, destinoMensaje, bloqueado = 
     // Cada impulso desplaza el cielo al revés del anillo y después lo
     // devuelve al centro, como la nave: nunca se llega al borde del fondo.
     "--orb-parallax": girando ? direccion : 0,
+    "--orb-rumbo": direccion || 1,
     "--orb-inclinacion": `${reducido ? 0 : inclinacion * 8}deg`,
     "--nave-neutra": reducido || !inclinacion ? 1 : 0,
     "--nave-izquierda": !reducido && inclinacion < 0 ? 1 : 0,
@@ -107,7 +120,7 @@ export function CarruselGalaxias({ perfil, records, destinoMensaje, bloqueado = 
   } as CSSProperties;
 
   function falta(imagen: string) { setFaltantes(prev => new Set(prev).add(imagen)); }
-  return <div className="orb-galaxias-escena" style={estilo} data-reducido={reducido} data-oculta={oculta}>
+  return <div className="orb-galaxias-escena" style={estilo} data-reducido={reducido} data-oculta={oculta || bloqueado}>
     <div className="orb-cielo-profundo" aria-hidden="true">
       <div className="orb-cielo-profundo__estrellas" />
       <div className="orb-cielo-profundo__nebulosa" />
@@ -154,20 +167,38 @@ export function CarruselGalaxias({ perfil, records, destinoMensaje, bloqueado = 
             aria-selected={frente} aria-label={galaxia.nombre || "Próximamente"}
             className={`orb-galaxia orb-galaxia--${estado}${galaxia.estado === "dormida" ? " orb-galaxia--dormida" : ""}`}
             data-id={galaxia.id} data-encendida={frente && !girando}
-            style={{ "--orb-puesto": `${i * 72}deg`, "--orb-mascara-galaxia": faltantes.has(galaxia.imagen) ? "radial-gradient(ellipse, #000, transparent 72%)" : `url(${galaxia.imagen})` } as CSSProperties}
+            style={{
+              "--orb-puesto": `${i * 72}deg`,
+              // El puesto viaja por el anillo, pero la ilustración compensa
+              // ese giro. Solo queda una inclinación suave, nunca de canto.
+              "--orb-orientacion": `${-distancia * 13}deg`,
+              "--orb-escala": frente ? 1 : Math.abs(distancia) === 1 ? .66 : .43,
+              "--orb-elevacion": frente ? "0px" : Math.abs(distancia) === 1 ? "-28px" : "-135px",
+              "--orb-tinte-galaxia": TINTES_GALAXIAS[i],
+              "--orb-fase-flota": `${-i * 1.7}s`,
+              "--orb-mascara-galaxia": faltantes.has(galaxia.imagen) ? "radial-gradient(ellipse, #000, transparent 72%)" : `url(${galaxia.imagen})`,
+            } as CSSProperties}
             onClick={() => { if (frente) entrar(); else if (Math.abs(distancia) === 1) girar(distancia); }}>
-            <div className="orb-galaxia__contenido">
-              <div key={frente ? negacion : 0} className="orb-galaxia__gesto" data-no={frente && negacion > 0}>
-                <div className="orb-galaxia__arte">
-                  {faltantes.has(galaxia.imagen)
-                    ? <span className="orb-galaxia__respaldo" aria-hidden="true" />
-                    : <img src={galaxia.imagen} alt="" draggable={false} onError={() => falta(galaxia.imagen)} />}
+            <div className="orb-galaxia__plano">
+              <div className="orb-galaxia__contenido">
+                <div className="orb-galaxia__flotacion">
+                  <div key={frente ? negacion : 0} className="orb-galaxia__gesto" data-no={frente && negacion > 0}>
+                    <div className="orb-galaxia__arte">
+                      <span className="orb-galaxia__aura" aria-hidden="true" />
+                      {faltantes.has(galaxia.imagen)
+                        ? <span className="orb-galaxia__respaldo" aria-hidden="true" />
+                        : <img src={galaxia.imagen} alt="" draggable={false} onError={() => falta(galaxia.imagen)} />}
+                    </div>
+                    <div className="orb-galaxia__orbita-polvo" aria-hidden="true">
+                      <div className="orb-galaxia__polvo">{MOTAS.map((mota, j) => <i key={j}
+                        style={{ left: `${mota.x}%`, top: `${mota.y}%`, width: mota.tamano, height: mota.tamano }} />)}</div>
+                    </div>
+                    {frente && !girando && destello > 0 && galaxia.estado === "activa" && <span key={destello} className="orb-galaxia__destello" aria-hidden="true">
+                      {!faltantes.has("destello") ? <img src="/assets/orbita/hub/destello.webp" alt="" onError={() => falta("destello")} /> : "✦"}
+                    </span>}
+                  </div>
                 </div>
-                {frente && !girando && destello > 0 && galaxia.estado === "activa" && <span key={destello} className="orb-galaxia__destello" aria-hidden="true">
-                  {!faltantes.has("destello") ? <img src="/assets/orbita/hub/destello.webp" alt="" onError={() => falta("destello")} /> : "✦"}
-                </span>}
               </div>
-            </div>
               <div className="orb-galaxia__rotulo">
                 <span className="orb-galaxia__nombre">{galaxia.nombre || "pronto"}</span>
                 {!!record && <span className="orb-pildora orb-galaxia__record">récord {record.toLocaleString("es-AR")}</span>}
@@ -175,9 +206,15 @@ export function CarruselGalaxias({ perfil, records, destinoMensaje, bloqueado = 
                   {galaxia.estado === "activa" ? celular ? "Jugá desde una computadora" : "Enter para jugar" : ""}
                 </span>
               </div>
+            </div>
           </div>;
         })}</div>
       </div>
+      <div className="orb-carrusel__rastros" aria-hidden="true">{RASTROS.map(([x, y, angulo], i) =>
+        <span key={i} className="orb-carrusel__rastro" style={{
+          left: `${x}%`, top: `${y}%`, "--orb-angulo-rastro": `${angulo}deg`, "--orb-espera-rastro": `${i * -95}ms`,
+        } as CSSProperties} />
+      )}</div>
       {([-1, 1] as const).map(lado => {
         const nombre = lado < 0 ? "izquierda" : "derecha";
         return <button type="button" key={lado} className={`orb-carrusel__flecha orb-carrusel__flecha--${nombre}`}
