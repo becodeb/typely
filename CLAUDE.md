@@ -902,9 +902,10 @@ touchpad, windows, tabs, shortcuts, text editing, UI literacy). `SkillLevelView`
 
 ### 8.1 Modo Órbita (arcade)
 
-El segundo eje del producto: minijuegos infinitos y rejugables, medidos por
-supervivencia y velocidad — no por completación. El primero es **Tormenta de
-palabras** (`/orbita/tormenta`). La especificación de diseño completa vive en
+El segundo eje del producto es una sección de minijuegos rejugables, medidos
+por supervivencia y velocidad. Incluye **Tormenta de palabras**
+(`/orbita/tormenta`) y **Carrera de cohetes** (`/orbita/carrera`).
+La especificación de diseño de Tormenta vive en
 el artefacto "Tormenta de palabras"; acá va lo que hace falta para tocar el
 código sin romper sus reglas.
 
@@ -914,7 +915,7 @@ para modos futuros. Las rutas: `/orbita` (hub), `/orbita/tormenta` (el juego,
 con `SoloEnComputadora` igual que los niveles), `/orbita/ranking`,
 `/orbita/tienda` (la antigua `/orbita/hangar` redirige). Todo lazy.
 
-**Carrusel de minijuegos (etapa 2, hito 1 en revisión).** `/orbita` ya monta
+**Carrusel de minijuegos (etapa 2, aprobado).** `/orbita` monta
 `CarruselJuegos.tsx` con los cinco puestos de `orbitaJuegos.ts`: Tormenta,
 Carrera y tres juegos futuros. Por pedido expreso de Ezequiel del 07/09,
 las galaxias se reemplazaron por objetos simples: nube con palabras,
@@ -943,13 +944,64 @@ la escena. La nave acompaña con desplazamiento y estelas desde los motores
 reales de cada pose, del color equipado. Solo se animan transform y opacity;
 con movimiento reducido se apagan estos adornos y se conserva el fundido.
 Celular: explorar solamente.
-**Todavía no está implementada la Carrera:** su entrada muestra un aviso
-temporal. El ranking con pestañas y los récords por juego pertenecen a los
-siguientes hitos. No continuar con el motor hasta que Ezequiel apruebe el
-carrusel. El brief está en `Images/orbita/GALAXIAS-BRIEF.html`.
-Para la futura Carrera ya autorizó conservar los textos de 90–140 caracteres
-y las velocidades reales, ajustando con la simulación el máximo del examen
-para 8 PPM y admitiendo en el servidor carreras legítimas de menos de 15 s.
+El hito del carrusel se mostró antes de avanzar. Ezequiel habilitó la Carrera
+y aprobó sus sesenta párrafos el 08/09/2026. El brief original está en
+`Images/orbita/GALAXIAS-BRIEF.html`; las revisiones autorizadas se documentan acá.
+
+**Carrera de cohetes.** `CarreraPage.tsx` es lazy, con `SoloEnComputadora`.
+`MotorCarrera` (`src/utils/orbita/carrera.ts`) es puro: cada carácter correcto
+avanza una fracción del recorrido; hasta cinco errores coral bloquean el
+avance hasta borrarlos. El sexto se ignora. Backspace también retrocede una
+correcta, sin otra penalidad. La entrada usa `beforeinput`, composición y
+normalización NFC para conservar mayúsculas, tildes y ñ. No admite pegar.
+El texto completo aparece arriba, en hasta tres líneas; tres luces con pasos
+de 800 ms dan la largada. A los 20 s sin tecla se congelan nave, reloj y
+fantasmas; cualquier tecla retoma. Pestaña oculta también pausa.
+La carrera termina al completar el texto, sin vidas ni corte por tiempo.
+
+**Excepción explícita a las bandas:** todos corren los mismos sesenta
+párrafos escritos a mano y aprobados, sin depender del progreso de Aventura.
+`src/data/carreraTextos.ts` contiene IDs estables, 90–140 caracteres, dos o
+tres oraciones y solo letras, espacios, puntos, comas y signos de pregunta.
+Otra vez sortea un texto distinto del anterior. El examen valida todo el corpus.
+
+Hasta cuatro fantasmas avanzan a PPM constante: el récord propio y los tres
+mejores del grado de la semana ISO, con alias y cosméticos, sin nombres reales.
+`GET /api/arcade/ghosts?game=carrera` se consulta una vez al entrar; sin red,
+en demo o sin grado queda un rival a la mediana del grado, o 25 PPM.
+El puesto cuenta los fantasmas que llegaron estrictamente antes del alumno.
+Puntaje = `round(ppmNeto × (precision/100)² × 10)`; cristales =
+`round(caracteres/5)` más 12/8/5/2/2 por puesto. El resultado muestra tiempo,
+PPM, precisión, puesto, puntaje y cristales; los tres primeros reciben medalla.
+La pista, meta, luces, medallas y chispas son arte generado; las naves,
+mascotas, estelas y el sonido se reutilizan. Movimiento reducido apaga
+cursor pulsante, chispas y destellos decorativos.
+
+**Duraciones revisadas con autorización:** se mantienen el largo de los
+textos y las velocidades reales. En veinte párrafos por perfil, las medianas
+del examen son 200/100/56/35/22/16 s para 8/15/25/40/60/85 PPM.
+El máximo observado para 8 PPM es 229 s. Se comprueban 45–75 s para 25 PPM,
+25–45 s para 40 PPM y hasta 360 s en todos los perfiles. La API admite
+Carrera de 5–360 s para ranking (el juego puede completarse fuera de esa
+ventana); valida textId, largo exacto, PPM, precisión, fórmula del puntaje,
+puesto, nivel cero y ausencia de mejoras. Tormenta conserva sus límites.
+
+**Datos y ranking por juego:** migración `0007_arcade_carrera.sql`, tabla
+`arcade_bests` por alumno/juego y `arcade_runs.text_id`. Los récords previos
+de Tormenta se copian en la migración; los campos históricos del perfil
+siguen siendo de Tormenta. `/me` agrega `bests`, el ranking tiene pestañas
+y el hub muestra el récord de cada juego. El récord local migra el formato
+anterior a un mapa por juego. Las partidas usan la cola existente y se
+reintentan al volver al hub; el demo nunca manda datos a la API.
+
+Verificación de Carrera (08/09/2026): build y TypeScript de API; examen de
+Carrera y ambos exámenes de Tormenta; integración local de migración,
+validación, cristales, récords, fantasmas y ranking. En Chrome se verificaron
+entrada, errores, composición, pausas, resultado, otra carrera y envío
+pendiente al recuperar la red, a 1366×768, 1366×912 y 1440×900 sin scroll.
+Movimiento reducido verificado; la ruta sigue siendo solo de exploración
+en celular a 375×812. Frontend y API reconstruidos en Docker, API saludable
+y proxy HTTP 200 en el puerto local 3007; el 3005 estaba ocupado.
 
 Verificación del hito 1 (08/09/2026): build, TypeScript de API y ambos
 exámenes de Tormenta aprobados; navegación y ausencia de scroll verificadas

@@ -1030,5 +1030,30 @@ a 1672×941. Se conserva su resolución nativa, sin agrandarlo artificialmente;
 la fuente de mayor resolución sigue pendiente. Los WebP de las cinco
 galaxias sí tienen 1536×1024.
 
-El arte de pista, largada, medallas y chispas corresponde a los siguientes
-hitos del brief. No está generado ni importado todavía.
+**Arte de Carrera incorporado (08/09/2026).** Los prompts completos, las
+referencias y las revisiones de cada generación están en
+[`carrera/prompts.md`](carrera/prompts.md). Se conserva cada PNG original,
+incluidas las propuestas descartadas; solo se procesan las copias web.
+
+| Fuente en `carrera/` | WebP en `public/assets/orbita/carrera/` | Medida final |
+| --- | --- | --- |
+| `recta-source.png` | `recta.webp` | 1672×941, alpha |
+| `meta-source.png` | `meta.webp` | 1024×1024, alpha |
+| `banderin-rojo-source.png`, `banderin-amarillo-source.png`, `banderin-verde-source.png` | nombres equivalentes `.webp` | 512×512, alpha |
+| `medalla-oro-source.png`, `medalla-plata-source.png`, `medalla-bronce-source.png` | nombres equivalentes `.webp` | 1024×1024, alpha |
+| `chispa-1-source.png`, `chispa-2-source.png`, `chispa-3-source.png` | nombres equivalentes `.webp` | 256×256, alpha |
+
+Importación reproducible: `node scripts/import-orbita-art.mjs carrera`.
+El mate negro de la recta, la medalla de plata y la de bronce se retira con
+la receta sharp autorizada; las demás fuentes ya contienen alpha real.
+El importador mide la transparencia del 35 % superior de la recta: alpha
+medio 0,000. **La recta conserva el lienzo entero**, sin recortar ni
+reencuadrar: los cinco carriles usan anclajes proporcionales a ese lienzo.
+El generador devolvió 1672×941 aunque se solicitaron 2560×1440; se conserva
+la resolución nativa y sigue pendiente una fuente mayor, sin ampliar píxeles.
+
+`node scripts/preview-orbita-carrera.mjs` arma la revisión de pista con
+texto, meta, luces, medallas y partículas en `.preview-orbita/arte-carrera.html`.
+Se verificaron además en la Carrera real a 1366×768 y 1366×912, con cuatro
+fantasmas, naves equipadas y medalla en el resultado. Las correcciones de
+plata y bronce separan claramente sus metales del oro.

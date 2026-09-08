@@ -9,6 +9,46 @@
   when applicable.
 - Tests we run at the end of every phase: `npm run build`.
 
+## Órbita — Carrera de cohetes (08/09/2026)
+
+- `api/migrations/0007_arcade_carrera.sql`: agrega `arcade_bests` por
+  alumno y juego, copia los récords de Tormenta y agrega `text_id` a las
+  partidas. Migración aplicada en el Postgres local con Docker.
+- `api/src/db/schema.ts`: refleja la tabla y la columna nuevas sin cambiar
+  los campos históricos del perfil de Tormenta.
+- `api/src/carrera.ts`: valida texto conocido y largo exacto, duración
+  5–360 s (revisión autorizada), PPM coherentes, precisión, puntaje, puesto,
+  nivel cero y mejoras vacías; calcula los cristales con la fórmula del motor.
+- `api/src/carreraTextos.json`: metadatos de los sesenta textos aprobados.
+  `scripts/preparar-carrera-servidor.mjs` los genera desde el corpus del
+  cliente; el examen exige que ambos sigan coincidiendo. El JSON viaja en
+  el compilado de API, independiente del árbol de fuentes del frontend.
+- `api/src/routes/arcade.ts`: acepta Carrera, mantiene compatibilidad con
+  cargas antiguas de Tormenta, guarda récords por juego y devuelve `bests`
+  en `/me`. `GET /api/arcade/ghosts?game=carrera` devuelve récord propio,
+  tres mejores del grado esta semana y mediana; solo alias y cosméticos.
+  Tormenta conserva su validación y sus campos anteriores del perfil.
+- `api/src/scripts/verificar-carrera.ts`: prueba carreras de 200, 40 y 12 s,
+  rechaza datos alterados, verifica cristales, aislamiento entre juegos,
+  fantasmas, privacidad y ranking. Crea cuentas efímeras sobre la base
+  local sembrada y las elimina al terminar. Ejecución desde `api/`:
+  `node --env-file=.env --import tsx src/scripts/verificar-carrera.ts`.
+- `src/utils/api.ts` y `src/utils/orbita/arcade.ts`: cargas de Carrera con
+  `textId`, récord local por juego y cola existente. Verificados en navegador
+  con cuentas locales: cuatro fantasmas, envío sin conexión, reintento al
+  volver al hub y ningún envío en modo demo.
+- `.dockerignore`: excluye también dependencias, compilados y archivos
+  `.env` anidados. La prueba de Docker desde Windows detectó que `COPY api/`
+  pisaba el bcrypt Linux con el binario local de Windows. Reconstrucción
+  verificada: API saludable y frontend con HTTP 200 detrás de nginx en
+  `127.0.0.1:3007` (3005 ya estaba ocupado por otra prueba local).
+
+Validación: build del frontend, TypeScript de API, `simular-carrera.mjs`,
+ambos exámenes de Tormenta y verificaciones de API `verificar-carrera.ts`,
+`verificar-signos.ts` y `verificar-tienda.ts` aprobados.
+La salida requiere frontend y API con migración 0007; merge y deploy manual
+de Ezequiel, según `DEPLOY.md`. No hay autodeploy.
+
 ## Phase A — Naming & order cleanup (in progress)
 
 ### Decision
