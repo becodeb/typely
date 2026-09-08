@@ -106,6 +106,7 @@ const PIEZAS = [
   // La recta conserva el lienzo: recortar el aire superior desplazaría
   // todos los carriles. La zona del texto se controla antes de exportar.
   { grupo: "carrera", base: "recta", tope: 2560, alfa: true, mate: "negro", arribaLimpio: .03, arribaFraccion: .35 },
+  { grupo: "carrera", base: "recta-frontal", tope: 2560, alfa: true, mate: "negro", arribaLimpio: .03, arribaFraccion: .35 },
   ...["meta", "medalla-oro", "medalla-plata", "medalla-bronce"].map(base => ({ grupo: "carrera", base, tope: 1024, alfa: true, mate: "negro", recortar: true, encuadrar: true })),
   ...["banderin-rojo", "banderin-amarillo", "banderin-verde"].map(base => ({ grupo: "carrera", base, tope: 512, alfa: true, mate: "negro", recortar: true, encuadrar: true })),
   ...["chispa-1", "chispa-2", "chispa-3"].map(base => ({ grupo: "carrera", base, tope: 256, alfa: true, mate: "negro", recortar: true, encuadrar: true })),

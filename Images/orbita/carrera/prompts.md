@@ -127,3 +127,22 @@ Generación: `exec-40c1bd48-d018-4be0-aa31-eab782971c57`.
 ```text
 Las tres referencias son de TYPELY: noche y las islas, estación de piedra lavanda y cristales, paleta espacial. Crear una pieza NUEVA del mismo cuento infantil. 3D suave de caramelo, luz cálida, colores saturados limpios, formas redondeadas. PNG con TRANSPARENCIA REAL; si no podés entregar alpha usar fondo NEGRO PURO #000000, sin gradiente ni damero, para quitarlo con sharp autorizado. Sin texto, interfaz, marco ni sombra exterior. 256×256. CHISPA DE ESTELA: una única partícula de luz suelta, estrellita de cuatro puntas rosa, con volumen y brillo, sin fondo ni otras partículas. Centrada, grande en el cuadro.
 ```
+
+## Recta frontal sin deformación (08/09/2026)
+
+La imagen lateral deformada y la segunda copia que parecía una escalera
+se retiraron de la pantalla. La nueva fuente es `recta-frontal-source.png`
+(1536×1024), generación `exec-ba13e810-7fd2-4ac6-bd76-53c4e7a6c08e`.
+`recta-frontal-guia.png` fija la geometría y `recta-frontal-estilo.png`
+conserva la referencia de materiales, generación
+`exec-895985e7-770a-439c-97de-a887a396c60a`.
+
+Prompt final, con guía como imagen 1 y referencia de estilo como imagen 2:
+
+> La IMAGEN 1 es la geometría OBLIGATORIA, la IMAGEN 2 es SOLO la referencia de materiales y detalles. Renderizá la imagen 1 como una pista de cristal del estilo de la imagen 2. Conservá EXACTAMENTE la silueta y las seis líneas divisorias de la imagen 1: su extremo lejano mide apenas 72 píxeles entre x732 y x804 en y410 del lienzo 1536x1024. Son CINCO carriles, todos llegan a ese pequeño extremo. Suelo índigo y violeta, finas líneas luminosas turquesa y lavanda, pequeños paneles de cristal y pequeñas marcas luminosas, nítidos y proporcionados, sin manchas ni estrellas grandes ni textura estirada. No copies la anchura lejana de la imagen 2: es demasiado grande. Debés RESPETAR la silueta de la PRIMERA imagen sin ensancharla, sin estrecharla y sin cambiar la cámara. NEGRO PURO #000000 en todo el exterior del polígono, incluyendo toda la parte de arriba. Sin ninguna plataforma adicional, sin escalón, sin base saliente, sin arco ni naves, sin texto. Queremos pintar materiales sobre la guía precisa, no rediseñar su geometría.
+
+El importador conserva el lienzo, quita el mate negro con sharp (autorizado)
+y exporta `recta-frontal.webp`: 99 KB, alpha medio 0,000 en el 35 % superior.
+En pantalla solo hay escala uniforme y traslación. Las coordenadas de los
+corredores se calculan sobre los carriles pintados; no hay homografía ni
+otra imagen debajo del arco. Los originales anteriores quedan conservados.
