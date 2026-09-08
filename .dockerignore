@@ -2,6 +2,8 @@
 node_modules
 dist
 dist-ssr
+**/node_modules
+**/dist
 
 # VCS / editor / OS clutter.
 .git
@@ -16,6 +18,9 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+**/.env
+**/.env.*
+!**/.env.example
 
 # Logs.
 logs
@@ -52,3 +57,7 @@ secrets/*
 
 # Claude/agent scratch.
 .claude
+
+# Revisiones locales de Órbita: capturas, videos y pruebas del navegador.
+.preview-orbita
+_backups
