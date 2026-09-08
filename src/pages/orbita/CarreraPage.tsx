@@ -5,6 +5,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../utils/api";
 import { hidratarPerfil, perfilLocal, registrarPartida, sincronizaArcade } from "../../utils/orbita/arcade";
 import { elegirTextoCarrera } from "../../data/carreraTextos";
+import { camaraCarrera } from "../../utils/orbita/pistaCarrera";
 import { JUEGOS_ORBITA, recordarJuego } from "../../data/orbitaJuegos";
 import { MotorCarrera, type EventoCarrera, type FantasmaCarrera, type ResultadoCarrera } from "../../utils/orbita/carrera";
 import { NaveOrbita } from "../../components/orbita/NaveOrbita";
@@ -29,7 +30,7 @@ export default function CarreraPage() {
   const entrada = useRef<HTMLInputElement>(null), escena = useRef<HTMLDivElement>(null);
   const voz = useRef<HTMLDivElement>(null), naveAlumno = useRef<HTMLDivElement>(null);
   const naves = useRef(new Map<string,HTMLDivElement>());
-  const meta = useRef<HTMLImageElement>(null), motor = useRef<MotorCarrera | null>(null);
+  const recta = useRef<HTMLImageElement>(null), baseMeta = useRef<HTMLImageElement>(null), meta = useRef<HTMLImageElement>(null), motor = useRef<MotorCarrera | null>(null);
   const sonidoRef = useRef(sonido); sonidoRef.current = sonido;
   const efectos = useRef(new Set<Animation>());
   const generacion = useRef(0);
@@ -58,7 +59,7 @@ export default function CarreraPage() {
     for (const e of eventos) {
       if (e.tipo === "acierto") {
         const chispa = naveAlumno.current?.querySelector(".car-chispa");
-        if (chispa) { (chispa as HTMLImageElement).src = `/assets/orbita/carrera/chispa-${e.indice % 3 + 1}.webp`; animar(chispa,[{opacity:1,transform:"translateX(0) scale(1)"},{opacity:0,transform:"translateX(-55px) scale(.2)"}]); }
+        if (chispa) { (chispa as HTMLImageElement).src = `/assets/orbita/carrera/chispa-${e.indice % 3 + 1}.webp`; animar(chispa,[{opacity:1,transform:"translateX(0) scale(1)"},{opacity:0,transform:"translateY(55px) scale(.2)"}]); }
       }
       if (e.tipo === "error") {
         animar(naveAlumno.current?.querySelector(".car-casco"),[{translate:"0 0"},{translate:"-5px 0"},{translate:"0 0"}]);
@@ -89,13 +90,22 @@ export default function CarreraPage() {
     motor.current = m;
     let raf = 0, anterior = performance.now(), ultimoHud = 0, ultimaLuz = -1, esperaBot = 0;
     let ancho = escena.current?.clientWidth ?? 1366, alto = escena.current?.clientHeight ?? 768;
-    const observar = new ResizeObserver(([r])=>{if(r){ancho=r.contentRect.width;alto=r.contentRect.height;}});
+    let camara = camaraCarrera(ancho,alto);
+    const ajustarCamara = () => {
+      camara=camaraCarrera(ancho,alto);
+      if(recta.current)recta.current.style.transform=camara.matriz;
+      if(baseMeta.current)baseMeta.current.style.transform=camara.base;
+      if(meta.current){meta.current.style.width=camara.arco+"px";meta.current.style.left=ancho/2+"px";meta.current.style.top=(camara.llegada-camara.arco*.91)+"px";}
+    };
+    const observar = new ResizeObserver(([r])=>{if(r){ancho=r.contentRect.width;alto=r.contentRect.height;ajustarCamara();}});
     if (escena.current) observar.observe(escena.current);
+    ajustarCamara();
     const posicionar = (el: HTMLElement | null | undefined, progreso: number, carril: number) => {
       if (!el) return;
-      // Anclajes medidos sobre recta.webp: centros de los cinco carriles.
-      const y = (.624 + carril*.066) * (1-progreso) + (.554 + carril*.039)*progreso;
-      el.style.transform = `translate3d(${(.085+.823*progreso)*ancho}px,${y*alto}px,0)`;
+      const p=camara.corredor(progreso,carril);
+      el.style.transform = `translate3d(${p.x}px,${p.y}px,0) scale(${p.escala})`;
+      el.style.zIndex=String(10+Math.round((1-progreso)*100));
+      el.style.setProperty("--car-alias-opacidad",String(Math.max(0,1-progreso*1.5)));
     };
     const cuadro = (ahora: number) => {
       const dt = Math.min(80,Math.max(0,ahora-anterior)); anterior = ahora;
@@ -107,7 +117,6 @@ export default function CarreraPage() {
       }
       posicionar(naveAlumno.current,m.progreso,2);
       m.fantasmas.forEach((f,i)=>posicionar(naves.current.get(f.id),f.progreso,[0,1,3,4][i]!));
-      if (meta.current) meta.current.style.transform = `translate(-50%,-50%) scale(${.9+.1*m.progreso})`;
       const luz = Math.min(2,Math.floor(m.cuentaMs/800)-1);
       if (luz !== ultimaLuz) { ultimaLuz=luz; if(sonidoRef.current)blip(220+luz*180,330+luz*180,.03); }
       if (ahora-ultimoHud >= 100) {ultimoHud=ahora;refrescar(n=>n+1);}
@@ -172,27 +181,27 @@ export default function CarreraPage() {
     const equipo=r?.id === "propio" || !r ? perfil?.equipped : r;
     return <><div className="car-casco"><NaveOrbita nave={navePorId(equipo?.ship)} pausada={pausada} colorMotor={colorEstela(equipo?.trail)} efectoEstela={efectoCosmetico(equipo?.trail)} /></div><MascotaOrbita id={equipo?.pet} pausada={pausada} contexto={r ? "tienda" : "partida"} destinoMensaje={r ? undefined : voz} /></>;
   };
-  return <main className="car-pagina" aria-label="Carrera de cohetes">
-    <div className="orb-fondo" style={{"--orb-nebulosa":"url(/assets/orbita/fondo/nebulosa.webp)","--orb-horizonte":"url(/assets/orbita/fondo/horizonte.webp)","--orb-tinte":"rgb(112, 96, 230)"} as CSSProperties} aria-hidden="true">
+  return <main className="car-pagina" data-resultado={!!resultado} aria-label="Carrera de cohetes">
+    <div className="orb-fondo car-cielo" style={{"--orb-nebulosa":"url(/assets/orbita/fondo/nebulosa.webp)","--orb-horizonte":"url(/assets/orbita/fondo/horizonte.webp)","--orb-tinte":"rgb(112, 96, 230)"} as CSSProperties} aria-hidden="true">
       <img className="orb-estrellas" src="/assets/orbita/fondo/estrellas.webp" alt=""/><div className="orb-tinte"/><img className="orb-horizonte" src="/assets/orbita/fondo/horizonte.webp" alt=""/>
     </div>
-    <div className="car-barra"><button className="orb-pildora orb-pildora--boton" onClick={()=>navigate("/orbita")}><ArrowLeft size={17}/> Órbita</button><h1 className="orb-dato">Carrera de cohetes</h1><button className="orb-pildora orb-pildora--boton" aria-label={sonido ? "Apagar sonido" : "Prender sonido"} onClick={()=>setSonido(v=>{try{localStorage.setItem(SONIDO_KEY,v ? "0":"1");}catch{/* Sin almacenamiento. */}return !v;})}>{sonido ? <Volume2 size={19}/> : <VolumeX size={19}/>}</button></div>
+    <div className="car-barra"><button className="orb-pildora orb-pildora--boton" onClick={()=>navigate("/orbita")}><ArrowLeft size={17}/> Órbita</button><h1 className="orb-dato">Carrera de cohetes</h1><div className="car-instrumentos"><div className="car-instrumento"><span>TIEMPO</span><b>{reloj(m?.tiempoMs ?? 0)}</b></div><div className="car-instrumento"><span>RITMO</span><b>{m?.ppm ?? 0}<small> PPM</small></b></div><button className="orb-pildora orb-pildora--boton" aria-label={sonido ? "Apagar sonido" : "Prender sonido"} onClick={()=>setSonido(v=>{try{localStorage.setItem(SONIDO_KEY,v ? "0":"1");}catch{/* Sin almacenamiento. */}return !v;})}>{sonido ? <Volume2 size={19}/> : <VolumeX size={19}/>}</button></div></div>
     <input ref={entrada} className="car-entrada" autoCapitalize="off" autoCorrect="off" autoComplete="off" spellCheck={false} aria-label="Escribí el texto de la carrera" tabIndex={-1}/>
     <section className="car-lectura" aria-label="Texto para escribir">
-      <p className="car-texto">{texto.texto.split(/( )/).map((palabra,i)=><span className={palabra === " " ? undefined : "car-palabra"} key={i}>{[...palabra].map(ch=>{
+      <p className="car-consigna">Escribí para impulsar tu nave</p><p className="car-texto">{texto.texto.split(/( )/).map((palabra,i)=><span className={palabra === " " ? undefined : "car-palabra"} key={i}>{[...palabra].map(ch=>{
         const indice=letra++, roja=m && indice>=m.indice && indice<m.indice+m.rojas.length;
         return <span key={indice} className={roja ? "car-letra--error" : indice<(m?.indice ?? 0) ? "car-letra--bien" : indice===(m?.indice ?? 0) ? "car-letra--actual" : ""}>{roja ? m.rojas[indice-m.indice] === " " ? "␣" : m.rojas[indice-m.indice] : ch}</span>;
       })}</span>)}{m && m.rojas.slice(Math.max(0,m.texto.length-m.indice)).map((ch,i)=><span className="car-letra--error" key={`extra-${i}`}>{ch === " " ? "␣" : ch}</span>)}</p>
-      <div className="car-datos orb-dato"><span>{reloj(m?.tiempoMs ?? 0)}</span><span>{m?.ppm ?? 0} PPM</span></div>
-      <p className="car-ayuda orb-dato" aria-live="polite">{m?.rojas.length ? "Borrá las letras rojas con Backspace para seguir." : !m?.largada ? "Leé el texto y preparate para salir." : "Cada letra correcta impulsa tu nave."}</p>
+      <div className="car-pie-lectura"><p className="car-ayuda orb-dato" aria-live="polite">{m?.rojas.length ? "Borrá las letras rojas con Backspace para seguir." : !m?.largada ? "Leé el texto y preparate para salir." : "Seguí el texto. Cada letra te acerca a la meta."}</p><span className="car-avance">{Math.round((m?.progreso ?? 0)*100)} %</span></div><div className="car-progreso" aria-hidden="true"><i style={{transform:`scaleX(${m?.progreso ?? 0})`}}/></div>
     </section>
     <div className="car-escena" ref={escena} aria-hidden="true">
-      <img className="car-recta" src="/assets/orbita/carrera/recta.webp" alt=""/>
+      <img ref={recta} className="car-recta" src="/assets/orbita/carrera/recta.webp" alt=""/>
+      <img ref={baseMeta} className="car-recta car-base-meta" src="/assets/orbita/carrera/recta.webp" alt=""/>
       <img ref={meta} className="car-meta" src="/assets/orbita/carrera/meta.webp" alt=""/>
       {(rivales ?? []).map(r=><div className="car-corredor car-corredor--fantasma" key={r.id} ref={el=>{if(el)naves.current.set(r.id,el);else naves.current.delete(r.id);}}><span className="car-alias orb-dato">{r.alias}</span>{casco(r)}</div>)}
-      <div className="car-corredor car-corredor--alumno" ref={naveAlumno}><span className="car-alias orb-dato">{perfil?.alias ?? "vos"}</span>{casco(null)}<img className="car-chispa" src="/assets/orbita/carrera/chispa-1.webp" alt=""/><img className="car-destello" src="/assets/orbita/hub/destello.webp" alt=""/></div>
+      <div className="car-corredor car-corredor--alumno" ref={naveAlumno}><span className="car-alias car-alias--vos orb-dato">VOS</span>{casco(null)}<img className="car-chispa" src="/assets/orbita/carrera/chispa-1.webp" alt=""/><img className="car-destello" src="/assets/orbita/hub/destello.webp" alt=""/></div>
     </div>
-    {!resultado && (!m?.largada || (m?.tiempoMs ?? 0)<650) && <div className="car-largada" role="status"><div>{["rojo","amarillo","verde"].map((color,i)=><img key={color} data-encendido={!!m && m.cuentaMs >= (i+1)*800} src={`/assets/orbita/carrera/banderin-${color}.webp`} alt={color}/>)}</div><strong className="orb-dato">{!rivales ? "Preparando la pista…" : m?.largada ? "¡Ya!" : "Preparate"}</strong></div>}
+    {!resultado && <div data-lista={!!m?.largada && m.tiempoMs>=650} className="car-largada" role="status"><div>{["rojo","amarillo","verde"].map((color,i)=><img key={color} data-encendido={!!m && m.cuentaMs >= (i+1)*800} src={`/assets/orbita/carrera/banderin-${color}.webp`} alt={color}/>)}</div><strong className="orb-dato">{!rivales ? "Preparando la pista…" : m?.largada ? "¡Ya!" : "Preparate"}</strong></div>}
     <div ref={voz} className="car-voz"/>
     {m?.inactivo && !resultado && <div className="car-capa"><section className="orb-vidrio tarjeta-marca car-pausa" role="dialog" aria-modal="true" aria-labelledby="car-seguimos"><h2 id="car-seguimos">¿Seguimos?</h2><p>Tu nave y los fantasmas te esperan.</p><button autoFocus className="orb-boton-vidrio" onClick={()=>{procesar(m.reanudar());entrada.current?.focus();}}>Seguir corriendo</button><p>También podés apretar cualquier tecla.</p></section></div>}
     {resultado && <div className="car-capa"><section className="orb-vidrio tarjeta-marca car-resultado" role="dialog" aria-modal="true" aria-labelledby="car-fin" onKeyDown={e=>{
