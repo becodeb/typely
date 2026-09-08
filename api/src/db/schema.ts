@@ -238,6 +238,14 @@ export const arcadeProfile = pgTable("arcade_profile", {
 
 /* Una partida, append-only. `ranked=false` = la telemetría no cerró: se
    guarda como dato pero no compite ni acuña cristales. */
+export const arcadeBests = pgTable("arcade_bests", {
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  gameId: text("game_id").notNull(),
+  bestScore: integer("best_score").notNull().default(0),
+  bestWpm: smallint("best_wpm").notNull().default(0),
+  bestAt: timestamp("best_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => ({ pk: primaryKey({ columns: [t.userId, t.gameId] }) }));
+
 export const arcadeRuns = pgTable(
   "arcade_runs",
   {
@@ -245,7 +253,8 @@ export const arcadeRuns = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    gameId: text("game_id").notNull(),
+      gameId: text("game_id").notNull(),
+      textId: text("text_id"),
     startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
     endedAt: timestamp("ended_at", { withTimezone: true }).notNull(),
     durationMs: integer("duration_ms").notNull(),

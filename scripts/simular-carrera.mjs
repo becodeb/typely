@@ -1,7 +1,7 @@
 /* Examen del motor real y del corpus. Cada error y cada borrado consumen
  * tiempo de tipeo: corregir no es gratis y el reloj nunca se adapta. */
 import { build } from "esbuild";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
 import assert from "node:assert/strict";
@@ -12,6 +12,10 @@ const bundle = path.join(salida, "carrera-examen.bundle.mjs");
 await build({ stdin: { contents: 'export * from "./src/utils/orbita/carrera"; export * from "./src/data/carreraTextos";', resolveDir: raiz }, bundle: true, format: "esm", outfile: bundle, logLevel: "silent" });
 const { MotorCarrera, TEXTOS_CARRERA, elegirTextoCarrera } = await import(pathToFileURL(bundle).href);
 assert.equal(TEXTOS_CARRERA.length, 60);
+const largosApi = JSON.parse(readFileSync(path.join(raiz,"api/src/carreraTextos.json"),"utf8"));
+assert.deepEqual(largosApi,Object.fromEntries(TEXTOS_CARRERA.map(t=>[t.id,t.texto.length])),"Regenerá los largos del servidor si cambió el corpus");
+const validacion = await build({entryPoints:[path.join(raiz,"api/src/carrera.ts")],bundle:true,format:"esm",write:false,logLevel:"silent"});
+const {validarCarrera,cristalesDeCarrera} = await import(`data:text/javascript;base64,${Buffer.from(validacion.outputFiles[0].text).toString("base64")}`);
 assert.equal(new Set(TEXTOS_CARRERA.map(t => t.texto)).size, 60);
 assert.equal(new Set(TEXTOS_CARRERA.map(t => t.texto.split(/[.?]/)[0])).size, 60);
 for (const {id,texto} of TEXTOS_CARRERA) {
@@ -42,6 +46,9 @@ for (const [ppm,error] of perfiles) {
     assert.equal(m.resultado.precision, Math.round(100 * texto.length / (texto.length + errores)));
     assert.equal(m.resultado.ppmNeto, Math.round(texto.length * 12000 / m.tiempoMs));
     assert(m.resultado.puesto >= 1 && m.resultado.puesto <= 2);
+    const carga = {textId:id,durationMs:m.resultado.durationMs,charsTyped:texto.length,wpmAvg:m.resultado.ppmNeto,accuracy:m.resultado.precision,score:m.resultado.puntaje,puesto:m.resultado.puesto,level:0,upgrades:[]};
+    assert(validarCarrera(carga)); assert.equal(cristalesDeCarrera(carga),m.resultado.cristales);
+    for (const cambio of [{score:carga.score+10},{textId:"inexistente"},{charsTyped:99.5},{wpmAvg:251},{level:1},{upgrades:[{}]},{puesto:6},{durationMs:400000}]) assert(!validarCarrera({...carga,...cambio}));
     return m.resultado;
   });
   const mediana = clave => corridas.map(r => r[clave]).sort((a,b)=>a-b)[10];
