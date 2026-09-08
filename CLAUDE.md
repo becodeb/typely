@@ -977,6 +977,20 @@ La pista, meta, luces, medallas y chispas son arte generado; las naves,
 mascotas, estelas y el sonido se reutilizan. Movimiento reducido apaga
 cursor pulsante, chispas y destellos decorativos.
 
+**Revisión visual de Carrera (08/09/2026):** a pedido de Ezequiel se reemplazó
+la vista lateral por una cámara detrás de las naves. `pistaCarrera.ts` define
+la proyección común de los cinco carriles, sus corredores y la llegada.
+La recta existente se proyecta en CSS desde sus cuatro bordes pintados y
+continúa debajo de la cámara; una segunda copia forma la base del arco.
+El arco mira de frente, apoyado sobre esa base, con su abertura alineada al
+final de los carriles. Las naves conservan su orientación frontal y reducen
+su escala al alejarse; los alias se atenúan a distancia. No se alteraron los
+PNG. Texto alineado a la izquierda, consigna y progreso en un mismo bloque,
+tiempo y ritmo agrupados en la barra, luces de largada junto a la consigna.
+El alto de la pista depende del espacio que deja el párrafo, incluso si
+ocupa tres líneas. El resultado refuerza la separación del fondo y la
+jerarquía entre medalla, puesto, puntaje y métricas.
+
 **Duraciones revisadas con autorización:** se mantienen el largo de los
 textos y las velocidades reales. En veinte párrafos por perfil, las medianas
 del examen son 200/100/56/35/22/16 s para 8/15/25/40/60/85 PPM.

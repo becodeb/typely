@@ -1057,3 +1057,11 @@ texto, meta, luces, medallas y partículas en `.preview-orbita/arte-carrera.html
 Se verificaron además en la Carrera real a 1366×768 y 1366×912, con cuatro
 fantasmas, naves equipadas y medalla en el resultado. Las correcciones de
 plata y bronce separan claramente sus metales del oro.
+
+**Nueva puesta de cámara, autorizada el 08/09/2026:** la vista lateral fue
+reemplazada por una vista desde atrás de las naves. Se reutilizan estos
+WebP sin editar las fuentes: `pistaCarrera.ts` proyecta el cuadrilátero de
+la recta en CSS y coloca una segunda copia como apoyo del arco frontal.
+El recorte CSS excluye las nubes deformadas por la proyección. Las mismas
+coordenadas colocan las naves en sus carriles y ajustan su tamaño con la
+distancia. La pista continúa fuera del borde inferior de la pantalla.
