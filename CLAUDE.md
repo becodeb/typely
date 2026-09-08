@@ -914,6 +914,29 @@ para modos futuros. Las rutas: `/orbita` (hub), `/orbita/tormenta` (el juego,
 con `SoloEnComputadora` igual que los niveles), `/orbita/ranking`,
 `/orbita/tienda` (la antigua `/orbita/hangar` redirige). Todo lazy.
 
+**Carrusel de galaxias (etapa 2, hito 1 en revisión).** `/orbita` ya monta
+`CarruselGalaxias.tsx` con los cinco puestos de `orbitaGalaxias.ts`: Tormenta,
+Carrera y tres galaxias dormidas. CSS 3D, destino entero sin acotar, giros
+de 700/1000/1200 ms según los gestos encadenados, teclado, flechas de vidrio,
+deslizar y clic lateral. La nave equipada y su mascota acompañan el giro;
+el cielo recibe el impulso contrario y vuelve al centro al descansar.
+El sonido comparte interruptor y clave con Tormenta. Movimiento reducido
+funde en 200 ms, sin rotación, inclinación, parallax ni respiración.
+Se conserva la selección en `typely_orbita_galaxia_v1`. La estación con
+la nave posada pasó a `Puerto.tsx`, fondo de la tienda.
+
+La distribución vertical se ajustó con autorización de Ezequiel para que
+arte, nombres y nave no se tapen a 1366×768 y 1366×912; se conservan radio,
+perspectiva, tamaño de las piezas y giro del brief. Los nombres laterales
+miran al lector aunque el disco se vea de canto. Celular: explorar solamente.
+**Todavía no está implementada la Carrera:** su entrada muestra un aviso
+temporal. El ranking con pestañas y los récords por juego pertenecen a los
+siguientes hitos. No continuar con el motor hasta que Ezequiel apruebe el
+carrusel. El brief está en `Images/orbita/GALAXIAS-BRIEF.html`.
+Para la futura Carrera ya autorizó conservar los textos de 90–140 caracteres
+y las velocidades reales, ajustando con la simulación el máximo del examen
+para 8 PPM y admitiendo en el servidor carreras legítimas de menos de 15 s.
+
 **Bonus Tormenta de signos.** `tormentaSignos.ts` controla una única oleada
 por partida, sin mirar el progreso de Aventura ni exigir precisión. Se
 habilita con seis intervalos dentro de palabras que promedien como máximo

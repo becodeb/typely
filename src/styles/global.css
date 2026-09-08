@@ -2452,7 +2452,7 @@ a { color: inherit; text-decoration: none; }
 .orb-carrusel__flecha--izquierda { left: max(2%, calc(50% - 510px)); }
 .orb-carrusel__flecha--derecha { right: max(2%, calc(50% - 510px)); }
 .orb-carrusel__flecha:active { transform: scale(.94); filter: brightness(1.1); }
-.orb-carrusel__flecha:focus-visible, .orb-lista-galaxias:focus-visible .orb-galaxia--frente .orb-galaxia__nombre { outline: 3px solid #5ff3d4; outline-offset: 7px; border-radius: 7px; }
+.orb-carrusel__flecha:focus-visible, .orb-lista-galaxias:focus-visible .orb-galaxia--frente .orb-galaxia__nombre { outline: 3px solid #5ff3d4; outline-offset: 3px; border-radius: 7px; }
 .orb-carrusel__escuadra { position: absolute; bottom: 0; left: 50%; width: clamp(110px, 12vw, 160px); translate: -50% 0; pointer-events: none; }
 .orb-carrusel__nave { position: relative; transform: rotate(var(--orb-inclinacion)); transition: transform 420ms var(--orb-curva); }
 .orb-carrusel__nave .orb-mascota { left: 100%; top: 36%; width: 38%; }
