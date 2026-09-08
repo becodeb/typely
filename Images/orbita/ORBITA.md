@@ -953,3 +953,50 @@ color del cristal. Si a 72 px se confunden, el que cambia es el de regeneración
 fila se ven como una familia, y a 96 px se reconoce cada símbolo sin leer el
 nombre. Importar con `node scripts/import-orbita-art.mjs gemas`; el importador
 rechaza cualquier nombre que no sea uno de los ocho.
+
+### 7.7 Galaxias y nuevo inicio de Órbita (hito 1)
+
+La segunda propuesta de Tormenta fue aprobada por Ezequiel como molde.
+Los prompts exactos de las dos propuestas están en
+[`galaxias/tormenta-propuesta-prompts.md`](galaxias/tormenta-propuesta-prompts.md).
+Los ocho prompts ejecutados para completar el carrusel están en
+[`galaxias/prompts-carrusel.md`](galaxias/prompts-carrusel.md): Carrera,
+nebulosa huevo, hielo, remolino, fondo profundo, flechas izquierda/derecha
+y destello. Se usó la herramienta integrada imagegen con el molde aprobado
+y las referencias del mundo, la estación y el cielo. Las cinco galaxias
+se revisan juntas en el carrusel real; queda pendiente esa aprobación.
+
+| Fuente conservada en `Images/orbita/` | WebP servido | Dimensiones finales |
+|---|---|---|
+| `galaxias/tormenta-source.png` | `galaxias/tormenta.webp` | 1536×1024, alpha |
+| `galaxias/carrera-source.png` | `galaxias/carrera.webp` | 1536×1024, alpha |
+| `galaxias/dormida-huevo-source.png` | `galaxias/dormida-huevo.webp` | 1536×1024, alpha |
+| `galaxias/dormida-hielo-source.png` | `galaxias/dormida-hielo.webp` | 1536×1024, alpha |
+| `galaxias/dormida-remolino-source.png` | `galaxias/dormida-remolino.webp` | 1536×1024, alpha |
+| `hub/fondo-profundo-source.png` | `hub/fondo-profundo.webp` | 1672×941, opaco |
+| `hub/flecha-izquierda-source.png` | `hub/flecha-izquierda.webp` | 512×512, alpha |
+| `hub/flecha-derecha-source.png` | `hub/flecha-derecha.webp` | 512×512, alpha |
+| `hub/destello-source.png` | `hub/destello.webp` | 512×512, alpha |
+
+**Transparencia:** la herramienta devolvió RGB, con un damero claro en
+Tormenta y remolino, y mate negro en las demás piezas recortables. Ezequiel
+autorizó expresamente procesar los fondos con sharp el 07/09/2026,
+conservando los originales. `scripts/orbita-alfa.mjs` inunda desde los bordes
+para identificar el mate conectado; conserva el núcleo blanco interior y
+descontamina el borde semitransparente. Se aplica solo a las piezas nuevas
+que declaran el mate. El importador verifica el canal alpha real, recorta
+el margen y encuadra las galaxias en 3:2. No reemplazar los PNG originales
+por imágenes ya recortadas: la receta tiene que poder repetirse.
+
+Importar con `node scripts/import-orbita-art.mjs galaxias hub`. Los WebP
+con alpha se revisaron sobre el cielo del hub, incluyendo los bordes y
+las galaxias vistas de canto. La estación existente se conserva y se ve
+en la tienda con la nave posada.
+
+**Resolución pendiente:** el fondo solicitado a 2560×1440 llegó del generador
+a 1672×941. Se conserva su resolución nativa, sin agrandarlo artificialmente;
+la fuente de mayor resolución sigue pendiente. Los WebP de las cinco
+galaxias sí tienen 1536×1024.
+
+El arte de pista, largada, medallas y chispas corresponde a los siguientes
+hitos del brief. No está generado ni importado todavía.

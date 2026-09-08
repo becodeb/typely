@@ -58,6 +58,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
+import { quitarMate } from "./orbita-alfa.mjs";
 
 const RAIZ = path.resolve(import.meta.dirname, "..");
 const FUENTES = path.join(RAIZ, "Images", "orbita");
@@ -99,6 +100,12 @@ const PIEZAS = [
   /* La estación del hub: la isla sola sobre transparencia, sin encuadrar
      (es 3:2 y la página la apoya por CSS). */
   { grupo: "hub", base: "estacion", tope: 1536, alfa: true, recortar: true },
+  { grupo: "hub", base: "fondo-profundo", tope: 2560, alfa: false },
+  ...["flecha-izquierda", "flecha-derecha", "destello"].map(base => ({ grupo: "hub", base, tope: 512, alfa: true, recortar: true, encuadrar: true, mate: "negro" })),
+  ...["tormenta", "carrera", "dormida-huevo", "dormida-hielo", "dormida-remolino"].map(base => ({
+    grupo: "galaxias", base, tope: 1536, alfa: true, recortar: true, encuadrarGalaxia: true,
+    mate: base === "tormenta" || base === "dormida-remolino" ? "claro" : "negro",
+  })),
 ];
 
 /** Insignias y gemas son listas ABIERTAS como los mundos: cualquier
@@ -346,6 +353,12 @@ async function importar(pieza) {
   /* La atenuación va primero: se mide lo que se va a servir. */
   const atenuar = ATENUAR[pieza.base];
   let fuente = origen;
+  /* Solo las nuevas piezas declaradas arriba admiten recuperación del mate.
+     Las fuentes anteriores conservan sus validaciones y su reproducción. */
+  if (pieza.mate) {
+    const original = await pixeles(origen);
+    if (!tieneAlfaReal(original)) fuente = await quitarMate(origen, pieza.mate);
+  }
   if (atenuar) {
     fuente = await sharp(origen)
       .ensureAlpha()
@@ -464,7 +477,14 @@ async function importar(pieza) {
   let img = sharp(entrada);
   let anchoFinal = Math.round(ancho * escala);
   let altoFinal = Math.round(alto * escala);
-  if (pieza.encuadrar) {
+  if (pieza.encuadrarGalaxia) {
+    // Cámara común 3:2. Se quita el aire sobrante y se vuelve a encuadrar
+    // sin agrandar el dibujo: las cinco piezas giran con la misma caja.
+    anchoFinal = Math.min(w, pieza.tope);
+    altoFinal = Math.round(anchoFinal / 1.5);
+    img = sharp(entrada).resize(anchoFinal, altoFinal, { fit: "contain", withoutEnlargement: true, background: { r: 0, g: 0, b: 0, alpha: 0 } });
+    notas.push("encuadrada en 3:2, sin agrandar el dibujo");
+  } else if (pieza.encuadrar) {
     /* Cuadrado con margen parejo del 6 %: las insignias y las gemas se
        ven del mismo tamaño en fila. */
     const ladoFinal = Math.round(lado * escala);
@@ -514,7 +534,7 @@ async function importar(pieza) {
 
 /* ------------------------------------------------------------------ */
 
-const GRUPOS = ["fondo", "orbes", "hub", "insignias", "gemas"];
+const GRUPOS = ["fondo", "orbes", "hub", "insignias", "gemas", "galaxias"];
 const filtro = process.argv.slice(2).filter((a) => GRUPOS.includes(a));
 const todas = [...PIEZAS, ...mundosPresentes(), ...abiertas("insignias"), ...abiertas("gemas")];
 const objetivo = filtro.length ? todas.filter((p) => filtro.includes(p.grupo)) : todas;
