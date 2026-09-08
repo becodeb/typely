@@ -1059,9 +1059,13 @@ fantasmas, naves equipadas y medalla en el resultado. Las correcciones de
 plata y bronce separan claramente sus metales del oro.
 
 **Nueva puesta de cámara, autorizada el 08/09/2026:** la vista lateral fue
-reemplazada por una vista desde atrás de las naves. Se reutilizan estos
-WebP sin editar las fuentes: `pistaCarrera.ts` proyecta el cuadrilátero de
-la recta en CSS y coloca una segunda copia como apoyo del arco frontal.
-El recorte CSS excluye las nubes deformadas por la proyección. Las mismas
-coordenadas colocan las naves en sus carriles y ajustan su tamaño con la
-distancia. La pista continúa fuera del borde inferior de la pantalla.
+reemplazada por una vista desde atrás de las naves. En la revisión siguiente
+Ezequiel rechazó el estiramiento de la textura y la base superpuesta del arco.
+Se generó `recta-frontal-source.png` a 1536×1024, usando una guía de cinco
+carriles y detalles pequeños de cristal. Se importa como `recta-frontal.webp`
+(99 KB; alpha medio 0,000 en el 35 % superior). Fuente, guía, referencia de
+materiales y prompt quedan en `carrera/` y `carrera/prompts.md`.
+`pistaCarrera.ts` ahora solo aplica escala uniforme y traslación; usa los
+anclajes del dibujo para colocar los corredores. Se eliminó la homografía
+y la segunda imagen debajo del arco. La pista sigue bajo la cámara y el
+arco conserva su posición. Los originales anteriores permanecen intactos.

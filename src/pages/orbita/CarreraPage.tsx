@@ -30,7 +30,7 @@ export default function CarreraPage() {
   const entrada = useRef<HTMLInputElement>(null), escena = useRef<HTMLDivElement>(null);
   const voz = useRef<HTMLDivElement>(null), naveAlumno = useRef<HTMLDivElement>(null);
   const naves = useRef(new Map<string,HTMLDivElement>());
-  const recta = useRef<HTMLImageElement>(null), baseMeta = useRef<HTMLImageElement>(null), meta = useRef<HTMLImageElement>(null), motor = useRef<MotorCarrera | null>(null);
+  const recta = useRef<HTMLImageElement>(null), meta = useRef<HTMLImageElement>(null), motor = useRef<MotorCarrera | null>(null);
   const sonidoRef = useRef(sonido); sonidoRef.current = sonido;
   const efectos = useRef(new Set<Animation>());
   const generacion = useRef(0);
@@ -93,8 +93,7 @@ export default function CarreraPage() {
     let camara = camaraCarrera(ancho,alto);
     const ajustarCamara = () => {
       camara=camaraCarrera(ancho,alto);
-      if(recta.current)recta.current.style.transform=camara.matriz;
-      if(baseMeta.current)baseMeta.current.style.transform=camara.base;
+      if(recta.current){recta.current.style.width=camara.imagen.ancho+"px";recta.current.style.height=camara.imagen.alto+"px";recta.current.style.left=camara.imagen.x+"px";recta.current.style.top=camara.imagen.y+"px";}
       if(meta.current){meta.current.style.width=camara.arco+"px";meta.current.style.left=ancho/2+"px";meta.current.style.top=(camara.llegada-camara.arco*.91)+"px";}
     };
     const observar = new ResizeObserver(([r])=>{if(r){ancho=r.contentRect.width;alto=r.contentRect.height;ajustarCamara();}});
@@ -195,8 +194,7 @@ export default function CarreraPage() {
       <div className="car-pie-lectura"><p className="car-ayuda orb-dato" aria-live="polite">{m?.rojas.length ? "Borrá las letras rojas con Backspace para seguir." : !m?.largada ? "Leé el texto y preparate para salir." : "Seguí el texto. Cada letra te acerca a la meta."}</p><span className="car-avance">{Math.round((m?.progreso ?? 0)*100)} %</span></div><div className="car-progreso" aria-hidden="true"><i style={{transform:`scaleX(${m?.progreso ?? 0})`}}/></div>
     </section>
     <div className="car-escena" ref={escena} aria-hidden="true">
-      <img ref={recta} className="car-recta" src="/assets/orbita/carrera/recta.webp" alt=""/>
-      <img ref={baseMeta} className="car-recta car-base-meta" src="/assets/orbita/carrera/recta.webp" alt=""/>
+      <img ref={recta} className="car-recta" src="/assets/orbita/carrera/recta-frontal.webp" alt=""/>
       <img ref={meta} className="car-meta" src="/assets/orbita/carrera/meta.webp" alt=""/>
       {(rivales ?? []).map(r=><div className="car-corredor car-corredor--fantasma" key={r.id} ref={el=>{if(el)naves.current.set(r.id,el);else naves.current.delete(r.id);}}><span className="car-alias orb-dato">{r.alias}</span>{casco(r)}</div>)}
       <div className="car-corredor car-corredor--alumno" ref={naveAlumno}><span className="car-alias car-alias--vos orb-dato">VOS</span>{casco(null)}<img className="car-chispa" src="/assets/orbita/carrera/chispa-1.webp" alt=""/><img className="car-destello" src="/assets/orbita/hub/destello.webp" alt=""/></div>

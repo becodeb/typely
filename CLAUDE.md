@@ -980,10 +980,12 @@ cursor pulsante, chispas y destellos decorativos.
 **Revisión visual de Carrera (08/09/2026):** a pedido de Ezequiel se reemplazó
 la vista lateral por una cámara detrás de las naves. `pistaCarrera.ts` define
 la proyección común de los cinco carriles, sus corredores y la llegada.
-La recta existente se proyecta en CSS desde sus cuatro bordes pintados y
-continúa debajo de la cámara; una segunda copia forma la base del arco.
-El arco mira de frente, apoyado sobre esa base, con su abertura alineada al
-final de los carriles. Las naves conservan su orientación frontal y reducen
+La recta frontal se generó directamente para esta cámara: `recta-frontal.webp`
+se muestra con escala uniforme y traslación, sin estirar su textura. Se
+retiraron la homografía de la imagen lateral y la segunda copia del suelo,
+que parecía una escalera flotante. El arco conserva su posición frontal y
+su abertura alineada al final de los carriles, sin tarimas debajo.
+Las naves conservan su orientación frontal y reducen
 su escala al alejarse; los alias se atenúan a distancia. No se alteraron los
 PNG. Texto alineado a la izquierda, consigna y progreso en un mismo bloque,
 tiempo y ritmo agrupados en la barra, luces de largada junto a la consigna.
