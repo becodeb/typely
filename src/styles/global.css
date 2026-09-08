@@ -2383,7 +2383,7 @@ a { color: inherit; text-decoration: none; }
 .orb-hub__aviso p { margin: 0; }
 .orb-galaxias-escena { width: 100%; --orb-curva: cubic-bezier(.22, 1.2, .36, 1); }
 .orb-cielo-profundo { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; background: #141b4d; }
-.orb-cielo-profundo > div { position: absolute; inset: -4%; transition: transform var(--orb-duracion) var(--orb-curva); }
+.orb-cielo-profundo > div { position: absolute; inset: -4%; will-change: transform; transition: transform var(--orb-duracion) var(--orb-curva); }
 .orb-cielo-profundo__estrellas {
   background: url("/assets/orbita/hub/fondo-profundo.webp") center / cover, url("/assets/orbita/fondo/estrellas.webp") center / cover;
   transform: translateX(calc(var(--orb-parallax) * 1.5%));
@@ -2402,6 +2402,7 @@ a { color: inherit; text-decoration: none; }
 .orb-anillo {
   position: absolute; left: 50%; top: 44%; width: 0; height: 0;
   transform-style: preserve-3d; transform: rotateY(var(--orb-giro));
+  will-change: transform;
   transition: transform var(--orb-duracion) var(--orb-curva); outline: none;
 }
 .orb-lista-galaxias { position: absolute; inset: 0; outline: none; transform-style: preserve-3d; }
@@ -2411,7 +2412,7 @@ a { color: inherit; text-decoration: none; }
   transform: rotateY(var(--orb-puesto)) translateZ(var(--orb-radio));
   transform-style: preserve-3d; cursor: pointer;
 }
-.orb-galaxia__contenido { position: relative; opacity: .55; transition: opacity var(--orb-duracion) ease; }
+.orb-galaxia__contenido { position: relative; opacity: .55; will-change: opacity; transition: opacity var(--orb-duracion) ease; }
 .orb-galaxia__gesto { position: relative; }
 .orb-galaxia__arte { position: relative; aspect-ratio: 3 / 2; }
 .orb-galaxia__arte > img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
@@ -2429,6 +2430,7 @@ a { color: inherit; text-decoration: none; }
 .orb-galaxia__rotulo { position: absolute; top: 100%; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 3px; padding-top: 2px;
   /* El disco se ve de canto; su nombre sigue mirando al lector. */
   transform: rotateY(calc(0deg - var(--orb-puesto) - var(--orb-giro))); transform-origin: 50% 0;
+  will-change: transform, opacity;
   transition: transform var(--orb-duracion) var(--orb-curva), opacity var(--orb-duracion) ease;
 }
 .orb-galaxia--lateral .orb-galaxia__rotulo { opacity: .85; }

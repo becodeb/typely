@@ -937,6 +937,13 @@ Para la futura Carrera ya autorizó conservar los textos de 90–140 caracteres
 y las velocidades reales, ajustando con la simulación el máximo del examen
 para 8 PPM y admitiendo en el servidor carreras legítimas de menos de 15 s.
 
+Verificación del hito 1 (07/09/2026): build, TypeScript de API y ambos
+exámenes de Tormenta aprobados; navegación y ausencia de scroll verificadas
+en Chrome a 1366×768, 1366×912, 1440×900 y 375×812. La medición del compilado
+local dio mediana 16,7 ms, p95 16,8 ms y dos cuadros por encima de 20 ms
+(máximo 50,1 ms, 418 muestras). **La aceptación de rendimiento sigue abierta:**
+no equivale a verificar 60 fps sin picos en la Chromebook del aula.
+
 **Bonus Tormenta de signos.** `tormentaSignos.ts` controla una única oleada
 por partida, sin mirar el progreso de Aventura ni exigir precisión. Se
 habilita con seis intervalos dentro de palabras que promedien como máximo
