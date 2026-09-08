@@ -1,6 +1,6 @@
 # Prompts ejecutados — carrusel de galaxias
 
-Generación integrada con imagegen. Referencia visual común: Tormenta v2 aprobada por Ezequiel. Los originales RGB se conservan; `import-orbita-art.mjs` recupera el alpha con sharp, con autorización expresa del 07/09/2026. Tormenta conserva sus dos prompts en `tormenta-propuesta-prompts.md`. La aprobación de las cinco piezas juntas queda para el hito del carrusel.
+Generación integrada con imagegen. Referencia visual común: Tormenta v2 aprobada por Ezequiel. Los originales RGB se conservan; `import-orbita-art.mjs` recupera el alpha con sharp, con autorización expresa del 07/09/2026. Tormenta conserva sus dos prompts en `tormenta-propuesta-prompts.md`. Las galaxias fueron descartadas después por pedido de Ezequiel: el arte vigente está documentado en `../destinos/prompts.md`. Se conservan el fondo, las flechas y el destello.
 
 ## Carrera
 
@@ -49,4 +49,3 @@ Las primeras tres imágenes son el estilo TYPELY: noche de islas, material de la
 ```text
 Referencias del juego infantil TYPELY: noche de las islas, material de cristales y piedra lavanda, paleta índigo, violeta, turquesa, rosa y dorado. Una pieza NUEVA de la misma familia, 3D suave de caramelo, luz cálida, objeto centrado sobre FONDO NEGRO PURO LISO que se quitará al importar con sharp. No dibujar damero. Sin texto, interfaz, marco, pedestal o sombra proyectada fuera del objeto. Imagen cuadrada 1024×1024 para reducir a 512×512. DESTELLO: una estrella de CUATRO puntas de luz blanca con núcleo dorado y un halo turquesa muy suave, con volumen, como el destello que aparece cuando algo se enciende. Simétrica, centrada. Cuatro puntas, una arriba, una abajo y una a cada lado.
 ```
-

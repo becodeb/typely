@@ -102,6 +102,10 @@ const PIEZAS = [
   { grupo: "hub", base: "estacion", tope: 1536, alfa: true, recortar: true },
   { grupo: "hub", base: "fondo-profundo", tope: 2560, alfa: false },
   ...["flecha-izquierda", "flecha-derecha", "destello"].map(base => ({ grupo: "hub", base, tope: 512, alfa: true, recortar: true, encuadrar: true, mate: "negro" })),
+  // Los objetos de cada juego reemplazan las galaxias por decisión de Ezequiel.
+  ...["tormenta", "carrera", "huevo", "cristal", "cofre"].map(base => ({
+    grupo: "destinos", base, tope: 768, alfa: true, recortar: true, encuadrar: true, mate: "negro",
+  })),
   ...["tormenta", "carrera", "dormida-huevo", "dormida-hielo", "dormida-remolino"].map(base => ({
     grupo: "galaxias", base, tope: 1536, alfa: true, recortar: true, encuadrarGalaxia: true,
     mate: base === "tormenta" || base === "dormida-remolino" ? "claro" : "negro",
@@ -534,7 +538,7 @@ async function importar(pieza) {
 
 /* ------------------------------------------------------------------ */
 
-const GRUPOS = ["fondo", "orbes", "hub", "insignias", "gemas", "galaxias"];
+const GRUPOS = ["fondo", "orbes", "hub", "insignias", "gemas", "galaxias", "destinos"];
 const filtro = process.argv.slice(2).filter((a) => GRUPOS.includes(a));
 const todas = [...PIEZAS, ...mundosPresentes(), ...abiertas("insignias"), ...abiertas("gemas")];
 const objetivo = filtro.length ? todas.filter((p) => filtro.includes(p.grupo)) : todas;

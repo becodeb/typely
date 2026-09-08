@@ -954,7 +954,38 @@ fila se ven como una familia, y a 96 px se reconoce cada símbolo sin leer el
 nombre. Importar con `node scripts/import-orbita-art.mjs gemas`; el importador
 rechaza cualquier nombre que no sea uno de los ocho.
 
-### 7.7 Galaxias y nuevo inicio de Órbita (hito 1)
+### 7.7 Ilustraciones de minijuegos y nuevo inicio de Órbita (hito 1)
+
+**Dirección vigente:** el 07/09/2026 Ezequiel descartó las galaxias y pidió
+objetos simples que representen cada juego. Autorizó elegir, generar e
+integrar el arte sin pedir otra aprobación individual. Tormenta usa una
+nube lavanda con las palabras sol, luna y mar; Carrera, dos cohetes con
+bandera. Los tres juegos futuros se representan con huevo, cristal y cofre,
+apagados y sin anticipar reglas de juegos todavía no definidos.
+
+Los ocho prompts de generación y corrección del fondo están en
+[`destinos/prompts.md`](destinos/prompts.md). Las referencias fueron la nave
+perlada y la estación existentes. Se conservan los cinco PNG elegidos sin
+procesar. El importador mantiene el alpha de Tormenta y quita el mate negro
+de las otras cuatro piezas con sharp, según la autorización previa.
+
+| Fuente en `Images/orbita/destinos/` | WebP en `public/assets/orbita/destinos/` | Medidas |
+|---|---|---|
+| `tormenta-source.png` | `tormenta.webp` | 768×768, alpha |
+| `carrera-source.png` | `carrera.webp` | 768×768, alpha |
+| `huevo-source.png` | `huevo.webp` | 635×635, alpha |
+| `cristal-source.png` | `cristal.webp` | 768×768, alpha |
+| `cofre-source.png` | `cofre.webp` | 768×768, alpha |
+
+Importar con `node scripts/import-orbita-art.mjs destinos`. Recorta el margen
+y encuadra en un cuadrado, sin agrandar. Los cinco WebP pesan unos 288 KB en
+total. Se revisaron integrados sobre el cielo, de frente y durante el giro,
+a 1366×768 y 1366×912. Los objetos compensan la rotación del anillo para
+conservar la cara visible; la distancia se representa con escala y una
+inclinación suave. Solo flota el objeto central. Se mantienen las estelas
+del viaje y se retiraron el aura y el polvo orbital.
+
+#### Galaxias descartadas y arte compartido conservado
 
 La segunda propuesta de Tormenta fue aprobada por Ezequiel como molde.
 Los prompts exactos de las dos propuestas están en
@@ -964,7 +995,8 @@ Los ocho prompts ejecutados para completar el carrusel están en
 nebulosa huevo, hielo, remolino, fondo profundo, flechas izquierda/derecha
 y destello. Se usó la herramienta integrada imagegen con el molde aprobado
 y las referencias del mundo, la estación y el cielo. Las cinco galaxias
-se revisan juntas en el carrusel real; queda pendiente esa aprobación.
+quedan como antecedentes descartados; el carrusel ya no las carga. El fondo
+profundo, las flechas y el destello se siguen usando.
 
 | Fuente conservada en `Images/orbita/` | WebP servido | Dimensiones finales |
 |---|---|---|
