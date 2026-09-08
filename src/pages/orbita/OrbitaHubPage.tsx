@@ -1,9 +1,9 @@
-/* Órbita es una sección: cada galaxia del carrusel abre un minijuego. */
+/* Órbita es una sección: cada objeto del carrusel representa un minijuego. */
 import { ArrowLeft, Rocket, Trophy, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { CarruselGalaxias } from "../../components/orbita/CarruselGalaxias";
-import { GALAXIAS, ultimaGalaxia, type GalaxiaDef } from "../../data/orbitaGalaxias";
+import { CarruselJuegos } from "../../components/orbita/CarruselJuegos";
+import { JUEGOS_ORBITA, ultimoJuego, type JuegoOrbitaDef } from "../../data/orbitaJuegos";
 import { Gema } from "../../components/orbita/OrbitaIconos";
 import { SONIDO_KEY, sonidoActivado } from "../../utils/orbita/sonido";
 import { useAuth } from "../../hooks/useAuth";
@@ -70,7 +70,7 @@ export function OrbitaHubPage() {
   const [alias, setAlias] = useState("");
   const [errorAlias, setErrorAlias] = useState("");
   const [guardando, setGuardando] = useState(false);
-  const [galaxia, setGalaxia] = useState<GalaxiaDef>(() => GALAXIAS[ultimaGalaxia()]!);
+  const [juego, setJuego] = useState<JuegoOrbitaDef>(() => JUEGOS_ORBITA[ultimoJuego()]!);
   const [sonido, setSonido] = useState(sonidoActivado);
   const [avisoCarrera, setAvisoCarrera] = useState(false);
 
@@ -108,7 +108,7 @@ export function OrbitaHubPage() {
 
   const record = recordLocal();
   const mejor = perfil?.bestScore || record?.puntaje || 0;
-  const entrar = (elegida: GalaxiaDef) => {
+  const entrar = (elegida: JuegoOrbitaDef) => {
     // Hito 1: la pista se conecta después de aprobar el carrusel.
     if (elegida.id === "carrera") { setAvisoCarrera(true); return; }
     if (elegida.ruta) navigate(elegida.ruta);
@@ -148,13 +148,13 @@ export function OrbitaHubPage() {
               {tieneCristalesInfinitos(perfil) ? "∞" : perfil?.crystals ?? 0} cristales
             </span>
           </div>
-        <CarruselGalaxias perfil={perfil} records={{ tormenta: mejor }} destinoMensaje={vozMascota}
-          bloqueado={pideAlias || avisoCarrera} alElegir={setGalaxia} alEntrar={entrar} />
+        <CarruselJuegos perfil={perfil} records={{ tormenta: mejor }} destinoMensaje={vozMascota}
+          bloqueado={pideAlias || avisoCarrera} alElegir={setJuego} alEntrar={entrar} />
 
-        {/* Servicios compartidos por todas las galaxias. */}
+        {/* Servicios compartidos por todos los minijuegos. */}
         <div className="orb-hub__acciones grid gap-3 w-[min(26rem,92vw)]">
           <div className="grid grid-cols-2 gap-3">
-            <Link to={`/orbita/ranking?game=${galaxia.gameId ?? "tormenta"}`} className="orb-boton-vidrio">
+            <Link to={`/orbita/ranking?game=${juego.gameId ?? "tormenta"}`} className="orb-boton-vidrio">
               <Trophy size={19} /> Ranking
             </Link>
             <Link to="/orbita/tienda" className="orb-boton-vidrio">
@@ -178,7 +178,7 @@ export function OrbitaHubPage() {
             if (e.key === "Escape") setAvisoCarrera(false);
             // El aviso tiene una sola acción: Tab conserva el foco adentro.
             if (e.key === "Tab") e.preventDefault();
-          }}>Volver a las galaxias</button>
+          }}>Volver a los juegos</button>
         </section>
       </div>}
 

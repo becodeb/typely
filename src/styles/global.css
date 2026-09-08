@@ -2365,7 +2365,7 @@ a { color: inherit; text-decoration: none; }
 .orb-campo:focus { outline: none; border-color: #73f3dc; box-shadow: 0 0 0 4px rgba(115, 243, 220, 0.3); }
 .orb-campo::placeholder { color: #8d9bbd; font-weight: 600; }
 
-/* ---- El carrusel de galaxias ---- */
+/* ---- El carrusel de minijuegos ---- */
 .orb-hub { position: relative; height: 100dvh; overflow: hidden; background: #141b4d; isolation: isolate; }
 .orb-hub__contenido {
   position: relative; z-index: 1; height: 100%;
@@ -2381,8 +2381,9 @@ a { color: inherit; text-decoration: none; }
 .orb-hub__aviso { display: grid; gap: 16px; padding: 28px; width: min(400px, 94vw); max-height: 88dvh; overflow-y: auto; text-align: center; }
 .orb-hub__aviso h2 { font-family: var(--font-display); font-size: 28px; margin: 0; }
 .orb-hub__aviso p { margin: 0; }
-.orb-galaxias-escena { width: 100%; --orb-curva: cubic-bezier(.22, 1.2, .36, 1); }
+.orb-juegos-escena { width: 100%; --orb-curva: cubic-bezier(.22, 1.2, .36, 1); }
 .orb-cielo-profundo { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; background: #141b4d; }
+.orb-cielo-profundo::after { content: ""; position: absolute; inset: 0; background: #111a4438; }
 .orb-cielo-profundo > div { position: absolute; inset: -4%; will-change: transform; transition: transform var(--orb-duracion) var(--orb-curva); }
 .orb-cielo-profundo__estrellas {
   background: url("/assets/orbita/hub/fondo-profundo.webp") center / cover, url("/assets/orbita/fondo/estrellas.webp") center / cover;
@@ -2393,10 +2394,10 @@ a { color: inherit; text-decoration: none; }
   transform: translateX(calc(var(--orb-parallax) * .6%));
 }
 .orb-carrusel {
-  --orb-radio: clamp(230px, 22vw, 340px); --orb-ancho-galaxia: clamp(260px, 26vw, 380px);
+  --orb-radio: clamp(230px, 22vw, 340px); --orb-ancho-ilustracion: clamp(225px, 18vw, 260px);
   /* Ajuste vertical aprobado: el arte, su rótulo y la nave no se tapan.
-     El radio y la galaxia del frente conservan su tamaño; la profundidad
-     reduce los puestos alejados. */
+     Se conserva el radio del anillo; los objetos usan encuadre cuadrado
+     y la profundidad reduce los puestos alejados. */
   position: relative; width: 100%; height: clamp(535px, 70vh, 580px);
   perspective: 1400px; perspective-origin: 50% 42%; touch-action: pan-y; user-select: none;
 }
@@ -2406,81 +2407,64 @@ a { color: inherit; text-decoration: none; }
   will-change: transform;
   transition: transform var(--orb-duracion) var(--orb-curva); outline: none;
 }
-.orb-lista-galaxias { position: absolute; inset: 0; outline: none; transform-style: preserve-3d; }
-.orb-galaxia {
-  position: absolute; width: var(--orb-ancho-galaxia); aspect-ratio: 3 / 2;
-  left: calc(var(--orb-ancho-galaxia) * -.5); top: calc(var(--orb-ancho-galaxia) * -.5 - 16px);
+.orb-lista-juegos { position: absolute; inset: 0; outline: none; transform-style: preserve-3d; }
+.orb-juego {
+  position: absolute; width: var(--orb-ancho-ilustracion); aspect-ratio: 1;
+  left: calc(var(--orb-ancho-ilustracion) * -.5); top: calc(var(--orb-ancho-ilustracion) * -.5 - 75px);
   transform: rotateY(var(--orb-puesto)) translateZ(var(--orb-radio));
   transform-style: preserve-3d; cursor: pointer;
 }
-.orb-galaxia__plano {
-  position: relative; aspect-ratio: 3 / 2; transform-style: preserve-3d;
+.orb-juego__plano {
+  position: relative; aspect-ratio: 1; transform-style: preserve-3d;
   transform: rotateY(calc(0deg - var(--orb-puesto) - var(--orb-giro))) translateY(var(--orb-elevacion)) rotateY(var(--orb-orientacion)) scale(var(--orb-escala));
   transition: transform var(--orb-duracion) var(--orb-curva); will-change: transform;
 }
-.orb-galaxia__contenido { position: relative; opacity: .55; will-change: opacity; transition: opacity var(--orb-duracion) ease; }
-.orb-galaxia__flotacion { animation: orbGalaxiaFlota 7s ease-in-out var(--orb-fase-flota) infinite alternate; }
-.orb-galaxia__gesto { position: relative; }
-.orb-galaxia__arte { position: relative; aspect-ratio: 3 / 2; }
-.orb-galaxia__arte > img { position: relative; display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
-.orb-galaxia__aura { position: absolute; inset: -9%; border-radius: 50%; pointer-events: none;
-  background: radial-gradient(ellipse, color-mix(in srgb, var(--orb-tinte-galaxia) 42%, transparent), transparent 68%);
-  opacity: .4; transform: scale(.9); transition: transform var(--orb-duracion) ease, opacity var(--orb-duracion) ease;
-}
-.orb-galaxia--frente .orb-galaxia__aura { opacity: .85; transform: scale(1.09); }
-.orb-galaxia--dormida .orb-galaxia__aura { opacity: .18; }
-.orb-galaxia__orbita-polvo { position: absolute; width: 110%; aspect-ratio: 1; left: 50%; top: 50%;
-  transform: translate(-50%, -50%) rotateX(63deg) rotateZ(-20deg); pointer-events: none; opacity: .6;
-}
-.orb-galaxia__polvo { position: absolute; inset: 0; border-radius: 50%; animation: orbPolvoGira 22s linear infinite; }
-.orb-galaxia__polvo::before { content: ""; position: absolute; inset: 2%; border-radius: 50%; border: 1px solid transparent;
-  border-bottom-color: color-mix(in srgb, var(--orb-tinte-galaxia) 55%, transparent); border-right-color: #ffffff18;
-}
-.orb-galaxia__polvo i { position: absolute; translate: -50% -50%; border-radius: 50%; background: #fff3df;
-  box-shadow: 0 0 6px 2px var(--orb-tinte-galaxia);
-}
-.orb-galaxia--frente .orb-galaxia__orbita-polvo { opacity: 1; }
-.orb-galaxia--dormida .orb-galaxia__orbita-polvo { opacity: .2; }
-.orb-galaxia--fondo .orb-galaxia__polvo { animation-play-state: paused; }
-.orb-galaxia__arte::after { content: ""; position: absolute; inset: 0; background: #050b1e; opacity: .6; pointer-events: none;
-  mask-image: var(--orb-mascara-galaxia); mask-size: contain; mask-repeat: no-repeat; mask-position: center;
+.orb-juego__contenido { position: relative; opacity: .55; will-change: opacity; transition: opacity var(--orb-duracion) ease; }
+.orb-juego__flotacion { animation: orbJuegoFlota 7s ease-in-out var(--orb-fase-flota) infinite alternate; }
+.orb-juego:not(.orb-juego--frente) .orb-juego__flotacion { animation-play-state: paused; }
+.orb-juego__gesto { position: relative; }
+.orb-juego__arte { position: relative; aspect-ratio: 1; }
+.orb-juego__arte > img { position: relative; display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.orb-juego__arte::after { content: ""; position: absolute; inset: 0; background: #050b1e; opacity: .6; pointer-events: none;
+  mask-image: var(--orb-mascara-ilustracion); mask-size: contain; mask-repeat: no-repeat; mask-position: center;
   transition: opacity var(--orb-duracion) ease;
 }
-.orb-galaxia--lateral .orb-galaxia__contenido { opacity: .85; }
-.orb-galaxia--lateral .orb-galaxia__arte::after { opacity: .35; }
-.orb-galaxia--frente .orb-galaxia__contenido { opacity: 1; }
-.orb-galaxia--frente .orb-galaxia__arte::after { opacity: 0; }
-.orb-galaxia--fondo { cursor: default; }
-.orb-galaxia--dormida img { filter: saturate(.6); }
-.orb-galaxia[data-encendida="true"]:not(.orb-galaxia--dormida) .orb-galaxia__arte { animation: orbGalaxiaRespira 6s ease-in-out infinite alternate; }
-.orb-galaxia__rotulo { position: absolute; top: 100%; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 3px; padding-top: 2px;
+.orb-juego--lateral .orb-juego__contenido { opacity: .85; }
+.orb-juego--lateral .orb-juego__arte::after { opacity: .35; }
+.orb-juego--frente .orb-juego__contenido { opacity: 1; }
+.orb-juego--frente .orb-juego__arte::after { opacity: 0; }
+.orb-juego--fondo { cursor: default; }
+.orb-juego--dormida img { filter: saturate(.6); }
+.orb-juego[data-encendida="true"]:not(.orb-juego--dormida) .orb-juego__arte { animation: orbJuegoRespira 6s ease-in-out infinite alternate; }
+.orb-juego__rotulo { position: absolute; top: calc(100% - 6px); width: 100%; display: flex; flex-direction: column; align-items: center; gap: 3px; padding-top: 2px;
   /* La inclinación del disco nunca inclina las letras. */
   transform: rotateY(calc(0deg - var(--orb-orientacion))); transform-origin: 50% 0;
   will-change: transform, opacity;
   transition: transform var(--orb-duracion) var(--orb-curva), opacity var(--orb-duracion) ease;
 }
-.orb-galaxia--lateral .orb-galaxia__rotulo { opacity: .85; }
-.orb-galaxia__nombre { color: #fff4ff; font: 800 clamp(18px, 1.6vw, 24px)/1.1 var(--font-display); white-space: nowrap; text-shadow: 0 2px 6px #050b1e, 0 0 14px #050b1e; }
-.orb-galaxia--dormida .orb-galaxia__nombre { color: #c4cbe1; font-weight: 600; }
-.orb-galaxia__record.orb-pildora { font-size: 11px; line-height: 1.2; padding: 2px 9px; min-height: 0; backdrop-filter: none; }
-.orb-galaxia__invitacion { font-size: 11px; min-height: 17px; visibility: hidden; }
-.orb-galaxia[data-encendida="true"] .orb-galaxia__invitacion { visibility: visible; }
-.orb-carrusel[data-girando="true"] .orb-galaxia--frente .orb-galaxia__contenido { opacity: .85; }
-.orb-carrusel[data-girando="true"] .orb-galaxia--frente .orb-galaxia__arte::after { opacity: .35; }
-.orb-galaxia--fondo .orb-galaxia__rotulo { visibility: hidden; }
-.orb-galaxia__respaldo { display: block; position: absolute; inset: 18% 2%; border-radius: 50%; background: radial-gradient(ellipse, #fff7df, #b28aff90 20%, #9568df40 48%, transparent 72%); }
-.orb-galaxia[data-id="carrera"] .orb-galaxia__respaldo { background: radial-gradient(ellipse, #fff4d6, #5be8ba90 20%, #54d8ef40 48%, transparent 72%); }
-.orb-galaxia--dormida .orb-galaxia__respaldo { background: radial-gradient(ellipse, #9fa8c455, #6a729a22 48%, transparent 72%); }
-.orb-galaxia__destello { position: absolute; left: 50%; top: 48%; width: 22%; aspect-ratio: 1; translate: -50% -50%; pointer-events: none; color: #fff9ce; font-size: 70px; animation: orbGalaxiaDestello 380ms ease-out both; }
-.orb-galaxia__destello img { width: 100%; height: 100%; }
-.orb-galaxia__gesto[data-no="true"] { animation: orbGalaxiaNo 280ms ease-out; }
+.orb-juego--lateral .orb-juego__rotulo { opacity: .85; }
+.orb-juego__nombre { color: #fff4ff; font: 800 clamp(18px, 1.6vw, 24px)/1.1 var(--font-display); white-space: nowrap; text-shadow: 0 2px 6px #050b1e, 0 0 14px #050b1e; }
+.orb-juego--dormida .orb-juego__nombre { color: #c4cbe1; font-weight: 600; }
+.orb-juego__record.orb-pildora { font-size: 11px; line-height: 1.2; padding: 2px 9px; min-height: 0; backdrop-filter: none; }
+.orb-juego__invitacion { font-size: 11px; min-height: 17px; visibility: hidden; }
+.orb-juego[data-encendida="true"] .orb-juego__invitacion { visibility: visible; }
+.orb-carrusel[data-girando="true"] .orb-juego--frente .orb-juego__contenido { opacity: .85; }
+.orb-carrusel[data-girando="true"] .orb-juego--frente .orb-juego__arte::after { opacity: .35; }
+.orb-juego--fondo .orb-juego__rotulo { visibility: hidden; }
+.orb-juego__respaldo { display: block; position: absolute; inset: 18% 2%; border-radius: 50%; background: radial-gradient(ellipse, #fff7df, #b28aff90 20%, #9568df40 48%, transparent 72%); }
+.orb-juego__respaldo svg { display: block; width: 70%; height: 70%; margin: 12% auto; color: #eef9ff; stroke-width: 1.5; }
+.orb-juego[data-id="carrera"] .orb-juego__respaldo { background: radial-gradient(ellipse, #fff4d6, #5be8ba90 20%, #54d8ef40 48%, transparent 72%); }
+.orb-juego--dormida .orb-juego__respaldo { background: radial-gradient(ellipse, #9fa8c455, #6a729a22 48%, transparent 72%); }
+.orb-juego__destello { position: absolute; left: 50%; top: 48%; width: 22%; aspect-ratio: 1; translate: -50% -50%; pointer-events: none; color: #fff9ce; font-size: 70px; animation: orbJuegoDestello 380ms ease-out both; }
+.orb-juego__destello img { width: 100%; height: 100%; }
+.orb-juego__gesto[data-no="true"] { animation: orbJuegoNo 280ms ease-out; }
 .orb-carrusel__flecha { position: absolute; top: 30%; width: clamp(48px, 5vw, 72px); aspect-ratio: 1; border: 0; padding: 0; background: transparent; cursor: pointer; z-index: 2; }
 .orb-carrusel__flecha img { width: 100%; height: 100%; object-fit: contain; }
 .orb-carrusel__flecha svg { width: 70%; height: 70%; margin: auto; color: #7eeed5; }
 .orb-carrusel__flecha--izquierda { left: max(2%, calc(50% - 510px)); }
 .orb-carrusel__flecha--derecha { right: max(2%, calc(50% - 510px)); }
 .orb-carrusel__flecha:active { transform: scale(.94); filter: brightness(1.1); }
-.orb-carrusel__flecha:focus-visible, .orb-lista-galaxias:focus-visible .orb-galaxia--frente .orb-galaxia__nombre { outline: 3px solid #5ff3d4; outline-offset: 3px; border-radius: 7px; }
+.orb-carrusel__flecha:focus-visible, .orb-lista-juegos:focus-visible .orb-juego--frente .orb-juego__nombre { outline: 3px solid #5ff3d4; outline-offset: 3px; border-radius: 7px; }
 .orb-carrusel__escuadra { position: absolute; bottom: 0; left: 50%; width: clamp(110px, 12vw, 160px); translate: -50% 0; pointer-events: none; }
 .orb-carrusel__nave { position: relative; transform: translateX(calc(var(--orb-parallax) * 18px)) rotate(var(--orb-inclinacion)); transition: transform 420ms var(--orb-curva); }
 .orb-carrusel__nave .orb-nave-sprite__motor::after {
@@ -2492,7 +2476,7 @@ a { color: inherit; text-decoration: none; }
 }
 [data-girando="true"] .orb-carrusel__nave .orb-nave-sprite__motor::after { transform: scaleY(1.15); opacity: .9; }
 .orb-carrusel__rastros { position: absolute; inset: -12% -4% 0; overflow: hidden; pointer-events: none; opacity: 0; transition: opacity 350ms ease; }
-[data-girando="true"] .orb-carrusel__rastros { opacity: .8; }
+[data-girando="true"] .orb-carrusel__rastros { opacity: .45; }
 .orb-carrusel__rastro { position: absolute; width: clamp(40px, 7vw, 95px); height: 2px; border-radius: 100%;
   background: linear-gradient(90deg, transparent, #b9f5ff88 70%, #fff1d9);
   animation: orbRastroViaja 850ms ease-out var(--orb-espera-rastro) infinite; animation-play-state: paused;
@@ -2501,33 +2485,32 @@ a { color: inherit; text-decoration: none; }
 .orb-carrusel__nave .orb-mascota { left: 100%; top: 36%; width: 38%; }
 .orb-carrusel__nave .orb-nave-sprite__motor { scale: 1 1; transition: scale var(--orb-duracion) var(--orb-curva); }
 [data-girando="true"] .orb-carrusel__nave .orb-nave-sprite__motor { scale: 1 1.4; }
-.orb-galaxias-escena[data-oculta="true"] * { animation-play-state: paused !important; }
-@keyframes orbGalaxiaRespira { from { transform: scale(1); } to { transform: scale(1.03); } }
-@keyframes orbGalaxiaFlota { from { transform: translateY(3px) rotateZ(-.6deg); } to { transform: translateY(-4px) rotateZ(.7deg); } }
-@keyframes orbPolvoGira { to { transform: rotate(360deg); } }
+.orb-juegos-escena[data-oculta="true"] * { animation-play-state: paused !important; }
+@keyframes orbJuegoRespira { from { transform: scale(1); } to { transform: scale(1.03); } }
+@keyframes orbJuegoFlota { from { transform: translateY(3px) rotateZ(-.6deg); } to { transform: translateY(-4px) rotateZ(.7deg); } }
 @keyframes orbRastroViaja {
   0% { opacity: 0; transform: translateX(calc(var(--orb-rumbo) * -65px)) rotate(var(--orb-angulo-rastro)) scaleX(.15); }
   25% { opacity: 1; }
   100% { opacity: 0; transform: translateX(calc(var(--orb-rumbo) * 95px)) rotate(var(--orb-angulo-rastro)) scaleX(1.1); }
 }
-@keyframes orbGalaxiaDestello { 0% { transform: scale(.4); opacity: 0; } 45% { transform: scale(1.3); opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
-@keyframes orbGalaxiaNo { 0%, 100% { transform: translateX(0); } 25%, 75% { transform: translateX(-4px); } 50% { transform: translateX(4px); } }
+@keyframes orbJuegoDestello { 0% { transform: scale(.4); opacity: 0; } 45% { transform: scale(1.3); opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
+@keyframes orbJuegoNo { 0%, 100% { transform: translateX(0); } 25%, 75% { transform: translateX(-4px); } 50% { transform: translateX(4px); } }
 @media (max-height: 760px) and (min-width: 601px) {
   .orb-hub__contenido { gap: 2px; padding-block: 6px; }
   .orb-hub__titulo h1 { font-size: 42px !important; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .orb-anillo, .orb-galaxia, .orb-galaxia__plano, .orb-galaxia__rotulo { transform: none; transition: none; }
-  .orb-galaxia__rotulo { opacity: 0; transition: opacity 200ms ease; }
-  .orb-galaxia--frente .orb-galaxia__rotulo { opacity: 1; }
-  .orb-galaxia { pointer-events: none; }
-  .orb-galaxia--frente { pointer-events: auto; }
-  .orb-galaxia__contenido { opacity: 0 !important; transition: opacity 200ms ease; }
-  .orb-galaxia--frente .orb-galaxia__contenido { opacity: 1 !important; }
-  .orb-galaxia__arte, .orb-galaxia__gesto, .orb-galaxia__destello { animation: none !important; }
-  .orb-galaxia__flotacion, .orb-galaxia__polvo { animation: none; transform: none; }
-  .orb-carrusel__rastros, .orb-carrusel__nave .orb-nave-sprite__motor::after, .orb-galaxia__orbita-polvo { display: none; }
-  .orb-galaxia__destello { display: none; }
+  .orb-anillo, .orb-juego, .orb-juego__plano, .orb-juego__rotulo { transform: none; transition: none; }
+  .orb-juego__rotulo { opacity: 0; transition: opacity 200ms ease; }
+  .orb-juego--frente .orb-juego__rotulo { opacity: 1; }
+  .orb-juego { pointer-events: none; }
+  .orb-juego--frente { pointer-events: auto; }
+  .orb-juego__contenido { opacity: 0 !important; transition: opacity 200ms ease; }
+  .orb-juego--frente .orb-juego__contenido { opacity: 1 !important; }
+  .orb-juego__arte, .orb-juego__gesto, .orb-juego__destello { animation: none !important; }
+  .orb-juego__flotacion { animation: none; transform: none; }
+  .orb-carrusel__rastros, .orb-carrusel__nave .orb-nave-sprite__motor::after { display: none; }
+  .orb-juego__destello { display: none; }
   .orb-carrusel__nave, .orb-cielo-profundo > div { transform: none; transition: none; }
   .orb-carrusel__nave .orb-nave-sprite__motor { scale: 1 1; transition: none; }
 }

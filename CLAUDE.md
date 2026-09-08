@@ -914,9 +914,14 @@ para modos futuros. Las rutas: `/orbita` (hub), `/orbita/tormenta` (el juego,
 con `SoloEnComputadora` igual que los niveles), `/orbita/ranking`,
 `/orbita/tienda` (la antigua `/orbita/hangar` redirige). Todo lazy.
 
-**Carrusel de galaxias (etapa 2, hito 1 en revisión).** `/orbita` ya monta
-`CarruselGalaxias.tsx` con los cinco puestos de `orbitaGalaxias.ts`: Tormenta,
-Carrera y tres galaxias dormidas. CSS 3D, destino entero sin acotar, giros
+**Carrusel de minijuegos (etapa 2, hito 1 en revisión).** `/orbita` ya monta
+`CarruselJuegos.tsx` con los cinco puestos de `orbitaJuegos.ts`: Tormenta,
+Carrera y tres juegos futuros. Por pedido expreso de Ezequiel del 07/09,
+las galaxias se reemplazaron por objetos simples: nube con palabras,
+cohetes con bandera, huevo, cristal y cofre. Autorizó elegir y generar el
+arte sin otra aprobación individual. Las fuentes y los prompts quedan en
+`Images/orbita/destinos/`, y los WebP en `public/assets/orbita/destinos/`.
+CSS 3D, destino entero sin acotar, giros
 de 700/1000/1200 ms según los gestos encadenados, teclado, flechas de vidrio,
 deslizar y clic lateral. La nave equipada y su mascota acompañan el giro;
 el cielo recibe el impulso contrario y vuelve al centro al descansar.
@@ -931,9 +936,10 @@ arte, nombres y nave no se tapen a 1366×768 y 1366×912. En la revisión del
 se conservan el recorrido del anillo, su radio y la perspectiva, pero cada
 ilustración compensa el giro y solo inclina 13° por puesto (máximo 26°).
 Las laterales se ven al 66 % y las del fondo al 43 %, más elevadas, para
-mostrar distancia sin perder la cara de la galaxia. Los nombres miran al
-lector. Hay flotación suave, aura, polvo orbital y rastros luminosos durante
-el viaje; la nave acompaña con desplazamiento y estelas desde los motores
+mostrar distancia sin perder la cara del objeto. Los nombres miran al
+lector. Flota suavemente solo el objeto central; cuatro rastros luminosos
+acompañan el viaje. Se retiraron el aura y el polvo orbital para simplificar
+la escena. La nave acompaña con desplazamiento y estelas desde los motores
 reales de cada pose, del color equipado. Solo se animan transform y opacity;
 con movimiento reducido se apagan estos adornos y se conserva el fundido.
 Celular: explorar solamente.
@@ -945,11 +951,13 @@ Para la futura Carrera ya autorizó conservar los textos de 90–140 caracteres
 y las velocidades reales, ajustando con la simulación el máximo del examen
 para 8 PPM y admitiendo en el servidor carreras legítimas de menos de 15 s.
 
-Verificación del hito 1 (07/09/2026): build, TypeScript de API y ambos
+Verificación del hito 1 (08/09/2026): build, TypeScript de API y ambos
 exámenes de Tormenta aprobados; navegación y ausencia de scroll verificadas
 en Chrome a 1366×768, 1366×912, 1440×900 y 375×812. La medición del compilado
-local dio mediana 16,7 ms, p95 16,8 ms y dos cuadros por encima de 20 ms
-(máximo 50,1 ms, 418 muestras). **La aceptación de rendimiento sigue abierta:**
+local con los nuevos objetos dio mediana 16,7 ms, p95 16,8 ms y tres cuadros
+por encima de 20 ms (máximo 66,6 ms, 419 muestras). La cara visible también
+se verificó durante giros encadenados e inversión en vuelo.
+**La aceptación de rendimiento sigue abierta:**
 no equivale a verificar 60 fps sin picos en la Chromebook del aula.
 
 **Bonus Tormenta de signos.** `tormentaSignos.ts` controla una única oleada
