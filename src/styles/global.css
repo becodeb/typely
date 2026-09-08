@@ -2365,69 +2365,119 @@ a { color: inherit; text-decoration: none; }
 .orb-campo:focus { outline: none; border-color: #73f3dc; box-shadow: 0 0 0 4px rgba(115, 243, 220, 0.3); }
 .orb-campo::placeholder { color: #8d9bbd; font-weight: 600; }
 
-/* ---- Inicio de Órbita: vuelo sobre la atmósfera ---- */
-.orb-hub { background: #080e32; isolation: isolate; }
-.orb-hub__fondo {
-  position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background: #080e32 url("/assets/orbita/hub/vuelo-v1.webp") center / cover no-repeat;
-}
-.orb-hub__fondo::after {
-  content: ""; position: absolute; inset: 0;
-  background: linear-gradient(180deg, #080d2810 40%, #080d2810 60%, #080d2870);
-}
+/* ---- El carrusel de galaxias ---- */
+.orb-hub { position: relative; height: 100dvh; overflow: hidden; background: #141b4d; isolation: isolate; }
 .orb-hub__contenido {
-  position: relative; z-index: 1; min-height: 100dvh;
+  position: relative; z-index: 1; height: 100%;
   display: grid; align-content: center; justify-items: center;
-  gap: 20px; padding: 32px 16px 24px;
+  gap: 4px; padding: 12px 16px;
 }
 .orb-hub__titulo h1 {
-  line-height: 1.1; letter-spacing: -.025em;
+  line-height: 1; letter-spacing: -.025em; font-size: clamp(42px, 6vh, 60px) !important;
   text-shadow: 0 3px 0 #55519e70, 0 0 40px #9187ff60;
 }
 .orb-hub__titulo, .orb-hub__datos, .orb-hub__acciones, .orb-hub__demo { position: relative; z-index: 2; }
-.orb-hub__escena { display: grid; justify-items: center; gap: 16px; width: 100%; }
-.orb-vuelo {
-  position: relative; margin: 0; width: min(620px, 100%);
-  height: clamp(260px, 38dvh, 350px); isolation: isolate; z-index: 0; pointer-events: none;
+.orb-hub__demo { color: #c0c6e9; opacity: .8; font-size: 12px; line-height: 18px; }
+.orb-hub__aviso { display: grid; gap: 16px; padding: 28px; width: min(400px, 94vw); max-height: 88dvh; overflow-y: auto; text-align: center; }
+.orb-hub__aviso h2 { font-family: var(--font-display); font-size: 28px; margin: 0; }
+.orb-hub__aviso p { margin: 0; }
+.orb-galaxias-escena { width: 100%; --orb-curva: cubic-bezier(.22, 1.2, .36, 1); }
+.orb-cielo-profundo { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; background: #141b4d; }
+.orb-cielo-profundo > div { position: absolute; inset: -4%; transition: transform var(--orb-duracion) var(--orb-curva); }
+.orb-cielo-profundo__estrellas {
+  background: url("/assets/orbita/hub/fondo-profundo.webp") center / cover, url("/assets/orbita/fondo/estrellas.webp") center / cover;
+  transform: translateX(calc(var(--orb-parallax) * 1.5%));
 }
-.orb-vuelo__luz {
-  position: absolute; inset: 0 -12% -8%; z-index: -1;
-  background: radial-gradient(ellipse at 50% 48%, #6577ef2e, #6151d21a 32%, transparent 65%);
+.orb-cielo-profundo__nebulosa {
+  background: radial-gradient(ellipse at 18% 22%, #745bd43b, transparent 45%), radial-gradient(ellipse at 85% 46%, #22c7b81c, transparent 45%);
+  transform: translateX(calc(var(--orb-parallax) * .6%));
 }
-.orb-vuelo__escuadra {
-  position: absolute; width: min(310px, 43dvh, 67vw);
-  left: 50%; top: 44%; translate: -50% -50%;
+.orb-carrusel {
+  --orb-radio: clamp(230px, 22vw, 340px); --orb-ancho-galaxia: clamp(260px, 26vw, 380px);
+  /* Ajuste vertical aprobado: el arte, su rótulo y la nave no se tapan.
+     El diámetro del anillo y los tamaños de las piezas no cambian. */
+  position: relative; width: 100%; height: clamp(535px, 70vh, 580px);
+  perspective: 1400px; perspective-origin: 50% 42%; touch-action: pan-y; user-select: none;
 }
-.orb-vuelo__escuadra[data-acompanada="true"] { translate: -62% -50%; }
-.orb-vuelo__nave { position: relative; animation: orbVueloSuave 6s ease-in-out infinite; }
-.orb-vuelo__nave > .orb-nave-sprite { filter: drop-shadow(0 0 15px #b2b9ff33); }
-.orb-vuelo__nave .orb-mascota { left: 95%; top: 36%; width: 35%; }
-.orb-vuelo__particulas { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: -1; }
-.orb-vuelo__particulas i {
-  position: absolute; left: calc(9% + var(--i) * 12%); top: 20%;
-  width: 1px; height: 24px; border-radius: 50%; opacity: 0;
-  background: linear-gradient(transparent, #a5cdff90, transparent);
-  animation: orbVueloEstrella 3.8s linear infinite;
-  animation-delay: calc(var(--i) * -.63s);
+.orb-anillo {
+  position: absolute; left: 50%; top: 44%; width: 0; height: 0;
+  transform-style: preserve-3d; transform: rotateY(var(--orb-giro));
+  transition: transform var(--orb-duracion) var(--orb-curva); outline: none;
 }
-.orb-hub__demo { color: #c0c6e9; opacity: .8; }
-@keyframes orbVueloSuave {
-  0%, 100% { transform: translate3d(-3px, 3px, 0) rotate(-1.5deg); }
-  50% { transform: translate3d(3px, -7px, 0) rotate(1.5deg); }
+.orb-lista-galaxias { position: absolute; inset: 0; outline: none; transform-style: preserve-3d; }
+.orb-galaxia {
+  position: absolute; width: var(--orb-ancho-galaxia); aspect-ratio: 3 / 2;
+  left: calc(var(--orb-ancho-galaxia) * -.5); top: calc(var(--orb-ancho-galaxia) * -.5 - 16px);
+  transform: rotateY(var(--orb-puesto)) translateZ(var(--orb-radio));
+  transform-style: preserve-3d; cursor: pointer;
 }
-@keyframes orbVueloEstrella {
-  0% { transform: translateY(-30px); opacity: 0; }
-  25%, 65% { opacity: .5; }
-  100% { transform: translateY(260px); opacity: 0; }
+.orb-galaxia__contenido { position: relative; opacity: .55; transition: opacity var(--orb-duracion) ease; }
+.orb-galaxia__gesto { position: relative; }
+.orb-galaxia__arte { position: relative; aspect-ratio: 3 / 2; }
+.orb-galaxia__arte > img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.orb-galaxia__arte::after { content: ""; position: absolute; inset: 0; background: #050b1e; opacity: .6; pointer-events: none;
+  mask-image: var(--orb-mascara-galaxia); mask-size: contain; mask-repeat: no-repeat; mask-position: center;
+  transition: opacity var(--orb-duracion) ease;
 }
-.orb-vuelo[data-oculta="true"] * { animation-play-state: paused !important; }
+.orb-galaxia--lateral .orb-galaxia__contenido { opacity: .85; }
+.orb-galaxia--lateral .orb-galaxia__arte::after { opacity: .35; }
+.orb-galaxia--frente .orb-galaxia__contenido { opacity: 1; }
+.orb-galaxia--frente .orb-galaxia__arte::after { opacity: 0; }
+.orb-galaxia--fondo { cursor: default; }
+.orb-galaxia--dormida img { filter: saturate(.6); }
+.orb-galaxia[data-encendida="true"]:not(.orb-galaxia--dormida) .orb-galaxia__arte { animation: orbGalaxiaRespira 6s ease-in-out infinite alternate; }
+.orb-galaxia__rotulo { position: absolute; top: 100%; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 3px; padding-top: 2px;
+  /* El disco se ve de canto; su nombre sigue mirando al lector. */
+  transform: rotateY(calc(0deg - var(--orb-puesto) - var(--orb-giro))); transform-origin: 50% 0;
+  transition: transform var(--orb-duracion) var(--orb-curva), opacity var(--orb-duracion) ease;
+}
+.orb-galaxia--lateral .orb-galaxia__rotulo { opacity: .85; }
+.orb-galaxia__nombre { color: #fff4ff; font: 800 clamp(18px, 1.6vw, 24px)/1.1 var(--font-display); white-space: nowrap; text-shadow: 0 2px 6px #050b1e, 0 0 14px #050b1e; }
+.orb-galaxia--dormida .orb-galaxia__nombre { color: #c4cbe1; font-weight: 600; }
+.orb-galaxia__record.orb-pildora { font-size: 11px; line-height: 1.2; padding: 2px 9px; min-height: 0; backdrop-filter: none; }
+.orb-galaxia__invitacion { font-size: 11px; min-height: 17px; visibility: hidden; }
+.orb-galaxia[data-encendida="true"] .orb-galaxia__invitacion { visibility: visible; }
+.orb-carrusel[data-girando="true"] .orb-galaxia--frente .orb-galaxia__contenido { opacity: .85; }
+.orb-carrusel[data-girando="true"] .orb-galaxia--frente .orb-galaxia__arte::after { opacity: .35; }
+.orb-galaxia--fondo .orb-galaxia__rotulo { visibility: hidden; }
+.orb-galaxia__respaldo { display: block; position: absolute; inset: 18% 2%; border-radius: 50%; background: radial-gradient(ellipse, #fff7df, #b28aff90 20%, #9568df40 48%, transparent 72%); }
+.orb-galaxia[data-id="carrera"] .orb-galaxia__respaldo { background: radial-gradient(ellipse, #fff4d6, #5be8ba90 20%, #54d8ef40 48%, transparent 72%); }
+.orb-galaxia--dormida .orb-galaxia__respaldo { background: radial-gradient(ellipse, #9fa8c455, #6a729a22 48%, transparent 72%); }
+.orb-galaxia__destello { position: absolute; left: 50%; top: 48%; width: 22%; aspect-ratio: 1; translate: -50% -50%; pointer-events: none; color: #fff9ce; font-size: 70px; animation: orbGalaxiaDestello 380ms ease-out both; }
+.orb-galaxia__destello img { width: 100%; height: 100%; }
+.orb-galaxia__gesto[data-no="true"] { animation: orbGalaxiaNo 280ms ease-out; }
+.orb-carrusel__flecha { position: absolute; top: 30%; width: clamp(48px, 5vw, 72px); aspect-ratio: 1; border: 0; padding: 0; background: transparent; cursor: pointer; z-index: 2; }
+.orb-carrusel__flecha img { width: 100%; height: 100%; object-fit: contain; }
+.orb-carrusel__flecha svg { width: 70%; height: 70%; margin: auto; color: #7eeed5; }
+.orb-carrusel__flecha--izquierda { left: max(2%, calc(50% - 510px)); }
+.orb-carrusel__flecha--derecha { right: max(2%, calc(50% - 510px)); }
+.orb-carrusel__flecha:active { transform: scale(.94); filter: brightness(1.1); }
+.orb-carrusel__flecha:focus-visible, .orb-lista-galaxias:focus-visible .orb-galaxia--frente .orb-galaxia__nombre { outline: 3px solid #5ff3d4; outline-offset: 7px; border-radius: 7px; }
+.orb-carrusel__escuadra { position: absolute; bottom: 0; left: 50%; width: clamp(110px, 12vw, 160px); translate: -50% 0; pointer-events: none; }
+.orb-carrusel__nave { position: relative; transform: rotate(var(--orb-inclinacion)); transition: transform 420ms var(--orb-curva); }
+.orb-carrusel__nave .orb-mascota { left: 100%; top: 36%; width: 38%; }
+.orb-carrusel__nave .orb-nave-sprite__motor { scale: 1 1; transition: scale var(--orb-duracion) var(--orb-curva); }
+[data-girando="true"] .orb-carrusel__nave .orb-nave-sprite__motor { scale: 1 1.4; }
+.orb-galaxias-escena[data-oculta="true"] * { animation-play-state: paused !important; }
+@keyframes orbGalaxiaRespira { from { transform: scale(1); } to { transform: scale(1.03); } }
+@keyframes orbGalaxiaDestello { 0% { transform: scale(.4); opacity: 0; } 45% { transform: scale(1.3); opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
+@keyframes orbGalaxiaNo { 0%, 100% { transform: translateX(0); } 25%, 75% { transform: translateX(-4px); } 50% { transform: translateX(4px); } }
 @media (max-height: 760px) and (min-width: 601px) {
-  .orb-hub__contenido { gap: 14px; padding-top: 24px; }
-  .orb-vuelo { height: 260px; }
-  .orb-hub__titulo h1 { font-size: 3.5rem !important; }
+  .orb-hub__contenido { gap: 2px; padding-block: 6px; }
+  .orb-hub__titulo h1 { font-size: 42px !important; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .orb-vuelo__nave, .orb-vuelo__particulas i { animation: none; }
+  .orb-anillo, .orb-galaxia, .orb-galaxia__rotulo { transform: none; transition: none; }
+  .orb-galaxia__rotulo { opacity: 0; transition: opacity 200ms ease; }
+  .orb-galaxia--frente .orb-galaxia__rotulo { opacity: 1; }
+  .orb-galaxia { pointer-events: none; }
+  .orb-galaxia--frente { pointer-events: auto; }
+  .orb-galaxia__contenido { opacity: 0 !important; transition: opacity 200ms ease; }
+  .orb-galaxia--frente .orb-galaxia__contenido { opacity: 1 !important; }
+  .orb-galaxia__arte, .orb-galaxia__gesto, .orb-galaxia__destello { animation: none !important; }
+  .orb-galaxia__destello { display: none; }
+  .orb-carrusel__nave, .orb-cielo-profundo > div { transform: none; transition: none; }
+  .orb-carrusel__nave .orb-nave-sprite__motor { scale: 1 1; transition: none; }
 }
 
 /* ---- Insignias y gemas: SVG chico, imagen 3D grande ---- */
@@ -2620,6 +2670,9 @@ a { color: inherit; text-decoration: none; }
 
 /* Tienda de Órbita: colección a la derecha, vuelo de prueba a la izquierda. */
 .orb-tienda { position: relative; min-height: 100dvh; overflow-x: clip; color: #fff; background: #141b4d; }
+.orb-puerto { position: fixed; width: min(92vw, 1300px); bottom: -14%; left: 50%; translate: -50% 0; pointer-events: none; opacity: .42; }
+.orb-puerto__estacion { width: 100%; display: block; }
+.orb-puerto__nave { position: absolute; width: 24%; left: 50%; top: 17%; translate: -50% 0; }
 .orb-tienda__contenido { position: relative; z-index: 1; width: min(1100px, calc(100% - 48px)); margin: auto; padding: 28px 0 40px; }
 .orb-tienda__cabecera { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .orb-tienda__cabecera > div { text-align: center; }
@@ -2716,6 +2769,8 @@ a { color: inherit; text-decoration: none; }
 .orb-mascota__voz[data-en-linea="true"] .orb-mascota__mensaje { text-align: center; }
 /* La voz ocupa texto de la interfaz, nunca el lienzo de la nave. */
 .orb-hub__saludo { position: relative; width: min(420px, 86vw); min-height: 42px; margin-top: 9px; display: grid; place-items: center; }
+.orb-hub__saludo[data-con-mascota="false"] { min-height: 0; margin-top: 0; }
+.orb-hub__saludo[data-con-mascota="true"] { min-height: 28px; margin-top: 4px; }
 .orb-hub__saludo .orb-mascota__voz[data-en-linea="true"] { position: absolute; inset: 0; display: grid; place-items: center; }
 .orb-tienda__voz { width: 100%; }
 .orb-tienda__voz[data-con-mascota="true"] { min-height: 39px; display: grid; place-items: center; }
@@ -2844,12 +2899,12 @@ a { color: inherit; text-decoration: none; }
 .orb-carta--rara  { --carta-tinte-a: rgba(155, 124, 255, 0.22); --carta-tinte-b: rgba(124, 113, 255, 0.32); }
 .orb-carta--epica { --carta-tinte-a: rgba(255, 213, 82, 0.28);  --carta-tinte-b: rgba(255, 171, 64, 0.34); }
 
-/* Inicio de Órbita — ajuste móvil del vuelo. */
+/* En el celular se explora el mismo anillo; las entradas no abren juegos. */
 @media (max-width: 600px) {
-  .orb-hub__contenido { padding-top: 76px; gap: 18px; }
-  .orb-vuelo { height: clamp(230px, 33dvh, 285px); }
-  .orb-hub__escena { gap: 18px; }
-  .orb-hub__escena .orb-pildora { font-size: .8rem; padding: .5rem .65rem; }
+  .orb-hub__contenido { padding: 60px 12px 12px; gap: 4px; }
+  .orb-carrusel { height: clamp(430px, 61dvh, 500px); }
+  .orb-carrusel__flecha { top: 44%; }
+  .orb-hub__datos .orb-pildora { font-size: .8rem; padding: .5rem .65rem; }
 }
 
 /* Mensajes de la mascota: mantenerlos dentro de ventanas angostas. */

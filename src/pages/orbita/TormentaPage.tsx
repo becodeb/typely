@@ -58,6 +58,7 @@ import {
   type ResultadoPartida,
 } from "../../utils/orbita/motor";
 import { getTotalStars } from "../../utils/progress";
+import { blip, SONIDO_KEY } from "../../utils/orbita/sonido";
 
 /* ------------------------------------------------------------------ */
 /* Geometría de la escena                                              */
@@ -151,29 +152,6 @@ function tinteDeAmenaza(amenaza: number): string {
 /* ------------------------------------------------------------------ */
 /* Sonido — dos blips de WebAudio, apagados por defecto                 */
 /* ------------------------------------------------------------------ */
-const SONIDO_KEY = "typely_orbita_sonido";
-
-function blip(freq: number, hasta: number, ganancia = 0.05) {
-  const Ctor =
-    window.AudioContext ||
-    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!Ctor) return;
-  const ctx = new Ctor();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = "sine";
-  osc.frequency.setValueAtTime(freq, ctx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(hasta, ctx.currentTime + 0.12);
-  gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(ganancia, ctx.currentTime + 0.01);
-  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.16);
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start();
-  osc.stop(ctx.currentTime + 0.18);
-  window.setTimeout(() => void ctx.close(), 260);
-}
-
 /* ------------------------------------------------------------------ */
 
 interface PalabraRender {
