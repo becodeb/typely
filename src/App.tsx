@@ -33,6 +33,7 @@ const GameplayPage = lazy(() =>
 const ModosPage = lazy(() => import("./pages/orbita/ModosPage"));
 const OrbitaHubPage = lazy(() => import("./pages/orbita/OrbitaHubPage"));
 const TormentaPage = lazy(() => import("./pages/orbita/TormentaPage"));
+const CarreraPage = lazy(() => import("./pages/orbita/CarreraPage"));
 const RankingPage = lazy(() => import("./pages/orbita/RankingPage"));
 const HangarPage = lazy(() => import("./pages/orbita/HangarPage"));
 
@@ -201,6 +202,10 @@ export function App() {
                 </Suspense>
               </SoloEnComputadora>
             }
+          />
+          <Route
+            path="/orbita/carrera"
+            element={<SoloEnComputadora><Suspense fallback={<PageFallback />}><CarreraPage /></Suspense></SoloEnComputadora>}
           />
           <Route
             path="/orbita/ranking"

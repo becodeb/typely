@@ -19,6 +19,7 @@ import {
 } from "../api";
 import { isDemoMode } from "../storage";
 import type { ResultadoPartida } from "./motor";
+import type { ResultadoCarrera } from "./carrera";
 import { cristalesInfinitosDemo } from "./desarrolloLocal";
 
 const COLA_KEY = "typely_orbita_cola_v1";
@@ -82,9 +83,25 @@ export async function vaciarColaArcade(rol: string | undefined): Promise<ArcadeR
 /** Convierte el resultado del motor en el payload del servidor, lo encola
  *  y trata de mandarlo ya. */
 export function registrarPartida(
-  resultado: ResultadoPartida,
+  resultado: ResultadoPartida | ResultadoCarrera,
   rol: string | undefined,
+  gameId: "tormenta" | "carrera" = "tormenta",
 ): Promise<ArcadeRunResponse | null> {
+  if ("gameId" in resultado) {
+    guardarRecordCarrera(resultado);
+    if (!sincronizaArcade(rol)) return Promise.resolve(null);
+    const fin = new Date();
+    escribirCola([...leerCola(), {
+      gameId: "carrera", textId: resultado.textId, puesto: resultado.puesto,
+      startedAt: new Date(fin.getTime() - resultado.durationMs).toISOString(), endedAt: fin.toISOString(),
+      durationMs: resultado.durationMs, score: resultado.puntaje, peakThreat: 0, rankId: "carrera",
+      wpmAvg: resultado.ppmNeto, wpmPeak: resultado.ppmNeto, accuracy: resultado.precision,
+      wordsDestroyed: 0, wordsTyped: 0, charsTyped: resultado.caracteres, errors: resultado.errores,
+      crystalsClaimed: resultado.cristales, level: 0, upgrades: [],
+    }]);
+    return vaciarColaArcade(rol);
+  }
+  if (gameId !== "tormenta") throw new Error("El resultado no corresponde al juego.");
   guardarRecordLocal(resultado);
   if (!sincronizaArcade(rol)) return Promise.resolve(null);
 
@@ -192,13 +209,29 @@ export interface RecordLocal {
   ppmPico: number;
 }
 
-export function recordLocal(): RecordLocal | null {
+function recordsLocales(): Partial<Record<"tormenta" | "carrera", RecordLocal>> {
   try {
     const raw = localStorage.getItem(RECORD_KEY);
-    return raw ? (JSON.parse(raw) as RecordLocal) : null;
-  } catch {
-    return null;
-  }
+    const valor = raw ? JSON.parse(raw) : {};
+    if (!valor || typeof valor !== "object") return {};
+    // El formato anterior era el récord suelto de Tormenta.
+    if (typeof valor.puntaje === "number") {
+      const migrado = { tormenta: valor as RecordLocal };
+      try { localStorage.setItem(RECORD_KEY, JSON.stringify(migrado)); } catch { /* La lectura sigue disponible. */ }
+      return migrado;
+    }
+    return valor;
+  } catch { return {}; }
+}
+export function recordLocal(gameId: "tormenta" | "carrera" = "tormenta"): RecordLocal | null {
+  return recordsLocales()[gameId] ?? null;
+}
+function guardarRecordCarrera(r: ResultadoCarrera) {
+  const previo = recordLocal("carrera");
+  if (previo && previo.puntaje >= r.puntaje) return;
+  try { localStorage.setItem(RECORD_KEY, JSON.stringify({ ...recordsLocales(), carrera: {
+    puntaje:r.puntaje, ppmPico:r.ppmNeto, amenazaMax:0, rango:"carrera",
+  } satisfies RecordLocal })); } catch { /* Sin espacio, el resultado sigue visible. */ }
 }
 
 function guardarRecordLocal(r: ResultadoPartida) {
@@ -207,12 +240,12 @@ function guardarRecordLocal(r: ResultadoPartida) {
   try {
     localStorage.setItem(
       RECORD_KEY,
-      JSON.stringify({
+      JSON.stringify({ ...recordsLocales(), tormenta: {
         puntaje: r.puntaje,
         amenazaMax: r.amenazaMax,
         rango: r.rango,
         ppmPico: r.ppmPico,
-      } satisfies RecordLocal),
+      } satisfies RecordLocal }),
     );
   } catch {
     /* ignorar */

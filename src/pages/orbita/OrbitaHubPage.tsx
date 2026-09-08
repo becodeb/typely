@@ -72,7 +72,6 @@ export function OrbitaHubPage() {
   const [guardando, setGuardando] = useState(false);
   const [juego, setJuego] = useState<JuegoOrbitaDef>(() => JUEGOS_ORBITA[ultimoJuego()]!);
   const [sonido, setSonido] = useState(sonidoActivado);
-  const [avisoCarrera, setAvisoCarrera] = useState(false);
 
   /* Perfil + cola pendiente, al entrar. Nada bloquea el dibujado. */
   useEffect(() => {
@@ -107,10 +106,8 @@ export function OrbitaHubPage() {
   }, [alias]);
 
   const record = recordLocal();
-  const mejor = perfil?.bestScore || record?.puntaje || 0;
+  const mejor = Math.max(perfil?.bestScore ?? 0, record?.puntaje ?? 0);
   const entrar = (elegida: JuegoOrbitaDef) => {
-    // Hito 1: la pista se conecta después de aprobar el carrusel.
-    if (elegida.id === "carrera") { setAvisoCarrera(true); return; }
     if (elegida.ruta) navigate(elegida.ruta);
   };
 
@@ -148,8 +145,8 @@ export function OrbitaHubPage() {
               {tieneCristalesInfinitos(perfil) ? "∞" : perfil?.crystals ?? 0} cristales
             </span>
           </div>
-        <CarruselJuegos perfil={perfil} records={{ tormenta: mejor }} destinoMensaje={vozMascota}
-          bloqueado={pideAlias || avisoCarrera} alElegir={setJuego} alEntrar={entrar} />
+        <CarruselJuegos perfil={perfil} records={{ tormenta: Math.max(mejor, perfil?.bests?.tormenta?.score ?? 0), carrera: Math.max(recordLocal("carrera")?.puntaje ?? 0, perfil?.bests?.carrera?.score ?? 0) }} destinoMensaje={vozMascota}
+          bloqueado={pideAlias} alElegir={setJuego} alEntrar={entrar} />
 
         {/* Servicios compartidos por todos los minijuegos. */}
         <div className="orb-hub__acciones grid gap-3 w-[min(26rem,92vw)]">
@@ -169,18 +166,6 @@ export function OrbitaHubPage() {
           </p>
         )}
       </div>
-
-      {avisoCarrera && <div className="fixed inset-0 z-30 grid place-items-center p-4" style={{ background: "rgba(20,27,77,.6)" }}>
-        <section className="orb-vidrio tarjeta-marca orb-hub__aviso" role="dialog" aria-modal="true" aria-labelledby="carrera-preparando">
-          <h2 id="carrera-preparando">Carrera de cohetes</h2>
-          <p>La pista se está preparando. ¡Pronto vas a poder correr!</p>
-          <button autoFocus type="button" className="orb-boton-primario" onClick={() => setAvisoCarrera(false)} onKeyDown={e => {
-            if (e.key === "Escape") setAvisoCarrera(false);
-            // El aviso tiene una sola acción: Tab conserva el foco adentro.
-            if (e.key === "Tab") e.preventDefault();
-          }}>Volver a los juegos</button>
-        </section>
-      </div>}
 
       {/* Onboarding del alias — con la nave de fondo, parte de la ficción. */}
       {pideAlias && (
