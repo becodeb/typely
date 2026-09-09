@@ -70,24 +70,21 @@ function rngCon(semilla) {
 /* conducta(t) → { wpm, err, activo }. `activo=false` = no toca el teclado.
    `procrastina` = solo tipea cuando hay al menos tantas palabras vivas. */
 const ESCENARIOS = [
-  { nombre: "bueno constante (60 PPM)", banda: 9, conducta: () => ({ wpm: 60, err: 0.04, activo: true }) },
-  { nombre: "malo constante (10 PPM)", banda: 1, conducta: () => ({ wpm: 10, err: 0.15, activo: true }) },
+  { nombre: "bueno constante (60 PPM)", conducta: () => ({ wpm: 60, err: 0.04, activo: true }) },
+  { nombre: "malo constante (10 PPM)", conducta: () => ({ wpm: 10, err: 0.15, activo: true }) },
   {
     nombre: "malo 30 s → muy bueno",
-    banda: 9,
     conducta: (t) => (t < 30 ? { wpm: 10, err: 0.15, activo: true } : { wpm: 70, err: 0.03, activo: true }),
   },
   {
     nombre: "muy bueno 40 s → se distrae",
-    banda: 9,
     conducta: (t) => (t < 40 ? { wpm: 70, err: 0.03, activo: true } : { wpm: 12, err: 0.2, activo: true }),
   },
   {
     nombre: "intermitente 5 s sí / 4 s no",
-    banda: 6,
     conducta: (t) => ({ wpm: 45, err: 0.05, activo: t % 9 < 5 }),
   },
-  { nombre: "no toca nada", banda: 3, conducta: () => ({ wpm: 0, err: 0, activo: false }) },
+  { nombre: "no toca nada", conducta: () => ({ wpm: 0, err: 0, activo: false }) },
   /* Sin corte por duración (a8dfece) y con la amenaza topeada en 100, un
      tipeador perfecto no pierde nunca: seguir viva a los 30 min es lo
      ESPERADO para este escenario, no una falla. Para cualquier perfil
@@ -95,32 +92,28 @@ const ESCENARIOS = [
   /* Con el TECHO BLANDO (pisos de vida y cadencia que bajan desde los 210 s)
      hasta la máquina perfecta tiene que caer: seguir viva a los 30 min
      vuelve a ser falla para TODOS los escenarios. */
-  { nombre: "máquina perfecta (130 PPM)", banda: 10, conducta: () => ({ wpm: 130, err: 0, activo: true }) },
-  { nombre: "rápido y torpe (55 PPM, 30 % err)", banda: 6, conducta: () => ({ wpm: 55, err: 0.3, activo: true }) },
+  { nombre: "máquina perfecta (130 PPM)", conducta: () => ({ wpm: 130, err: 0, activo: true }) },
+  { nombre: "rápido y torpe (55 PPM, 30 % err)", conducta: () => ({ wpm: 55, err: 0.3, activo: true }) },
   {
     nombre: "procrastinador (espera 2 vivas)",
-    banda: 6,
     conducta: () => ({ wpm: 50, err: 0.05, activo: true }),
     procrastina: 2,
   },
-  { nombre: "principiante real (8 PPM, B0)", banda: 0, conducta: () => ({ wpm: 8, err: 0.14, activo: true }) },
+  { nombre: "principiante real (8 PPM)", conducta: () => ({ wpm: 8, err: 0.14, activo: true }) },
   /* Las estrategias de build, sobre un mismo jugador medio: comparan
      supervivencia sin imponer un corte por tiempo. */
   {
     nombre: "build defensiva (45 PPM)",
-    banda: 6,
     conducta: () => ({ wpm: 45, err: 0.05, activo: true }),
     elige: ESTRATEGIAS.defensiva,
   },
   {
     nombre: "build ofensiva (45 PPM)",
-    banda: 6,
     conducta: () => ({ wpm: 45, err: 0.05, activo: true }),
     elige: ESTRATEGIAS.ofensiva,
   },
   {
     nombre: "cazador de balas (45 PPM)",
-    banda: 6,
     conducta: () => ({ wpm: 45, err: 0.05, activo: true }),
     elige: ESTRATEGIAS.bala,
   },
@@ -132,7 +125,6 @@ const HITOS = [5, 10, 20, 30, 45, 60, 90, 120];
 function jugar(esc, semilla) {
   const rng = rngCon(semilla);
   const motor = new MotorTormenta({
-    bandaMax: esc.banda,
     rng: rngCon(semilla ^ 0x9e37),
     ajustes: AJUSTES_CLI,
   });
@@ -220,7 +212,7 @@ function jugar(esc, semilla) {
       hitoIdx++;
     }
     /* Invariantes duros. */
-    if (vivas > 8) m.fallas.push(`${vivas} palabras vivas a los ${Math.round(t)} s (tope 8)`);
+    if (vivas > motor.aj.simultaneasMax) m.fallas.push(`${vivas} palabras vivas a los ${Math.round(t)} s (tope ${motor.aj.simultaneasMax})`);
     if (motor.fase === "calibracion" && vivas > 3) m.fallas.push(`${vivas} vivas durante el vuelo de prueba`);
     const iniciales = new Set();
     for (const p of motor.vivas) {
@@ -316,7 +308,7 @@ for (const esc of ESCENARIOS) {
   const fallas = [...new Set(corridas.flatMap((c) => c.fallas))];
   fallasTotales += fallas.length;
 
-  console.log(`■ ${esc.nombre}  (banda ${esc.banda})`);
+  console.log(`■ ${esc.nombre}`);
   console.log(
     `    duración ${dur.toFixed(0)} s · amenaza máx ${amenaza} · ${rango} · ${palabras} palabras` +
       ` · vuelo de prueba termina a los ${prueba.toFixed(1)} s`,

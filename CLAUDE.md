@@ -902,9 +902,10 @@ touchpad, windows, tabs, shortcuts, text editing, UI literacy). `SkillLevelView`
 
 ### 8.1 Modo Órbita (arcade)
 
-El segundo eje del producto: minijuegos infinitos y rejugables, medidos por
-supervivencia y velocidad — no por completación. El primero es **Tormenta de
-palabras** (`/orbita/tormenta`). La especificación de diseño completa vive en
+El segundo eje del producto es una sección de minijuegos rejugables, medidos
+por supervivencia y velocidad. Incluye **Tormenta de palabras**
+(`/orbita/tormenta`) y **Carrera de cohetes** (`/orbita/carrera`).
+La especificación de diseño de Tormenta vive en
 el artefacto "Tormenta de palabras"; acá va lo que hace falta para tocar el
 código sin romper sus reglas.
 
@@ -913,6 +914,119 @@ selector de ORBES DE CRISTAL — Aventura (las islas), Órbita, y un orbe dormid
 para modos futuros. Las rutas: `/orbita` (hub), `/orbita/tormenta` (el juego,
 con `SoloEnComputadora` igual que los niveles), `/orbita/ranking`,
 `/orbita/tienda` (la antigua `/orbita/hangar` redirige). Todo lazy.
+
+**Carrusel de minijuegos (etapa 2, aprobado).** `/orbita` monta
+`CarruselJuegos.tsx` con los cinco puestos de `orbitaJuegos.ts`: Tormenta,
+Carrera y tres juegos futuros. Por pedido expreso de Ezequiel del 07/09,
+las galaxias se reemplazaron por objetos simples: nube con palabras,
+cohetes con bandera, huevo, cristal y cofre. Autorizó elegir y generar el
+arte sin otra aprobación individual. Las fuentes y los prompts quedan en
+`Images/orbita/destinos/`, y los WebP en `public/assets/orbita/destinos/`.
+CSS 3D, destino entero sin acotar, giros
+de 700/1000/1200 ms según los gestos encadenados, teclado, flechas de vidrio,
+deslizar y clic lateral. La nave equipada y su mascota acompañan el giro;
+el cielo recibe el impulso contrario y vuelve al centro al descansar.
+El sonido comparte interruptor y clave con Tormenta. Movimiento reducido
+funde en 200 ms, sin rotación, inclinación, parallax ni respiración.
+Se conserva la selección en `typely_orbita_galaxia_v1`. La estación con
+la nave posada pasó a `Puerto.tsx`, fondo de la tienda.
+
+La distribución vertical se ajustó con autorización de Ezequiel para que
+arte, nombres y nave no se tapen a 1366×768 y 1366×912. En la revisión del
+07/09 pidió reemplazar explícitamente el efecto de láminas vistas de canto:
+se conservan el recorrido del anillo, su radio y la perspectiva, pero cada
+ilustración compensa el giro y solo inclina 13° por puesto (máximo 26°).
+Las laterales se ven al 66 % y las del fondo al 43 %, más elevadas, para
+mostrar distancia sin perder la cara del objeto. Los nombres miran al
+lector. Flota suavemente solo el objeto central; cuatro rastros luminosos
+acompañan el viaje. Se retiraron el aura y el polvo orbital para simplificar
+la escena. La nave acompaña con desplazamiento y estelas desde los motores
+reales de cada pose, del color equipado. Solo se animan transform y opacity;
+con movimiento reducido se apagan estos adornos y se conserva el fundido.
+Celular: explorar solamente.
+El hito del carrusel se mostró antes de avanzar. Ezequiel habilitó la Carrera
+y aprobó sus sesenta párrafos el 08/09/2026. El brief original está en
+`Images/orbita/GALAXIAS-BRIEF.html`; las revisiones autorizadas se documentan acá.
+
+**Carrera de cohetes.** `CarreraPage.tsx` es lazy, con `SoloEnComputadora`.
+`MotorCarrera` (`src/utils/orbita/carrera.ts`) es puro: cada carácter correcto
+avanza una fracción del recorrido; hasta cinco errores coral bloquean el
+avance hasta borrarlos. El sexto se ignora. Backspace también retrocede una
+correcta, sin otra penalidad. La entrada usa `beforeinput`, composición y
+normalización NFC para conservar mayúsculas, tildes y ñ. No admite pegar.
+El texto completo aparece arriba, en hasta tres líneas; tres luces con pasos
+de 800 ms dan la largada. A los 20 s sin tecla se congelan nave, reloj y
+fantasmas; cualquier tecla retoma. Pestaña oculta también pausa.
+La carrera termina al completar el texto, sin vidas ni corte por tiempo.
+
+**Excepción explícita a las bandas:** todos corren los mismos sesenta
+párrafos escritos a mano y aprobados, sin depender del progreso de Aventura.
+`src/data/carreraTextos.ts` contiene IDs estables, 90–140 caracteres, dos o
+tres oraciones y solo letras, espacios, puntos, comas y signos de pregunta.
+Otra vez sortea un texto distinto del anterior. El examen valida todo el corpus.
+
+Hasta cuatro fantasmas avanzan a PPM constante: el récord propio y los tres
+mejores del grado de la semana ISO, con alias y cosméticos, sin nombres reales.
+`GET /api/arcade/ghosts?game=carrera` se consulta una vez al entrar; sin red,
+en demo o sin grado queda un rival a la mediana del grado, o 25 PPM.
+El puesto cuenta los fantasmas que llegaron estrictamente antes del alumno.
+Puntaje = `round(ppmNeto × (precision/100)² × 10)`; cristales =
+`round(caracteres/5)` más 12/8/5/2/2 por puesto. El resultado muestra tiempo,
+PPM, precisión, puesto, puntaje y cristales; los tres primeros reciben medalla.
+La pista, meta, luces, medallas y chispas son arte generado; las naves,
+mascotas, estelas y el sonido se reutilizan. Movimiento reducido apaga
+cursor pulsante, chispas y destellos decorativos.
+
+**Revisión visual de Carrera (08/09/2026):** a pedido de Ezequiel se reemplazó
+la vista lateral por una cámara detrás de las naves. `pistaCarrera.ts` define
+la proyección común de los cinco carriles, sus corredores y la llegada.
+La recta frontal se generó directamente para esta cámara: `recta-frontal.webp`
+se muestra con escala uniforme y traslación, sin estirar su textura. Se
+retiraron la homografía de la imagen lateral y la segunda copia del suelo,
+que parecía una escalera flotante. El arco conserva su posición frontal y
+su abertura alineada al final de los carriles, sin tarimas debajo.
+Las naves conservan su orientación frontal y reducen
+su escala al alejarse; los alias se atenúan a distancia. No se alteraron los
+PNG. Texto alineado a la izquierda, consigna y progreso en un mismo bloque,
+tiempo y ritmo agrupados en la barra, luces de largada junto a la consigna.
+El alto de la pista depende del espacio que deja el párrafo, incluso si
+ocupa tres líneas. El resultado refuerza la separación del fondo y la
+jerarquía entre medalla, puesto, puntaje y métricas.
+
+**Duraciones revisadas con autorización:** se mantienen el largo de los
+textos y las velocidades reales. En veinte párrafos por perfil, las medianas
+del examen son 200/100/56/35/22/16 s para 8/15/25/40/60/85 PPM.
+El máximo observado para 8 PPM es 229 s. Se comprueban 45–75 s para 25 PPM,
+25–45 s para 40 PPM y hasta 360 s en todos los perfiles. La API admite
+Carrera de 5–360 s para ranking (el juego puede completarse fuera de esa
+ventana); valida textId, largo exacto, PPM, precisión, fórmula del puntaje,
+puesto, nivel cero y ausencia de mejoras. Tormenta conserva sus límites.
+
+**Datos y ranking por juego:** migración `0007_arcade_carrera.sql`, tabla
+`arcade_bests` por alumno/juego y `arcade_runs.text_id`. Los récords previos
+de Tormenta se copian en la migración; los campos históricos del perfil
+siguen siendo de Tormenta. `/me` agrega `bests`, el ranking tiene pestañas
+y el hub muestra el récord de cada juego. El récord local migra el formato
+anterior a un mapa por juego. Las partidas usan la cola existente y se
+reintentan al volver al hub; el demo nunca manda datos a la API.
+
+Verificación de Carrera (08/09/2026): build y TypeScript de API; examen de
+Carrera y ambos exámenes de Tormenta; integración local de migración,
+validación, cristales, récords, fantasmas y ranking. En Chrome se verificaron
+entrada, errores, composición, pausas, resultado, otra carrera y envío
+pendiente al recuperar la red, a 1366×768, 1366×912 y 1440×900 sin scroll.
+Movimiento reducido verificado; la ruta sigue siendo solo de exploración
+en celular a 375×812. Frontend y API reconstruidos en Docker, API saludable
+y proxy HTTP 200 en el puerto local 3007; el 3005 estaba ocupado.
+
+Verificación del hito 1 (08/09/2026): build, TypeScript de API y ambos
+exámenes de Tormenta aprobados; navegación y ausencia de scroll verificadas
+en Chrome a 1366×768, 1366×912, 1440×900 y 375×812. La medición del compilado
+local con los nuevos objetos dio mediana 16,7 ms, p95 16,8 ms y tres cuadros
+por encima de 20 ms (máximo 66,6 ms, 419 muestras). La cara visible también
+se verificó durante giros encadenados e inversión en vuelo.
+**La aceptación de rendimiento sigue abierta:**
+no equivale a verificar 60 fps sin picos en la Chromebook del aula.
 
 **Bonus Tormenta de signos.** `tormentaSignos.ts` controla una única oleada
 por partida, sin mirar el progreso de Aventura ni exigir precisión. Se
@@ -1037,22 +1151,36 @@ cada tecla, porque el nivel sube dentro de `tecla()`.
   la que no cierra se guarda con `ranked=false` — no compite ni acuña. Los
   cristales los recomputa el servidor, nunca se acredita lo que diga el
   cliente sin tope.
-- **El corpus sale del currículum** (`src/data/orbitaCorpus.ts`: once bandas
-  desde los `targets[]` reales, en orden pedagógico) y el techo del alumno es
-  su banda desbloqueada +1 de asomo — nunca símbolos que jamás vio.
+- **Tormenta es el mismo juego para todos** (decisión de Ezequiel,
+  08/09/2026): el corpus NO depende de la isla en la que va el chico. Son
+  tres bandas fijas (`src/data/orbitaCorpus.ts`: letras sueltas, sílabas y
+  palabras de 2-4, palabras de 5-6 como asomo), sacadas de los `targets[]`
+  reales de cualquier isla y filtradas a pura letra minúscula sin tilde —
+  ni dígitos, ni signos, ni espacios. El motor sube de banda con la amenaza
+  solo hasta `AJUSTES.bandaTope` (1); lo que escala con la habilidad es la
+  presión (cadencia, velocidad, simultáneas), no el vocabulario. Los signos
+  aparecen ÚNICAMENTE en la oleada "tormenta de signos". La página ya no
+  consulta estrellas ni mundos abiertos, y `MotorTormenta` no recibe banda.
+  Recalibración que lo acompañó, con los dos exámenes pasando: la banda
+  sube a amenaza 10 (`bandaCadaAmenaza`; con 8 el lector de 8 PPM caía a
+  sílabas en su borde y duraba 82 s) y el tope de simultáneas es 10, una
+  más cada 12 de amenaza (`simultaneasMax`, `simultaneasCadaAmenaza`; con
+  8 y cada 20, calibrados para palabras largas, el experto de 85 PPM
+  limpiaba las cortas más rápido de lo que el tope dejaba entregar y
+  duraba 190 s). Medianas: 108/150/152/143/154/173 s para 8→85 PPM.
 - **El demo juega y no manda nada**: sin cuenta no hay ranking ni cristales.
 - **El docente puede pausar el modo por grupo** (`groups.arcade_enabled`,
   toggle en la pantalla de islas del grupo). El orbe se ve dormido, nunca
   desaparece ni queda como botón muerto.
 - La partida **se pausa sola con la pestaña oculta** (rAF + recorte de dt en
-  el motor): una interrupción de aula no regala impactos. Cuatro ganchos
+  el motor): una interrupción de aula no regala impactos. Tres ganchos
   existen SOLO en dev y no aparecen en producción: `?bot=N` corre el bucle
   por intervalo a N× (para verificar desde una pestaña oculta, donde no hay
   rAF, antes de que el cliente de Vite recargue), `window.__tormentaTecla`
-  tipea por el mismo camino que el teclado, `window.__tormentaVivas` da la
-  lista viva del MOTOR (el DOM entre dos pintadas de React miente), y
-  `?banda=8` fuerza la banda máxima de corpus (0-10) para probar símbolos o
-  correos sin pasarse cinco islas. Ojo con `?bot=4`: una partida sin teclas
+  tipea por el mismo camino que el teclado y `window.__tormentaVivas` da la
+  lista viva del MOTOR (el DOM entre dos pintadas de React miente). El
+  `?banda=N` que forzaba la banda del corpus se fue con las bandas por isla
+  (08/09/2026). Ojo con `?bot=4`: una partida sin teclas
   termina en 22 s de juego, o sea 5 s de pared — el bot hay que inyectarlo
   antes de que termine la cuenta regresiva.
 

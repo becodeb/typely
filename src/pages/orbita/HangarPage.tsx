@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Gema } from "../../components/orbita/OrbitaIconos";
 import { VistaPreviaTienda } from "../../components/orbita/VistaPreviaTienda";
+import { Puerto } from "../../components/orbita/Puerto";
 import { MuestraEfecto } from "../../components/orbita/EfectosCosmeticos";
 import { COSMETICOS, NOMBRE_RAREZA, SLOT_COSMETICO, type Cosmetico, type TipoCosmetico } from "../../data/orbitaCosmeticos";
 import { navePorId } from "../../data/orbitaNaves";
@@ -114,6 +115,7 @@ export function HangarPage() {
   }
   return <main className="orb-tienda" aria-label="Tienda de Órbita">
     <FondoEspacio tinte="rgb(84, 130, 224)" fuerza={0.45} />
+    <Puerto naveId={perfil?.equipped.ship} />
     <div className="orb-tienda__contenido">
       <header className="orb-tienda__cabecera">
         <button type="button" className="orb-boton-vidrio orb-boton--chico" onClick={() => navigate("/orbita")}><ArrowLeft size={18} /> Órbita</button>

@@ -14,7 +14,7 @@
  */
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { InsigniaRango } from "../../components/orbita/OrbitaIconos";
 import { useAuth } from "../../hooks/useAuth";
 import { api, ApiError, type ArcadeBoardRow } from "../../utils/api";
@@ -38,8 +38,8 @@ const ORO = "#c98a00";
 /* Atajo de desarrollo: ?demo=1 llena el ranking con filas de mentira.
    El podio es el único lugar donde las insignias se ven grandes y una al
    lado de la otra, y hasta ahora no había forma de mirarlo sin una cuenta
-   de verdad — se revisaba a ciegas. Mismo trato que el ?banda= y el ?bot=
-   de la partida: en producción la condición es constante false y el
+   de verdad — se revisaba a ciegas. Mismo trato que el ?bot= de la
+   partida: en producción la condición es constante false y el
    bundler se lleva puesto todo esto. */
 const FILAS_DEMO: ArcadeBoardRow[] = [
   { pos: 1, alias: "Nova", realName: null, score: 1240, rankId: "leyenda", wpmPeak: 78, mine: false },
@@ -52,6 +52,8 @@ const FILAS_DEMO: ArcadeBoardRow[] = [
 
 export function RankingPage() {
   const navigate = useNavigate();
+  const [parametros,setParametros] = useSearchParams();
+  const juego = parametros.get("game") === "carrera" ? "carrera" : "tormenta";
   const { user } = useAuth();
   const demo =
     import.meta.env.DEV && new URLSearchParams(window.location.search).has("demo");
@@ -76,7 +78,7 @@ export function RankingPage() {
     setCargando(true);
     setError("");
     void api
-      .arcadeLeaderboard({ scope: alcance, period: periodo })
+      .arcadeLeaderboard({ game: juego, scope: alcance, period: periodo })
       .then((res) => {
         if (cancelado) return;
         setFilas(res.rows);
@@ -93,7 +95,7 @@ export function RankingPage() {
     return () => {
       cancelado = true;
     };
-  }, [alcance, periodo, sincroniza, demo]);
+  }, [alcance, periodo, sincroniza, demo, juego]);
 
   const pildora = (activo: boolean) =>
     `orb-pildora orb-pildora--boton text-sm ${activo ? "orb-pildora--activa" : ""}`;
@@ -125,6 +127,9 @@ export function RankingPage() {
           </h1>
         </header>
 
+        <div className="flex gap-2" role="group" aria-label="Juego del ranking">
+          {(["tormenta","carrera"] as const).map(id=><button key={id} className={pildora(juego===id)} aria-pressed={juego===id} onClick={()=>setParametros(p=>{p.set("game",id);return p;})}>{id==="tormenta" ? "Tormenta" : "Carrera de cohetes"}</button>)}
+        </div>
         {!sincroniza ? (
           <section className="orb-vidrio tarjeta-marca w-[min(28rem,94vw)] p-6 text-center grid gap-2">
             <p
@@ -182,11 +187,11 @@ export function RankingPage() {
                     <span className="orb-podio__puesto">
                       {f.pos === 1 ? "1.º puesto" : f.pos === 2 ? "2.º" : "3.º"}
                     </span>
-                    <InsigniaRango
+                    {juego === "carrera" ? <img src={`/assets/orbita/carrera/medalla-${["oro","plata","bronce"][f.pos-1]}.webp`} alt={`Puesto ${f.pos}`} className={f.pos === 1 ? "w-24 h-24" : "w-16 h-16"}/> : <InsigniaRango
                       rango={f.rankId as RangoId}
                       tamano="grande"
                       className={f.pos === 1 ? "w-24 h-24" : "w-16 h-16"}
-                    />
+                    />}
                     <b
                       className="block truncate max-w-full"
                       style={{
@@ -249,7 +254,7 @@ export function RankingPage() {
                       >
                         {f.pos}
                       </span>
-                      <InsigniaRango rango={f.rankId as RangoId} className="w-7 h-7" />
+                      {juego === "tormenta" && <InsigniaRango rango={f.rankId as RangoId} className="w-7 h-7" />}
                       <span
                         className="flex-1 font-bold truncate"
                         style={{ fontFamily: "var(--font-display)" }}

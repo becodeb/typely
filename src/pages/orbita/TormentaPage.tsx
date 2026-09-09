@@ -6,7 +6,7 @@
  *
  * Decisiones de dibujo que importan:
  *
- *  - Las ≤8 palabras vivas se mueven con estilos IMPERATIVOS desde el
+ *  - Las ≤10 palabras vivas se mueven con estilos IMPERATIVOS desde el
  *    rAF (transform sobre refs), nunca con setState por frame: React
  *    monta y desmonta palabras (eventos discretos), el frame solo las
  *    empuja. En una Chromebook de aula esa diferencia es jugable/no.
@@ -33,14 +33,12 @@ import {
   IconoOrbita,
   InsigniaRango,
 } from "../../components/orbita/OrbitaIconos";
-import { bandaMaxDesbloqueada } from "../../data/orbitaCorpus";
 import { colorEstela, colorRayo, efectoCosmetico, cosmeticoPorId } from "../../data/orbitaCosmeticos";
 import { DURACION_IMPACTO_MS, DURACION_RAYO_MS, ImpactoCosmetico, RayoCosmetico } from "../../components/orbita/EfectosCosmeticos";
 import { MascotaOrbita } from "../../components/orbita/MascotaOrbita";
 import { EscenaSignos } from "../../components/orbita/EscenaSignos";
 import type { EstadoSignos } from "../../utils/orbita/tormentaSignos";
 import { navePorId } from "../../data/orbitaNaves";
-import { getWorldStarRequirements, WORLD_PEDAGOGY_ORDER } from "../../data/worlds";
 import { useAuth } from "../../hooks/useAuth";
 import type { ArcadeRunResponse } from "../../utils/api";
 import {
@@ -57,7 +55,7 @@ import {
   type MejoraId,
   type ResultadoPartida,
 } from "../../utils/orbita/motor";
-import { getTotalStars } from "../../utils/progress";
+import { blip, SONIDO_KEY } from "../../utils/orbita/sonido";
 
 /* ------------------------------------------------------------------ */
 /* Geometría de la escena                                              */
@@ -151,29 +149,6 @@ function tinteDeAmenaza(amenaza: number): string {
 /* ------------------------------------------------------------------ */
 /* Sonido — dos blips de WebAudio, apagados por defecto                 */
 /* ------------------------------------------------------------------ */
-const SONIDO_KEY = "typely_orbita_sonido";
-
-function blip(freq: number, hasta: number, ganancia = 0.05) {
-  const Ctor =
-    window.AudioContext ||
-    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!Ctor) return;
-  const ctx = new Ctor();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = "sine";
-  osc.frequency.setValueAtTime(freq, ctx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(hasta, ctx.currentTime + 0.12);
-  gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(ganancia, ctx.currentTime + 0.01);
-  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.16);
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start();
-  osc.stop(ctx.currentTime + 0.18);
-  window.setTimeout(() => void ctx.close(), 260);
-}
-
 /* ------------------------------------------------------------------ */
 
 interface PalabraRender {
@@ -218,7 +193,7 @@ type FasePantalla = "cuenta" | "jugando" | "resultado";
 
 /* Lo que falta escribir se dibuja como HTML para poder PINTAR las
    mayúsculas: cada letra que necesita Shift va en <em>, que el CSS pinta
-   dorada. Se escapa antes — la banda de símbolos trae < > &. */
+   dorada. Se escapa antes — la oleada de signos trae & y comillas. */
 function escaparHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -264,26 +239,9 @@ export function TormentaPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  /* Banda máxima desbloqueada por el modo historia: el corpus del arcade
-     es "lo aprendido y un poco más allá", nunca símbolos jamás vistos. */
-  /* Atajo de desarrollo: ?banda=8 fuerza la banda máxima (0-10) para
-     probar símbolos, correos o mensajes sin pasarse cinco islas antes.
-     Solo en dev: en producción la condición es constante false. */
-  const bandaForzada = useMemo(() => {
-    if (!import.meta.env.DEV) return null;
-    const q = new URLSearchParams(window.location.search);
-    if (!q.has("banda")) return null;
-    const n = Number(q.get("banda"));
-    return Number.isFinite(n) ? Math.max(0, Math.min(10, Math.round(n))) : null;
-  }, []);
-
-  const bandaMax = useMemo(() => {
-    if (bandaForzada !== null) return bandaForzada;
-    const total = getTotalStars();
-    const requisitos = getWorldStarRequirements();
-    const abiertos = new Set(WORLD_PEDAGOGY_ORDER.filter((id) => total >= (requisitos[id] ?? 0)));
-    return bandaMaxDesbloqueada(abiertos);
-  }, [bandaForzada]);
+  /* El corpus es el mismo para todos (decisión de Ezequiel, 08/09/2026):
+     Tormenta ya no mira la isla en la que va el chico ni sus estrellas.
+     Ver `AJUSTES.bandaTope` en el motor y la cabecera de orbitaCorpus.ts. */
 
   const perfil = useMemo(() => perfilLocal(), []);
   const estela = colorEstela(perfil?.equipped.trail);
@@ -367,13 +325,13 @@ export function TormentaPage() {
   useEffect(() => {
     if (fase !== "cuenta") return;
     if (cuenta === 0) {
-      motorRef.current = new MotorTormenta({ bandaMax });
+      motorRef.current = new MotorTormenta();
       setFase("jugando");
       return;
     }
     const t = window.setTimeout(() => setCuenta((c) => c - 1), 900);
     return () => window.clearTimeout(t);
-  }, [fase, cuenta, bandaMax]);
+  }, [fase, cuenta]);
 
   function otraVez() {
     setSignos(null);
@@ -1341,11 +1299,6 @@ export function TormentaPage() {
             style={{ writingMode: "vertical-rl" }}
           >
             sobrecarga ×{(1 + hud.sobrecarga).toFixed(1)}
-          </div>
-        )}
-        {bandaForzada !== null && (
-          <div className="orb-dato left-4 bottom-3 text-[11px] font-bold tracking-widest uppercase opacity-70">
-            dev · banda forzada {bandaForzada}
           </div>
         )}
         {/* El vuelo de prueba se anuncia: el chico tiene que saber que los

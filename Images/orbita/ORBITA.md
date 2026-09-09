@@ -953,3 +953,131 @@ color del cristal. Si a 72 px se confunden, el que cambia es el de regeneración
 fila se ven como una familia, y a 96 px se reconoce cada símbolo sin leer el
 nombre. Importar con `node scripts/import-orbita-art.mjs gemas`; el importador
 rechaza cualquier nombre que no sea uno de los ocho.
+
+### 7.7 Ilustraciones de minijuegos y nuevo inicio de Órbita (hito 1)
+
+**Dirección vigente:** el 07/09/2026 Ezequiel descartó las galaxias y pidió
+objetos simples que representen cada juego. Autorizó elegir, generar e
+integrar el arte sin pedir otra aprobación individual. Tormenta usa una
+nube lavanda con las palabras sol, luna y mar; Carrera, dos cohetes con
+bandera. Los tres juegos futuros se representan con huevo, cristal y cofre,
+apagados y sin anticipar reglas de juegos todavía no definidos.
+
+Los ocho prompts de generación y corrección del fondo están en
+[`destinos/prompts.md`](destinos/prompts.md). Las referencias fueron la nave
+perlada y la estación existentes. Se conservan los cinco PNG elegidos sin
+procesar. El importador mantiene el alpha de Tormenta y quita el mate negro
+de las otras cuatro piezas con sharp, según la autorización previa.
+
+| Fuente en `Images/orbita/destinos/` | WebP en `public/assets/orbita/destinos/` | Medidas |
+|---|---|---|
+| `tormenta-source.png` | `tormenta.webp` | 768×768, alpha |
+| `carrera-source.png` | `carrera.webp` | 768×768, alpha |
+| `huevo-source.png` | `huevo.webp` | 635×635, alpha |
+| `cristal-source.png` | `cristal.webp` | 768×768, alpha |
+| `cofre-source.png` | `cofre.webp` | 768×768, alpha |
+
+Importar con `node scripts/import-orbita-art.mjs destinos`. Recorta el margen
+y encuadra en un cuadrado, sin agrandar. Los cinco WebP pesan unos 288 KB en
+total. Se revisaron integrados sobre el cielo, de frente y durante el giro,
+a 1366×768 y 1366×912. Los objetos compensan la rotación del anillo para
+conservar la cara visible; la distancia se representa con escala y una
+inclinación suave. Solo flota el objeto central. Se mantienen las estelas
+del viaje y se retiraron el aura y el polvo orbital.
+
+#### Galaxias descartadas y arte compartido conservado
+
+La segunda propuesta de Tormenta fue aprobada por Ezequiel como molde.
+Los prompts exactos de las dos propuestas están en
+[`galaxias/tormenta-propuesta-prompts.md`](galaxias/tormenta-propuesta-prompts.md).
+Los ocho prompts ejecutados para completar el carrusel están en
+[`galaxias/prompts-carrusel.md`](galaxias/prompts-carrusel.md): Carrera,
+nebulosa huevo, hielo, remolino, fondo profundo, flechas izquierda/derecha
+y destello. Se usó la herramienta integrada imagegen con el molde aprobado
+y las referencias del mundo, la estación y el cielo. Las cinco galaxias
+quedan como antecedentes descartados; el carrusel ya no las carga. El fondo
+profundo, las flechas y el destello se siguen usando.
+
+| Fuente conservada en `Images/orbita/` | WebP servido | Dimensiones finales |
+|---|---|---|
+| `galaxias/tormenta-source.png` | `galaxias/tormenta.webp` | 1536×1024, alpha |
+| `galaxias/carrera-source.png` | `galaxias/carrera.webp` | 1536×1024, alpha |
+| `galaxias/dormida-huevo-source.png` | `galaxias/dormida-huevo.webp` | 1536×1024, alpha |
+| `galaxias/dormida-hielo-source.png` | `galaxias/dormida-hielo.webp` | 1536×1024, alpha |
+| `galaxias/dormida-remolino-source.png` | `galaxias/dormida-remolino.webp` | 1536×1024, alpha |
+| `hub/fondo-profundo-source.png` | `hub/fondo-profundo.webp` | 1672×941, opaco |
+| `hub/flecha-izquierda-source.png` | `hub/flecha-izquierda.webp` | 512×512, alpha |
+| `hub/flecha-derecha-source.png` | `hub/flecha-derecha.webp` | 512×512, alpha |
+| `hub/destello-source.png` | `hub/destello.webp` | 512×512, alpha |
+
+**Transparencia:** la herramienta devolvió RGB, con un damero claro en
+Tormenta y remolino, y mate negro en las demás piezas recortables. Ezequiel
+autorizó expresamente procesar los fondos con sharp el 07/09/2026,
+conservando los originales. `scripts/orbita-alfa.mjs` inunda desde los bordes
+para identificar el mate conectado; conserva el núcleo blanco interior y
+descontamina el borde semitransparente. Se aplica solo a las piezas nuevas
+que declaran el mate. El importador verifica el canal alpha real, recorta
+el margen y encuadra las galaxias en 3:2. No reemplazar los PNG originales
+por imágenes ya recortadas: la receta tiene que poder repetirse.
+
+Importar con `node scripts/import-orbita-art.mjs galaxias hub`. Los WebP
+con alpha se revisaron sobre el cielo del hub, incluyendo los bordes y
+las galaxias vistas de canto. La estación existente se conserva y se ve
+en la tienda con la nave posada.
+
+**Resolución pendiente:** el fondo solicitado a 2560×1440 llegó del generador
+a 1672×941. Se conserva su resolución nativa, sin agrandarlo artificialmente;
+la fuente de mayor resolución sigue pendiente. Los WebP de las cinco
+galaxias sí tienen 1536×1024.
+
+**Arte de Carrera incorporado (08/09/2026).** Los prompts completos, las
+referencias y las revisiones de cada generación están en
+[`carrera/prompts.md`](carrera/prompts.md). Se conserva cada PNG original,
+incluidas las propuestas descartadas; solo se procesan las copias web.
+
+| Fuente en `carrera/` | WebP en `public/assets/orbita/carrera/` | Medida final |
+| --- | --- | --- |
+| `recta-source.png` | `recta.webp` | 1672×941, alpha |
+| `meta-source.png` | `meta.webp` | 1024×1024, alpha |
+| `banderin-rojo-source.png`, `banderin-amarillo-source.png`, `banderin-verde-source.png` | nombres equivalentes `.webp` | 512×512, alpha |
+| `medalla-oro-source.png`, `medalla-plata-source.png`, `medalla-bronce-source.png` | nombres equivalentes `.webp` | 1024×1024, alpha |
+| `chispa-1-source.png`, `chispa-2-source.png`, `chispa-3-source.png` | nombres equivalentes `.webp` | 256×256, alpha |
+
+Importación reproducible: `node scripts/import-orbita-art.mjs carrera`.
+El mate negro de la recta, la medalla de plata y la de bronce se retira con
+la receta sharp autorizada; las demás fuentes ya contienen alpha real.
+El importador mide la transparencia del 35 % superior de la recta: alpha
+medio 0,000. **La recta conserva el lienzo entero**, sin recortar ni
+reencuadrar: los cinco carriles usan anclajes proporcionales a ese lienzo.
+El generador devolvió 1672×941 aunque se solicitaron 2560×1440; se conserva
+la resolución nativa y sigue pendiente una fuente mayor, sin ampliar píxeles.
+
+`node scripts/preview-orbita-carrera.mjs` arma la revisión de pista con
+texto, meta, luces, medallas y partículas en `.preview-orbita/arte-carrera.html`.
+Se verificaron además en la Carrera real a 1366×768 y 1366×912, con cuatro
+fantasmas, naves equipadas y medalla en el resultado. Las correcciones de
+plata y bronce separan claramente sus metales del oro.
+
+**Nueva puesta de cámara, autorizada el 08/09/2026:** la vista lateral fue
+reemplazada por una vista desde atrás de las naves. En la revisión siguiente
+Ezequiel rechazó el estiramiento de la textura y la base superpuesta del arco.
+Se generó `recta-frontal-source.png` a 1536×1024, usando una guía de cinco
+carriles y detalles pequeños de cristal. Se importa como `recta-frontal.webp`
+(99 KB; alpha medio 0,000 en el 35 % superior). Fuente, guía, referencia de
+materiales y prompt quedan en `carrera/` y `carrera/prompts.md`.
+`pistaCarrera.ts` ahora solo aplica escala uniforme y traslación; usa los
+anclajes del dibujo para colocar los corredores. Se eliminó la homografía
+y la segunda imagen debajo del arco. La pista sigue bajo la cámara y el
+arco conserva su posición. Los originales anteriores permanecen intactos.
+
+**Integración de la meta y las naves (08/09/2026):** el nuevo
+`carrera/meta-ancha-source.png` conserva los materiales de la meta original
+y redibuja las columnas finas y el vano ancho. Se importa sin recortar como
+`meta-ancha.webp` (1536×1024, 151 KB). La recta continúa detrás del arco
+para que ambos pies apoyen sobre el cristal; las sombras de contacto no
+agregan plataformas. Las naves conservan su proporción, con sombra suave,
+reflejo del motor equipado y un giro leve hacia la llegada. El párrafo
+ahora tiene una superficie índigo, con largada, ayuda y progreso integrados;
+el título usa Baloo con volumen y el rótulo Órbita. Prompts en
+`carrera/prompts.md`. Verificación visual con cuatro fantasmas en largada,
+recorrido y llegada, a 1366×768 y 1366×912.

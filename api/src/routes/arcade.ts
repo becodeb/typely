@@ -35,8 +35,9 @@ import { and, eq, sql } from "drizzle-orm";
 import { requireActor, requireRole } from "../authContext.js";
 import { audit } from "../audit.js";
 import { cristalesInfinitosLocales } from "../localDevelopment.js";
+import { validarCarrera, cristalesDeCarrera } from "../carrera.js";
 
-const GAME_IDS = ["tormenta"] as const;
+const GAME_IDS = ["tormenta", "carrera"] as const;
 
 /* ------------------------------------------------------------------ */
 /* Rangos y cristales — ESPEJO de src/utils/orbita/motor.ts.           */
@@ -157,7 +158,9 @@ function aliasInvalido(alias: string, username: string, fullName: string): strin
 /* Coherencia de una partida                                           */
 /* ------------------------------------------------------------------ */
 const runItemSchema = z.object({
-  gameId: z.enum(GAME_IDS),
+  gameId: z.enum(GAME_IDS).default("tormenta"),
+  textId: z.string().max(80).optional(),
+  puesto: z.number().int().optional(),
   startedAt: z.string().datetime(),
   endedAt: z.string().datetime(),
   durationMs: z.number().int().min(0),
@@ -195,6 +198,7 @@ const runSchema = z.union([
 /** ¿La telemetría cierra? Los topes son holgados a propósito: acá no se
  *  arbitra el récord mundial, se filtra al que abrió la consola. */
 function validarCoherencia(it: RunItem): boolean {
+  if (it.gameId === "carrera") return validarCarrera(it);
   if (!RANGOS_VALIDOS.includes(it.rankId)) return false;
   /* La partida termina al perder las vidas, sin duración máxima. */
   if (it.durationMs < 15_000) return false;
@@ -222,6 +226,7 @@ function validarCoherencia(it: RunItem): boolean {
 }
 
 function cristalesMaximos(it: RunItem): number {
+  if (it.gameId === "carrera") return cristalesDeCarrera(it);
   const bono = BONO_RANGO[it.rankId] ?? 0;
   /* Formato anterior a las mejoras (sin wordsTyped): palabras + extra de
      cosecha, como pagaba entonces. Con mejoras, solo lo tipeado + el bono. */
@@ -324,6 +329,7 @@ export async function arcadeRoutes(app: FastifyInstance) {
       await db.insert(schema.arcadeRuns).values({
         userId: actor.id,
         gameId: it.gameId,
+        textId: it.textId,
         startedAt: new Date(it.startedAt),
         endedAt: new Date(it.endedAt),
         durationMs: it.durationMs,
@@ -346,7 +352,15 @@ export async function arcadeRoutes(app: FastifyInstance) {
       if (ok) {
         algunaRankeada = true;
         cristalesGanados += cristales;
-        if (it.score > mejorPuntaje) {
+        await db.insert(schema.arcadeBests).values({
+          userId: actor.id, gameId: it.gameId, bestScore: it.score,
+          bestWpm: it.wpmAvg, bestAt: new Date(it.endedAt),
+        }).onConflictDoUpdate({
+          target: [schema.arcadeBests.userId, schema.arcadeBests.gameId],
+          set: { bestScore: it.score, bestWpm: it.wpmAvg, bestAt: new Date(it.endedAt) },
+          setWhere: sql`${schema.arcadeBests.bestScore} < ${it.score}`,
+        });
+        if (it.gameId === "tormenta" && it.score > mejorPuntaje) {
           mejorPuntaje = it.score;
           mejorAmenaza = it.peakThreat;
           mejorRango = it.rankId;
@@ -415,10 +429,38 @@ export async function arcadeRoutes(app: FastifyInstance) {
     const perfil = await asegurarPerfil(actor.id);
     const semana = claveSemana(new Date());
     const semanal = await posicionEn(actor.id, "tormenta", semana, {});
+    const records = await db.select().from(schema.arcadeBests).where(eq(schema.arcadeBests.userId, actor.id));
+    const bests = Object.fromEntries(records.map(r => [r.gameId, { score: r.bestScore, wpm: r.bestWpm }]));
     return reply.send({
-      profile: { ...perfilPublico(perfil), crystalsInfinite: cristalesInfinitosLocales(req) },
+      profile: { ...perfilPublico(perfil), bests, crystalsInfinite: cristalesInfinitosLocales(req) },
+      bests,
       week: { key: semana, best: semanal?.score ?? null, pos: semanal?.pos ?? null },
     });
+  });
+
+  /* Fantasmas: una sola lectura al entrar. Solo alias y cosméticos, nunca
+     nombre real; el grado usa el mismo alcance que el ranking existente. */
+  app.get("/api/arcade/ghosts", async (req, reply) => {
+    const actor = requireRole(req, "alumno");
+    if ((req.query as {game?: string}).game !== "carrera") return reply.code(400).send({error:"Juego inválido."});
+    const [yo] = await pg<{grade:string | null}[]>`SELECT g.grade FROM users u LEFT JOIN groups g ON g.id=u.group_id WHERE u.id=${actor.id}`;
+    if (!yo?.grade) return reply.send({mine:null,grade:[],median:25});
+    const [mine] = await db.select({wpm:schema.arcadeBests.bestWpm,score:schema.arcadeBests.bestScore})
+      .from(schema.arcadeBests).where(and(eq(schema.arcadeBests.userId,actor.id),eq(schema.arcadeBests.gameId,"carrera")));
+    const mejores = await pg<{user_id:string;alias:string | null;wpm:number;score:number;ship:string|null;trail:string|null;pet:string|null}[]>`
+      SELECT DISTINCT ON (r.user_id) r.user_id, p.alias, r.wpm_avg AS wpm, r.score,
+        p.equipped_ship AS ship, p.equipped_trail AS trail, p.equipped_pet AS pet
+      FROM arcade_runs r JOIN users u ON u.id=r.user_id JOIN groups g ON g.id=u.group_id
+      LEFT JOIN arcade_profile p ON p.user_id=r.user_id
+      WHERE r.ranked AND r.game_id='carrera' AND r.week_key=${claveSemana(new Date())}
+        AND u.deleted_at IS NULL AND g.grade=${yo.grade}
+      ORDER BY r.user_id, r.score DESC, r.ended_at ASC`;
+    const velocidades = mejores.map(r=>Number(r.wpm)).sort((a,b)=>a-b);
+    const mitad = Math.floor(velocidades.length / 2);
+    const median = velocidades.length ? (velocidades.length % 2 ? velocidades[mitad]! : (velocidades[mitad-1]! + velocidades[mitad]!) / 2) : 25;
+    const grade = mejores.filter(r=>r.user_id !== actor.id).sort((a,b)=>b.score-a.score).slice(0,3)
+      .map(r=>({alias:r.alias ?? "Piloto sin nombre",wpm:Number(r.wpm),ship:r.ship,trail:r.trail,pet:r.pet}));
+    return reply.send({mine:mine ?? null,grade,median});
   });
 
   /* ----- GET /api/arcade/leaderboard?game=&scope=&period= -----
