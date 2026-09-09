@@ -1069,3 +1069,15 @@ materiales y prompt quedan en `carrera/` y `carrera/prompts.md`.
 anclajes del dibujo para colocar los corredores. Se eliminó la homografía
 y la segunda imagen debajo del arco. La pista sigue bajo la cámara y el
 arco conserva su posición. Los originales anteriores permanecen intactos.
+
+**Integración de la meta y las naves (08/09/2026):** el nuevo
+`carrera/meta-ancha-source.png` conserva los materiales de la meta original
+y redibuja las columnas finas y el vano ancho. Se importa sin recortar como
+`meta-ancha.webp` (1536×1024, 151 KB). La recta continúa detrás del arco
+para que ambos pies apoyen sobre el cristal; las sombras de contacto no
+agregan plataformas. Las naves conservan su proporción, con sombra suave,
+reflejo del motor equipado y un giro leve hacia la llegada. El párrafo
+ahora tiene una superficie índigo, con largada, ayuda y progreso integrados;
+el título usa Baloo con volumen y el rótulo Órbita. Prompts en
+`carrera/prompts.md`. Verificación visual con cuatro fantasmas en largada,
+recorrido y llegada, a 1366×768 y 1366×912.

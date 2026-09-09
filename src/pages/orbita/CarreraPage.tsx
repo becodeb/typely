@@ -30,7 +30,7 @@ export default function CarreraPage() {
   const entrada = useRef<HTMLInputElement>(null), escena = useRef<HTMLDivElement>(null);
   const voz = useRef<HTMLDivElement>(null), naveAlumno = useRef<HTMLDivElement>(null);
   const naves = useRef(new Map<string,HTMLDivElement>());
-  const recta = useRef<HTMLImageElement>(null), meta = useRef<HTMLImageElement>(null), motor = useRef<MotorCarrera | null>(null);
+  const recta = useRef<HTMLImageElement>(null), meta = useRef<HTMLDivElement>(null), motor = useRef<MotorCarrera | null>(null);
   const sonidoRef = useRef(sonido); sonidoRef.current = sonido;
   const efectos = useRef(new Set<Animation>());
   const generacion = useRef(0);
@@ -94,7 +94,7 @@ export default function CarreraPage() {
     const ajustarCamara = () => {
       camara=camaraCarrera(ancho,alto);
       if(recta.current){recta.current.style.width=camara.imagen.ancho+"px";recta.current.style.height=camara.imagen.alto+"px";recta.current.style.left=camara.imagen.x+"px";recta.current.style.top=camara.imagen.y+"px";}
-      if(meta.current){meta.current.style.width=camara.arco+"px";meta.current.style.left=ancho/2+"px";meta.current.style.top=(camara.llegada-camara.arco*.91)+"px";}
+      if(meta.current){meta.current.style.width=camara.arco+"px";meta.current.style.left=ancho/2+"px";meta.current.style.top=camara.techoMeta+"px";}
     };
     const observar = new ResizeObserver(([r])=>{if(r){ancho=r.contentRect.width;alto=r.contentRect.height;ajustarCamara();}});
     if (escena.current) observar.observe(escena.current);
@@ -104,6 +104,7 @@ export default function CarreraPage() {
       const p=camara.corredor(progreso,carril);
       el.style.transform = `translate3d(${p.x}px,${p.y}px,0) scale(${p.escala})`;
       el.style.zIndex=String(10+Math.round((1-progreso)*100));
+      el.style.setProperty("--car-rumbo",`${p.giro}deg`);
       el.style.setProperty("--car-alias-opacidad",String(Math.max(0,1-progreso*1.5)));
     };
     const cuadro = (ahora: number) => {
@@ -178,16 +179,16 @@ export default function CarreraPage() {
   let letra=0;
   const casco=(r:Rival | null)=>{
     const equipo=r?.id === "propio" || !r ? perfil?.equipped : r;
-    return <><div className="car-casco"><NaveOrbita nave={navePorId(equipo?.ship)} pausada={pausada} colorMotor={colorEstela(equipo?.trail)} efectoEstela={efectoCosmetico(equipo?.trail)} /></div><MascotaOrbita id={equipo?.pet} pausada={pausada} contexto={r ? "tienda" : "partida"} destinoMensaje={r ? undefined : voz} /></>;
+    return <><span className="car-sombra-nave"/><span className="car-reflejo-motor" style={{"--car-reflejo":colorEstela(equipo?.trail) ?? "#55dfff"} as CSSProperties}/><div className="car-casco"><NaveOrbita nave={navePorId(equipo?.ship)} pausada={pausada} colorMotor={colorEstela(equipo?.trail)} efectoEstela={efectoCosmetico(equipo?.trail)} /></div><MascotaOrbita id={equipo?.pet} pausada={pausada} contexto={r ? "tienda" : "partida"} destinoMensaje={r ? undefined : voz} /></>;
   };
   return <main className="car-pagina" data-resultado={!!resultado} aria-label="Carrera de cohetes">
     <div className="orb-fondo car-cielo" style={{"--orb-nebulosa":"url(/assets/orbita/fondo/nebulosa.webp)","--orb-horizonte":"url(/assets/orbita/fondo/horizonte.webp)","--orb-tinte":"rgb(112, 96, 230)"} as CSSProperties} aria-hidden="true">
       <img className="orb-estrellas" src="/assets/orbita/fondo/estrellas.webp" alt=""/><div className="orb-tinte"/><img className="orb-horizonte" src="/assets/orbita/fondo/horizonte.webp" alt=""/>
     </div>
-    <div className="car-barra"><button className="orb-pildora orb-pildora--boton" onClick={()=>navigate("/orbita")}><ArrowLeft size={17}/> Órbita</button><h1 className="orb-dato">Carrera de cohetes</h1><div className="car-instrumentos"><div className="car-instrumento"><span>TIEMPO</span><b>{reloj(m?.tiempoMs ?? 0)}</b></div><div className="car-instrumento"><span>RITMO</span><b>{m?.ppm ?? 0}<small> PPM</small></b></div><button className="orb-pildora orb-pildora--boton" aria-label={sonido ? "Apagar sonido" : "Prender sonido"} onClick={()=>setSonido(v=>{try{localStorage.setItem(SONIDO_KEY,v ? "0":"1");}catch{/* Sin almacenamiento. */}return !v;})}>{sonido ? <Volume2 size={19}/> : <VolumeX size={19}/>}</button></div></div>
+    <div className="car-barra"><button className="orb-pildora orb-pildora--boton" onClick={()=>navigate("/orbita")}><ArrowLeft size={17}/> Órbita</button><div className="car-titulo"><span>ÓRBITA</span><h1>Carrera de cohetes</h1></div><div className="car-instrumentos"><div className="car-instrumento"><span>TIEMPO</span><b>{reloj(m?.tiempoMs ?? 0)}</b></div><div className="car-instrumento"><span>RITMO</span><b>{m?.ppm ?? 0}<small> PPM</small></b></div><button className="orb-pildora orb-pildora--boton" aria-label={sonido ? "Apagar sonido" : "Prender sonido"} onClick={()=>setSonido(v=>{try{localStorage.setItem(SONIDO_KEY,v ? "0":"1");}catch{/* Sin almacenamiento. */}return !v;})}>{sonido ? <Volume2 size={19}/> : <VolumeX size={19}/>}</button></div></div>
     <input ref={entrada} className="car-entrada" autoCapitalize="off" autoCorrect="off" autoComplete="off" spellCheck={false} aria-label="Escribí el texto de la carrera" tabIndex={-1}/>
     <section className="car-lectura" aria-label="Texto para escribir">
-      <p className="car-consigna">Escribí para impulsar tu nave</p><p className="car-texto">{texto.texto.split(/( )/).map((palabra,i)=><span className={palabra === " " ? undefined : "car-palabra"} key={i}>{[...palabra].map(ch=>{
+      <div className="car-cabecera-texto"><p className="car-consigna">Escribí para impulsar tu nave</p>{!resultado && <div data-lista={!!m?.largada && m.tiempoMs>=650} className="car-largada" role="status"><div>{["rojo","amarillo","verde"].map((color,i)=><img key={color} data-encendido={!!m && m.cuentaMs >= (i+1)*800} src={`/assets/orbita/carrera/banderin-${color}.webp`} alt={color}/>)}</div><strong className="orb-dato">{!rivales ? "Preparando la pista…" : m?.largada ? "¡Ya!" : "Preparate"}</strong></div>}</div><p className="car-texto">{texto.texto.split(/( )/).map((palabra,i)=><span className={palabra === " " ? undefined : "car-palabra"} key={i}>{[...palabra].map(ch=>{
         const indice=letra++, roja=m && indice>=m.indice && indice<m.indice+m.rojas.length;
         return <span key={indice} className={roja ? "car-letra--error" : indice<(m?.indice ?? 0) ? "car-letra--bien" : indice===(m?.indice ?? 0) ? "car-letra--actual" : ""}>{roja ? m.rojas[indice-m.indice] === " " ? "␣" : m.rojas[indice-m.indice] : ch}</span>;
       })}</span>)}{m && m.rojas.slice(Math.max(0,m.texto.length-m.indice)).map((ch,i)=><span className="car-letra--error" key={`extra-${i}`}>{ch === " " ? "␣" : ch}</span>)}</p>
@@ -195,11 +196,11 @@ export default function CarreraPage() {
     </section>
     <div className="car-escena" ref={escena} aria-hidden="true">
       <img ref={recta} className="car-recta" src="/assets/orbita/carrera/recta-frontal.webp" alt=""/>
-      <img ref={meta} className="car-meta" src="/assets/orbita/carrera/meta.webp" alt=""/>
+      <div ref={meta} className="car-meta"><img src="/assets/orbita/carrera/meta-ancha.webp" alt=""/></div>
       {(rivales ?? []).map(r=><div className="car-corredor car-corredor--fantasma" key={r.id} ref={el=>{if(el)naves.current.set(r.id,el);else naves.current.delete(r.id);}}><span className="car-alias orb-dato">{r.alias}</span>{casco(r)}</div>)}
       <div className="car-corredor car-corredor--alumno" ref={naveAlumno}><span className="car-alias car-alias--vos orb-dato">VOS</span>{casco(null)}<img className="car-chispa" src="/assets/orbita/carrera/chispa-1.webp" alt=""/><img className="car-destello" src="/assets/orbita/hub/destello.webp" alt=""/></div>
     </div>
-    {!resultado && <div data-lista={!!m?.largada && m.tiempoMs>=650} className="car-largada" role="status"><div>{["rojo","amarillo","verde"].map((color,i)=><img key={color} data-encendido={!!m && m.cuentaMs >= (i+1)*800} src={`/assets/orbita/carrera/banderin-${color}.webp`} alt={color}/>)}</div><strong className="orb-dato">{!rivales ? "Preparando la pista…" : m?.largada ? "¡Ya!" : "Preparate"}</strong></div>}
+
     <div ref={voz} className="car-voz"/>
     {m?.inactivo && !resultado && <div className="car-capa"><section className="orb-vidrio tarjeta-marca car-pausa" role="dialog" aria-modal="true" aria-labelledby="car-seguimos"><h2 id="car-seguimos">¿Seguimos?</h2><p>Tu nave y los fantasmas te esperan.</p><button autoFocus className="orb-boton-vidrio" onClick={()=>{procesar(m.reanudar());entrada.current?.focus();}}>Seguir corriendo</button><p>También podés apretar cualquier tecla.</p></section></div>}
     {resultado && <div className="car-capa"><section className="orb-vidrio tarjeta-marca car-resultado" role="dialog" aria-modal="true" aria-labelledby="car-fin" onKeyDown={e=>{
