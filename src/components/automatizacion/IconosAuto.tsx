@@ -38,6 +38,41 @@ export function IcoRetroceder({ className }: Props) {
   );
 }
 
+/* Las cuatro direcciones absolutas. Son la misma flecha girada de a 90°,
+   a propósito: se leen como un solo grupo, y el chico reconoce el bloque
+   por la punta de la flecha sin tener que leer el nombre. */
+export function IcoArriba({ className }: Props) {
+  return (
+    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
+      <path d="M17 29V9M17 5l-9 9M17 5l9 9" {...trazo} />
+    </svg>
+  );
+}
+
+export function IcoDerecha({ className }: Props) {
+  return (
+    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
+      <path d="M5 17h20M29 17l-9-9M29 17l-9 9" {...trazo} />
+    </svg>
+  );
+}
+
+export function IcoAbajo({ className }: Props) {
+  return (
+    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
+      <path d="M17 5v20M17 29l-9-9M17 29l9-9" {...trazo} />
+    </svg>
+  );
+}
+
+export function IcoIzquierda({ className }: Props) {
+  return (
+    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
+      <path d="M29 17H9M5 17l9-9M5 17l9 9" {...trazo} />
+    </svg>
+  );
+}
+
 export function IcoGirarIzq({ className }: Props) {
   return (
     <svg viewBox="0 0 34 34" className={className} aria-hidden="true">

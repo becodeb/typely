@@ -58,12 +58,12 @@ import {
   puntoRutinaPorDefecto,
   tasaReciente,
   tieneRepetir,
-  volverAlOrigen,
   type EstadoCampo,
 } from "../../utils/automatizacion/motor";
 import {
   buscarNodo,
   cabeA,
+  cierraLaCadena,
   colocar,
   colocarCadena,
   conSensor,
@@ -198,7 +198,11 @@ export function AutomatizacionPage() {
     setNodoActivo(null);
     setContadorActivo(null);
     setEvento(null);
-    volverAlOrigen(e);
+    /* La nave NO vuelve al muelle al detener: queda donde la dejó el
+       programa. Es la única forma de ver dónde terminó de verdad, que es
+       justo lo que hay que mirar cuando algo salió distinto de lo
+       esperado. Empezar tampoco la devuelve: la corrida siguiente
+       arranca desde ahí mismo. */
     actualizarRecord(e);
     guardador.current.pedir(usuario, e, true);
     repintar();
@@ -211,7 +215,10 @@ export function AutomatizacionPage() {
     const token = corridaRef.current;
     setCorriendo(true);
     setContadorActivo(0);
-    volverAlOrigen(e);
+    /* La nave NO vuelve al muelle al empezar: la corrida arranca desde
+       donde quedó parada. Es una decisión explícita del usuario —
+       encadenar una corrida con la anterior, o retomar desde donde la
+       dejó una corrida detenida, sin tener que reacomodar el campo. */
     repintar();
 
     /* El intérprete mira el campo en cada paso: un `Si` decide con la
@@ -247,6 +254,11 @@ export function AutomatizacionPage() {
       const variante = antes?.variante ?? p.mineral ?? "punta";
       const etapaPrevia = antes?.etapa ?? 0;
       const ev = ejecutarPaso(e, p.nodoId, p.tipo, Math.random, p.mineral);
+      /* `move`, `turn` y `wait` no dejan nada que dibujar en el campo: la
+         posición y el rumbo ya viajan en el estado. `wrap` sí PASA, y
+         tiene que pasar: es el único aviso que recibe el campo de que
+         este traslado cruza la isla entera y va con la transición corta.
+         El paso dura lo mismo que cualquier otro (`msPorAccion`). */
       if (ev.tipo !== "move" && ev.tipo !== "turn" && ev.tipo !== "wait") {
         contadorEventos.current += 1;
         setEvento({
@@ -395,6 +407,12 @@ export function AutomatizacionPage() {
           return;
         }
       }
+      /* Debajo de un `Por siempre` no va nada (`destinoBloqueado`,
+         programa.ts). Este encadenado al final es el ÚNICO camino que no
+         pasa por `colocar`, así que la guarda se repite acá o el toque se
+         escapa de la regla. El editor ya sacude la pieza para que el
+         chico no quede tocando algo que no responde. */
+      if (cierraLaCadena(ultimo)) return;
       e.programa = [...e.programa, nodo];
       guardarYRepintar();
     },

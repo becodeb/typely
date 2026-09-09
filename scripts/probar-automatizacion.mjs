@@ -109,10 +109,58 @@ prueba("2 · la nave empieza abajo a la izquierda mirando arriba", () => {
   igual(e.nave, { fila: e.lado - 1, col: 0, direccion: "north" });
 });
 
-prueba("2b · el campo arranca en 1x1 y avanzar sólo rebota", () => {
+prueba("2b · el campo arranca en 1x1 y moverse envuelve sobre la única baldosa", () => {
   const e = M.estadoInicial(azar);
   igual(e.lado, 1);
-  igual(correr(e, [acc("move_forward")])[0].tipo, "bump");
+  igual(correr(e, [acc("move_forward")])[0].tipo, "wrap");
+  igual({ fila: e.nave.fila, col: e.nave.col }, { fila: 0, col: 0 });
+});
+
+prueba("2c · en 1x1 las cuatro direcciones envuelven sobre sí mismas sin romperse", () => {
+  for (const t of ["move_north", "move_east", "move_south", "move_west"]) {
+    const e = M.estadoInicial(azar);
+    igual(e.lado, 1);
+    const [ev] = correr(e, [acc(t)]);
+    igual(ev.tipo, "wrap", t + ": ");
+    igual({ fila: e.nave.fila, col: e.nave.col }, { fila: 0, col: 0 }, t + ": ");
+  }
+});
+
+prueba("2d · cada dirección mueve una baldosa por su eje y orienta la nave", () => {
+  /* Campo 3x3 y la nave al centro, para que ninguna de las cuatro toque
+     un borde: acá se mide el eje y el rumbo, no el envolvimiento. */
+  const casos = [
+    ["move_north", { fila: 0, col: 1 }, "north"],
+    ["move_east", { fila: 1, col: 2 }, "east"],
+    ["move_south", { fila: 2, col: 1 }, "south"],
+    ["move_west", { fila: 1, col: 0 }, "west"],
+  ];
+  for (const [tipo, destino, rumbo] of casos) {
+    const e = campoDe(3);
+    e.nave = { fila: 1, col: 1, direccion: "north" };
+    const [ev] = correr(e, [acc(tipo)]);
+    igual(ev.tipo, "move", tipo + ": ");
+    igual({ fila: e.nave.fila, col: e.nave.col }, destino, tipo + ": ");
+    igual(e.nave.direccion, rumbo, tipo + ": la nave tiene que girar sola");
+  }
+});
+
+prueba("2e · en 2x2 cada borde envuelve al extremo opuesto de su fila o columna", () => {
+  const casos = [
+    // [rumbo del bloque, desde, destino esperado]
+    ["move_east", { fila: 1, col: 1 }, { fila: 1, col: 0 }],
+    ["move_west", { fila: 1, col: 0 }, { fila: 1, col: 1 }],
+    ["move_north", { fila: 0, col: 1 }, { fila: 1, col: 1 }],
+    ["move_south", { fila: 1, col: 1 }, { fila: 0, col: 1 }],
+  ];
+  for (const [tipo, desde, destino] of casos) {
+    const e = campoDe(2);
+    e.nave = { ...desde, direccion: "north" };
+    const [ev] = correr(e, [acc(tipo)]);
+    igual(ev.tipo, "wrap", tipo + ": ");
+    igual({ fila: e.nave.fila, col: e.nave.col }, destino, tipo + ": ");
+    igual(ev.despues, { ...destino, direccion: tipo.slice(5) }, tipo + ": ");
+  }
 });
 
 prueba("3 · avanzar desde el origen sube a la celda de arriba", () => {
@@ -134,12 +182,15 @@ prueba("4b · girar a izquierda y a derecha son inversos", () => {
   igual(e.nave.direccion, "north");
 });
 
-prueba("5 · el borde rebota, consume el paso y el programa sigue", () => {
+prueba("5 · el borde envuelve, consume el paso y el programa sigue", () => {
   const e = campoDe(2);
-  // Mirando al norte desde el origen: dos avances y el segundo choca.
+  /* Mirando al norte desde el origen: el primer avance llega a la fila
+     0 y el segundo se sale por arriba, así que reaparece por abajo en
+     la MISMA columna. El paso se consume igual y el `girar` posterior
+     se ejecuta: envolver no interrumpe nada. */
   const evs = correr(e, [acc("move_forward", "m1"), acc("move_forward", "m2"), acc("turn_right", "g")]);
-  igual(evs.map((x) => x.tipo), ["move", "bump", "turn"]);
-  igual({ fila: e.nave.fila, col: e.nave.col }, { fila: 0, col: 0 });
+  igual(evs.map((x) => x.tipo), ["move", "wrap", "turn"]);
+  igual({ fila: e.nave.fila, col: e.nave.col }, { fila: e.lado - 1, col: 0 });
 });
 
 prueba("6 · cosechar una veta madura suma y la reinicia a etapa 0", () => {
@@ -236,7 +287,8 @@ prueba("15 · Repetir 4 [avanzar, cosechar, girar] recorre el 2x2 entero", () =>
   for (const c of e.celdas) c.etapa = 3;
   const evs = correr(e, [rep(4, [acc("move_forward", "a"), acc("harvest", "b"), acc("turn_right", "c")])]);
   igual(evs.filter((x) => x.tipo === "harvest").length, 4, "tiene que cosechar las cuatro baldosas");
-  igual(evs.filter((x) => x.tipo === "bump").length, 0, "y sin chocar una sola vez");
+  igual(evs.filter((x) => x.tipo === "wrap").length, 0, "y sin salirse del campo una sola vez");
+  igual(evs.filter((x) => x.tipo === "bump").length, 0, "ningún movimiento produce `bump`");
   igual(e.nave, { fila: e.lado - 1, col: 0, direccion: "north" }, "y volver sola al muelle");
 });
 
@@ -895,6 +947,92 @@ prueba("L19 · un movimiento de teclado entre pilas (Alt+↑/↓) preserva la ca
   igual(nuevoCuerpoA.map((n) => n.id), ["w", "b"], "el bloque cruzado queda al FINAL de la pila destino");
 });
 
+prueba("L20 · colocar no encadena nada DEBAJO de un Por siempre, pero sí adentro y antes", () => {
+  const base = [acc("move_forward", "a"), siempre([], "s")];
+  const x = () => acc("turn_left", "x");
+
+  cierto(P.colocar(base, x(), { tipo: "final" }) === base, "al final de una lista que termina en Por siempre: mismo programa");
+  igual(
+    P.colocar(base, x(), { tipo: "dentro", id: "s", rama: "body" })[1].body.map((n) => n.id),
+    ["x"],
+    "ADENTRO del Por siempre sí: es justamente para lo que está",
+  );
+  igual(
+    P.colocar(base, x(), { tipo: "antes", id: "s" }).map((n) => n.id),
+    ["a", "x", "s"],
+    "ANTES de un Por siempre sigue siendo un lugar válido",
+  );
+
+  // Un programa VIEJO ya guardado puede tener un bloque después del
+  // `Por siempre` (ver `destinoBloqueado`): tampoco se puede meter otro
+  // en esa posición.
+  const viejo = [siempre([], "s"), acc("harvest", "muerto")];
+  cierto(P.colocar(viejo, x(), { tipo: "antes", id: "muerto" }) === viejo, "antes del bloque que sigue al Por siempre: mismo programa");
+  igual(
+    P.colocar(viejo, x(), { tipo: "antes", id: "s" }).map((n) => n.id),
+    ["x", "s", "muerto"],
+    "antes del propio Por siempre, en cambio, sí entra",
+  );
+});
+
+prueba("L21 · mover una CADENA respeta la misma regla que colocar", () => {
+  const base = [acc("move_forward", "a"), siempre([], "s")];
+  const cadena = [acc("turn_left", "x"), acc("turn_right", "y")];
+
+  cierto(P.colocarCadena(base, cadena, { tipo: "final" }) === base, "una cadena al final de una lista que cierra en Por siempre: nada");
+  igual(
+    P.colocarCadena(base, cadena, { tipo: "dentro", id: "s", rama: "body" })[1].body.map((n) => n.id),
+    ["x", "y"],
+    "la cadena entera ADENTRO del Por siempre, en orden",
+  );
+  igual(
+    P.colocarCadena(base, cadena, { tipo: "antes", id: "s" }).map((n) => n.id),
+    ["a", "x", "y", "s"],
+    "y antes del Por siempre, también en orden",
+  );
+
+  const viejo = [siempre([], "s"), acc("harvest", "muerto")];
+  cierto(P.colocarCadena(viejo, cadena, { tipo: "antes", id: "muerto" }) === viejo, "ni una cadena entra debajo del Por siempre");
+
+  // `moverNodo` pasa por `colocar`, así que hereda la regla: el bloque
+  // no se pierde, el programa vuelve igual.
+  const conSuelto = [siempre([], "s2"), acc("wait", "w")];
+  cierto(P.moverNodo(conSuelto, "w", { tipo: "final" }) === conSuelto, "mover un bloque al final tampoco lo cuelga del Por siempre");
+});
+
+prueba("L22 · un programa YA GUARDADO con un bloque después de un Por siempre sigue cargando entero", () => {
+  /* La regla vive en la colocación, NUNCA en la validación: `validarNodo`
+     devuelve `null` al rechazar, `cargar()` lee ese `null` como snapshot
+     corrupto y descarta LA PARTIDA ENTERA —campo, minerales, mejoras—.
+     Estos bloques ya eran inalcanzables en ejecución, así que dejarlos
+     donde están no pierde nada; rechazarlos borraría partidas. */
+  const prog = [siempre([acc("harvest", "h")], "s"), acc("move_forward", "muerto")];
+  cierto(P.validarPrograma(JSON.parse(JSON.stringify(prog))) !== null, "la validación no lo rechaza");
+
+  const base = M.estadoInicial(azar);
+  const { nave: _nave, ...guardado } = base;
+  guardado.saldos = M.porMineral(7);
+  guardado.programa = JSON.parse(JSON.stringify(prog));
+  const e = A.validarCampo(guardado);
+  cierto(e !== null, "el campo se lee, no se descarta");
+  igual(e.programa.map((n) => n.id), ["s", "muerto"], "y el bloque muerto sigue ahí, tal cual estaba");
+  igual(e.saldos.punta, 7, "con la partida intacta: minerales incluidos");
+});
+
+prueba("L23 · las flechas del teclado tampoco meten un bloque debajo de un Por siempre", () => {
+  /* `desplazarNodo` intercambia dos hermanos y NO pasa por `colocar`, así
+     que sin guarda propia el teclado sería la rendija por la que se cuela
+     justo lo que el arrastre, el toque y Alt+↑/↓ ya rechazan. */
+  const prog = [acc("harvest", "a"), siempre([], "s")];
+  igual(P.desplazarNodo(prog, "a", 1).map((n) => n.id), ["a", "s"], "bajar por debajo del Por siempre no hace nada");
+  igual(P.desplazarNodo(prog, "s", -1).map((n) => n.id), ["s", "a"], "pero subir el Por siempre sí se puede");
+
+  /* Y en un programa viejo, subir es justamente cómo se DESHACE el caso
+     heredado: nunca se deja al chico encerrado sin poder arreglarlo. */
+  const viejo = [siempre([], "s"), acc("harvest", "muerto")];
+  igual(P.desplazarNodo(viejo, "muerto", -1).map((n) => n.id), ["muerto", "s"], "sacar el bloque muerto de abajo sigue permitido");
+});
+
 /* ================================================================== */
 console.log("\nCONTADOR Y TAMAÑO DEL CAMPO");
 
@@ -1058,7 +1196,7 @@ prueba("E3 · un programa que servía sigue sirviendo después de expandir", () 
   for (const c of e2.celdas) c.etapa = 3;
   const evs = correr(e2, prog);
   igual(evs.filter((x) => x.tipo === "harvest").length, 4, "el mismo programa sigue cosechando 4");
-  igual(evs.filter((x) => x.tipo === "bump").length, 0, "y sin chocar");
+  igual(evs.filter((x) => x.tipo === "wrap").length, 0, "y sin salirse del campo");
 });
 
 prueba("E4 · el campo tiene tope y no se puede comprar más allá", () => {

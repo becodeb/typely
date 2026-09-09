@@ -109,12 +109,15 @@ const NOMBRE: Record<ClaveMejora, string> = {
 };
 
 /** Orden de aparición. Tierra primero: con el campo en 1×1 ninguna otra
- *  mejora tiene sentido todavía. Después las piezas, en el orden en que
- *  el campo las hace necesarias, y las evoluciones al final, en el
- *  orden de la cadena de minerales. */
+ *  mejora tiene sentido todavía. Enseguida `Por siempre`, barato y sin
+ *  prerrequisitos: es la primera automatización de verdad y cuanto antes
+ *  llegue, antes deja el chico de apretar "correr" a mano. Después el
+ *  resto de las piezas, en el orden en que el campo las hace necesarias,
+ *  y las evoluciones al final, en el orden de la cadena de minerales. */
 const ORDEN: ClaveTienda[] = [
   "campo",
   "capacidad",
+  "siempre",
   "crecimiento",
   "velocidad",
   "repetir",
@@ -122,7 +125,6 @@ const ORDEN: ClaveTienda[] = [
   "si",
   "sino",
   "mientras",
-  "siempre",
   "rutinas",
   "contador",
   "hacer_con",
@@ -228,10 +230,11 @@ export function BarraMejoras({
       })}
 
       {/* Un hueco por cada categoría que todavía no se reveló, hasta
-          cinco por fila, para que la franja no se reacomode entera
-          cuando aparece una nueva. Es un contorno apenas visible, no un
-          candado ni una tarjeta gris: dice "acá cabe algo" sin prometer
-          nada. */}
+          cinco por fila. NO se dibuja: es aire que reserva el lugar para
+          que la franja no salte entera cuando aparece una categoría
+          nueva. Antes tenía un contorno punteado que decía "acá cabe
+          algo"; era una promesa que el chico no había pedido y ensuciaba
+          la franja. El espacio se queda, el dibujo no. */}
       {Array.from({ length: Math.max(0, 5 - tarjetas.length) }, (_, i) => (
         <div key={`hueco-${i}`} className="auto-mejora auto-mejora--hueco" aria-hidden="true" />
       ))}

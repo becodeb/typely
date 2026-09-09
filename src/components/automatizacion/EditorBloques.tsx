@@ -30,14 +30,15 @@
  *     drag-and-drop de HTML5, porque ése no anda con el dedo, y las
  *     Chromebook del aula son táctiles. Mientras se arrastra, la cadena
  *     se LEVANTA (un fantasma que la sigue al puntero) y cerca de un
- *     conector se abre UN HUECO del color de la pieza (encastre); lejos
- *     de todo conector se ve un CONTORNO punteado (`.auto-contorno`):
- *     ahí va a caer como pila nueva, suelta. Soltar en el vacío del
- *     lienzo NUNCA borra (Lienzo, decisión #6, design.md) — eso es
- *     justamente el gesto normal de dejar algo en un lugar vacío.
+ *     conector se marca DÓNDE VA A ENCASTRAR, con la silueta del color
+ *     de la pieza (`.auto-bloque--marca`). Lejos de todo conector no se
+ *     dibuja nada: el bloque cae donde se lo suelta y queda de pila
+ *     suelta. El lienzo no dibuja siluetas de lo que todavía no existe.
+ *     Soltar en el vacío NUNCA borra (Lienzo, decisión #6, design.md) —
+ *     eso es justamente el gesto normal de dejar algo en un lugar vacío.
  *     Borrar es un acto aparte: el tachito o la paleta (Fase 3). Donde
- *     no cabe (el tope de anidamiento) no se abre hueco ni contorno y
- *     soltar no hace nada.
+ *     no cabe (el tope de anidamiento) no se marca nada y soltar no
+ *     hace nada.
  *   - TECLADO: con el foco en una pieza, las flechas la suben o bajan
  *     dentro de su propia pila y Suprimir la quita.
  *
@@ -57,6 +58,8 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import {
+  IcoAbajo,
+  IcoArriba,
   IcoAvanzar,
   IcoContadorCero,
   IcoContadorMas,
@@ -68,7 +71,9 @@ import {
   IcoCosechar,
   IcoGirarDer,
   IcoGirarIzq,
+  IcoDerecha,
   IcoHacer,
+  IcoIzquierda,
   IcoMientras,
   IcoMineral,
   IcoNo,
@@ -90,6 +95,7 @@ import {
   buscarNodo,
   cabeA,
   capacidadDeLienzo,
+  cierraLaCadena,
   contiene,
   cortarEn,
   costoDeNodo,
@@ -125,6 +131,12 @@ import { puntoRutinaPorDefecto, type Lienzo, type Pila, type Punto } from "../..
 /* ------------------------------------------------------------------ */
 
 const COLOR: Record<TipoAccion, string> = {
+  /* Las cuatro direcciones comparten un solo azul: son un grupo, y lo
+     que las distingue es la flecha, no el color. */
+  move_north: "#4aa8f0",
+  move_east: "#4aa8f0",
+  move_south: "#4aa8f0",
+  move_west: "#4aa8f0",
   move_forward: "#4aa8f0",
   move_back: "#3d8fd4",
   turn_left: "#9b7cff",
@@ -169,6 +181,10 @@ const COLOR_CONTADOR: Record<TipoContador, string> = {
 };
 
 const NOMBRE: Record<TipoAccion, string> = {
+  move_north: "Arriba",
+  move_east: "Derecha",
+  move_south: "Abajo",
+  move_west: "Izquierda",
   move_forward: "Avanzar",
   move_back: "Retroceder",
   turn_left: "Girar a la izquierda",
@@ -245,6 +261,10 @@ export function crearNodo(pieza: Pieza, id: string): NodoPrograma {
 }
 
 function Dibujo({ tipo }: { tipo: TipoAccion }) {
+  if (tipo === "move_north") return <IcoArriba />;
+  if (tipo === "move_east") return <IcoDerecha />;
+  if (tipo === "move_south") return <IcoAbajo />;
+  if (tipo === "move_west") return <IcoIzquierda />;
   if (tipo === "move_forward") return <IcoAvanzar />;
   if (tipo === "move_back") return <IcoRetroceder />;
   if (tipo === "turn_left") return <IcoGirarIzq />;
@@ -834,7 +854,17 @@ export function EditorBloques(props: Props) {
         };
         ofrecer(lomo.left, lomo.top, ref, { tipo: "antes", id });
         ofrecer(lomo.left, lomo.bottom, ref, inicioDe("body"));
-        ofrecer(brazo.left, brazo.top, ref, despuesDe(prog, id));
+        /* El conector del brazo significa "después de este contenedor", y
+           debajo de un `Por siempre` no va nada: nunca termina, así que
+           todo lo encadenado abajo sería código muerto (`destinoBloqueado`,
+           programa.ts). No se ofrece el conector en vez de ofrecerlo y
+           rechazar el encastre: un conector que se ilumina y no encastra
+           es peor que ninguno. Sin conector cerca, lo que se suelta ahí
+           cae por la rama `nueva` y queda como pila suelta, que es el
+           resultado correcto y ya diseñado. Los otros dos conectores del
+           `Por siempre` siguen enteros: ADENTRO (el lomo) es justamente
+           para lo que está, y ANTES sigue siendo un lugar válido. */
+        if (nodo.type !== "forever") ofrecer(brazo.left, brazo.top, ref, despuesDe(prog, id));
         if (brazoMedio) ofrecer(brazoMedio.left, brazoMedio.top, ref, inicioDe("sino"));
       }
 
@@ -1007,7 +1037,20 @@ export function EditorBloques(props: Props) {
   };
 
   const intentarAgregar = (pieza: Pieza) => {
-    if (!entra(costoDeNodo(nodoDeMuestra(pieza)))) {
+    const muestra = nodoDeMuestra(pieza);
+    if (!entra(costoDeNodo(muestra))) {
+      sacudir();
+      return;
+    }
+    /* Tocar encadena al FINAL de la cadena verde, y debajo de un `Por
+       siempre` no va nada (`cierraLaCadena`, programa.ts). Una acción
+       igual entra: `agregar` la mete ADENTRO del último contenedor, que
+       es lo que uno espera. Un contenedor iría debajo, así que se rechaza
+       — y se sacude, porque un botón que se aprieta y no hace nada es
+       justamente el problema que esta rama evita. Una `Mi rutina` (`def`)
+       no toca la cadena: nace como rutina suelta, así que se deja pasar. */
+    const ultimo = props.programa[props.programa.length - 1];
+    if (esContenedor(muestra) && muestra.type !== "def" && cierraLaCadena(ultimo)) {
       sacudir();
       return;
     }
@@ -1146,9 +1189,6 @@ export function EditorBloques(props: Props) {
         <div className="auto-repetir__espina" />
         <div className="auto-repetir__cavidad" data-parte="cavidad" data-rama={rama}>
           {dibujarLista(lista, nodo.id, rama, nivel + 1, estatico, refPila)}
-          {lista.length === 0 && !(!estatico && marcaEn(nodo.id, rama, refPila)) && (
-            <div className="auto-hueco auto-hueco--cavidad" />
-          )}
         </div>
       </div>
     );
@@ -1179,7 +1219,7 @@ export function EditorBloques(props: Props) {
       return (
         <div
           key={nodo.id}
-          className={`auto-repetir${levantado ? " auto-repetir--levantado" : ""}${activo ? " auto-repetir--activo" : ""}${nodo.type === "def" ? " auto-repetir--sombrero" : ""}`}
+          className={`auto-repetir${levantado ? " auto-repetir--levantado" : ""}${activo ? " auto-repetir--activo" : ""}${nodo.type === "def" ? " auto-repetir--sombrero" : ""}${nodo.type === "forever" ? " auto-repetir--siempre" : ""}`}
           style={{ "--auto-tono": nodo.type === "def" ? COLOR_LLAMADA[nodo.rutina] : COLOR_CONTENEDOR[nodo.type] } as CSSProperties}
           data-nodo={puedeArrastrar ? nodo.id : undefined}
           data-clase={puedeArrastrar ? "contenedor" : undefined}
@@ -1397,10 +1437,14 @@ export function EditorBloques(props: Props) {
 
   /* La caja: acciones, plantar por mineral, y los controles comprados. */
   const piezas: Pieza[] = [
-    "move_forward",
-    "move_back",
-    "turn_left",
-    "turn_right",
+    /* Cuatro direcciones absolutas: la nave gira sola hacia donde va.
+       `move_forward`, `move_back` y los dos giros siguen siendo válidos
+       y ejecutables para los programas ya guardados, pero ya no se
+       ofrecen acá. */
+    "move_north",
+    "move_east",
+    "move_south",
+    "move_west",
     "harvest",
     ...plantables.map((m) => `plant:${m}` as const),
     ...(compradas.esperar ? (["wait"] as const) : []),
@@ -1419,29 +1463,12 @@ export function EditorBloques(props: Props) {
     ...(compradas.contador ? (["counter_add", "counter_reset"] as const) : []),
   ];
 
-  const huecoFinal =
-    usada < capacidad &&
-    !(destinoVisible && destinoVisible.pila.donde === "verde" && destinoVisible.destino.tipo === "final");
-  /* El contorno fantasma (tarea 2b.2): "acá va a caer como pila nueva".
-     Vive en coordenadas de lienzo — mismas que `destino.x`/`.y` — así
-     hereda el pan/zoom de `.auto-lienzo__capa` sin cuentas aparte. El
-     tamaño es una aproximación con el ancho capturado al agarrar (ya en
-     px de pantalla, se divide por el zoom para volver a px de lienzo) y
-     una altura por bloque de la cadena — no el tamaño exacto de cada
-     contenedor, que dependería de medir el fantasma ya montado. */
-  const contorno =
-    destino && destino.tipo === "nueva" ? (
-      <div
-        className="auto-contorno"
-        style={{
-          left: destino.x,
-          top: destino.y,
-          width: arrastre ? arrastre.ancho / vista.z : 172,
-          height: arrastre ? Math.max(56, arrastre.cadena.length * 54) : 56,
-        }}
-        aria-hidden="true"
-      />
-    ) : null;
+  /* Ni hueco al final de la cadena verde ni contorno fantasma para "cae
+     como pila nueva". El lienzo no dibuja siluetas de lo que todavía no
+     existe: lo único que se marca es dónde va a ENCASTRAR la pieza que
+     está en el aire (`.auto-bloque--marca`), que es información real. Un
+     rectángulo vacío flotando en el vacío no dice nada — el bloque cae
+     donde lo soltás y listo. */
 
   /* Las flechas de "hay más piezas para allá". Un GRUPO es cada cosa que
      el chico puede perder de vista paneando: la cadena verde, cada
@@ -1504,7 +1531,7 @@ export function EditorBloques(props: Props) {
           borrado por paleta (tarea 3.2) se anuncia con `--recibe`, el
           mismo lenguaje que ya usa el tachito. */}
       <div
-        className={`auto-caja${piezas.length > 7 ? " auto-caja--doble" : ""}${lleno ? " auto-caja--llena" : ""}${destino?.tipo === "paleta" ? " auto-caja--recibe" : ""}`}
+        className={`auto-caja${piezas.length > 7 ? " auto-caja--doble" : ""}${lleno ? " auto-caja--llena" : ""}${destino?.tipo === "paleta" ? " auto-caja--recibe" : ""}${corriendo ? " auto-caja--corriendo" : ""}`}
       >
         {piezas.map((p) => {
           const muestra = nodoDeMuestra(p);
@@ -1576,7 +1603,6 @@ export function EditorBloques(props: Props) {
             style={{ left: datosLienzo.inicio.x, top: datosLienzo.inicio.y + ALTO_INICIO }}
           >
             {dibujarLista(programa, null, "body", 0, false, { donde: "verde" })}
-            {huecoFinal && <div className="auto-hueco" />}
             {programa.length === 0 && !arrastre && (
               <p className="auto-lienzo__pista">Tocá una pieza, o arrastrala hasta acá.</p>
             )}
@@ -1606,7 +1632,6 @@ export function EditorBloques(props: Props) {
             </div>
           ))}
 
-          {contorno}
         </div>
       </div>
 

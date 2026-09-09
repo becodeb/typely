@@ -158,8 +158,16 @@ export function capacidadUsadaCampo(e: EstadoCampo): number {
 
 export type TipoEvento =
   | "move"
+  /* Salir por un borde reaparece por el borde opuesto de la misma fila
+     o columna: el paso se consume igual que un `move`, pero la nave
+     cruza el campo entero y la UI necesita saberlo para acortar la
+     transición. */
+  | "wrap"
   | "turn"
   | "harvest"
+  /* `bump` ya no lo produce ningún movimiento —el borde envuelve, no
+     rechaza—, pero se conserva en la unión por compatibilidad y por si
+     alguna vez vuelve el esquema de girar y avanzar. */
   | "bump"
   | "empty_harvest"
   | "break"
@@ -408,13 +416,43 @@ function girar(d: Direccion, hacia: -1 | 1): Direccion {
   return RUMBOS[(i + hacia + RUMBOS.length) % RUMBOS.length];
 }
 
+/** Hacia dónde mira la nave con cada bloque de dirección absoluta. */
+const DIRECCION_DE_MOVIMIENTO: Record<"move_north" | "move_east" | "move_south" | "move_west", Direccion> = {
+  move_north: "north",
+  move_east: "east",
+  move_south: "south",
+  move_west: "west",
+};
+
+/** Módulo siempre positivo: `-1 % 3` en JavaScript da `-1`, y acá hace
+ *  falta el índice de la baldosa del otro extremo. */
+function envolver(v: number, lado: number): number {
+  return ((v % lado) + lado) % lado;
+}
+
+/** Deja la nave en la baldosa pedida, envolviendo por el borde si se
+ *  fue del campo. El paso se consume siempre; lo único que cambia es si
+ *  el evento se llama `move` o `wrap`. */
+function mover(e: EstadoCampo, nodoId: string, antes: EstadoNave, fila: number, col: number): EventoPaso {
+  const afuera = fila < 0 || col < 0 || fila >= e.lado || col >= e.lado;
+  e.nave.fila = envolver(fila, e.lado);
+  e.nave.col = envolver(col, e.lado);
+  const despues: EstadoNave = { ...e.nave };
+  return { nodoId, tipo: afuera ? "wrap" : "move", antes, despues, premio: 0 };
+}
+
 /** Ejecuta UNA instrucción y devuelve qué pasó. Muta el estado.
  *
+ *  El campo es un toro: salir por un borde deja a la nave en el borde
+ *  opuesto de la misma fila o columna (`tipo: "wrap"`). Cuesta un paso,
+ *  exactamente igual que cualquier otro movimiento, y nunca interrumpe
+ *  el programa. Con `lado === 1` toda dirección envuelve sobre la única
+ *  baldosa que hay, que es lo correcto y no rompe nada.
+ *
  *  Las acciones inútiles no son errores y no interrumpen nada (MVP.md
- *  §6): chocar contra el borde consume el turno y sigue, cosechar en
- *  vacío consume el turno y no paga, plantar donde no se puede no hace
- *  nada. Que el desperdicio se VEA es lo que después crea la necesidad
- *  de sensores; un cartel de error, no.
+ *  §6): cosechar en vacío consume el turno y no paga, plantar donde no
+ *  se puede no hace nada. Que el desperdicio se VEA es lo que después
+ *  crea la necesidad de sensores; un cartel de error, no.
  *
  *  Y una acción inútil que además CUESTA: cosechar verde rompe el
  *  cristal (salvo la chispa). Es el precio de no mirar. */
@@ -438,6 +476,21 @@ export function ejecutarPaso(
     return { nodoId, tipo: "turn", antes, despues: quieto(), premio: 0 };
   }
 
+  if (tipo === "move_north" || tipo === "move_east" || tipo === "move_south" || tipo === "move_west") {
+    /* Las cuatro direcciones absolutas: la nave se ORIENTA sola hacia
+       donde va antes de moverse, así que el giro deja de ser un bloque
+       que hay que pensar aparte. "Arriba" siempre es arriba, mire donde
+       mire la nave. */
+    const hacia = DIRECCION_DE_MOVIMIENTO[tipo];
+    e.nave.direccion = hacia;
+    let { fila, col } = e.nave;
+    if (hacia === "north") fila -= 1;
+    else if (hacia === "south") fila += 1;
+    else if (hacia === "east") col += 1;
+    else col -= 1;
+    return mover(e, nodoId, antes, fila, col);
+  }
+
   if (tipo === "move_forward" || tipo === "move_back") {
     /* Retroceder es avanzar al revés y SIN GIRAR: la nave sigue mirando
        a donde miraba. Es lo que hace que sirva —dar marcha atrás una
@@ -450,14 +503,7 @@ export function ejecutarPaso(
     else if (e.nave.direccion === "south") fila += atras;
     else if (e.nave.direccion === "east") col += atras;
     else col -= atras;
-
-    const afuera = fila < 0 || col < 0 || fila >= e.lado || col >= e.lado;
-    if (afuera) {
-      return { nodoId, tipo: "bump", antes, despues: quieto(), premio: 0 };
-    }
-    e.nave.fila = fila;
-    e.nave.col = col;
-    return { nodoId, tipo: "move", antes, despues: quieto(), premio: 0 };
+    return mover(e, nodoId, antes, fila, col);
   }
 
   const idx = indice(e, e.nave.fila, e.nave.col);

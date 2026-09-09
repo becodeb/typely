@@ -57,13 +57,13 @@ const ETAPA_ARCHIVO: Record<number, string> = { 1: "brote", 2: "creciendo", 3: "
 
 /** Lo que el campo anima cuando la nave hace algo que se tiene que VER:
  *  cosechar (el cristal sube hacia la nave y sale un +1), cosechar en
- *  vacío (un anillo que se disipa: no había nada) y chocar contra el
- *  borde (la nave se sacude). Las acciones inútiles no son errores
- *  (MVP.md §6), pero el desperdicio tiene que verse. `n` crece con cada
- *  evento para que dos seguidos se dibujen los dos. */
+ *  vacío (un anillo que se disipa: no había nada) y cruzar el borde (la
+ *  nave atraviesa el campo entero de un tirón). Las acciones inútiles no
+ *  son errores (MVP.md §6), pero el desperdicio tiene que verse. `n`
+ *  crece con cada evento para que dos seguidos se dibujen los dos. */
 export interface EventoCampo {
   n: number;
-  tipo: "harvest" | "empty_harvest" | "bump" | "break" | "plant" | "plant_fail";
+  tipo: "harvest" | "empty_harvest" | "bump" | "wrap" | "break" | "plant" | "plant_fail";
   celda: number;
   /** El mineral que había (o el que se quiso plantar). */
   variante: VarianteCristal;
@@ -153,6 +153,9 @@ export function CampoCristales({
   const baldosa = (fila: number, col: number): Baldosa =>
     campo.baldosas.find((b) => b.fila === fila && b.col === col) ?? campo.baldosas[0];
 
+  /* Qué cruce de borde se está dibujando y en qué baldosa terminó. */
+  const saltoVisto = useRef<{ n: number; fila: number; col: number } | null>(null);
+
   const naveB = baldosa(estado.nave.fila, estado.nave.col);
   const angulo = useAnguloNave(estado.nave.direccion);
 
@@ -186,6 +189,32 @@ export function CampoCristales({
   /* La baldosa del último evento, para dibujar el efecto encima. */
   const eventoB = evento ? baldosa(Math.floor(evento.celda / estado.lado), evento.celda % estado.lado) : null;
   const golpe = evento?.tipo === "bump" ? evento.n : 0;
+
+  /* El cruce de borde acorta la transición de `left`/`top`: sin eso, la
+     nave cruza el campo entero a la misma velocidad con la que camina
+     una baldosa y parece que se teletransporta despacio.
+
+     Dos cosas tienen que pasar en la MISMA pintada: la clase y las
+     coordenadas nuevas. Se cumple porque `AutomatizacionPage` llama a
+     `setEvento` y a `repintar` en el mismo bloque síncrono, y React los
+     agrupa en un solo render.
+
+     Y tiene que durar SÓLO ese traslado: un `move` normal no genera
+     evento, así que el `wrap` seguiría siendo el último y dejaría rápido
+     también al paso siguiente. Por eso se anota la baldosa en la que
+     ocurrió y la clase se cae sola en cuanto la nave se movió de ahí —
+     en el mismo render en que cambian `left`/`top`, que es lo que
+     importa. El ref se escribe durante el render igual que `pops`. */
+  if (evento?.tipo === "wrap" && saltoVisto.current?.n !== evento.n) {
+    saltoVisto.current = { n: evento.n, fila: estado.nave.fila, col: estado.nave.col };
+  }
+  const marca = saltoVisto.current;
+  const salto =
+    evento?.tipo === "wrap" &&
+    marca !== null &&
+    marca.n === evento.n &&
+    marca.fila === estado.nave.fila &&
+    marca.col === estado.nave.col;
 
   return (
     <div className="auto-visor">
@@ -371,7 +400,7 @@ export function CampoCristales({
             imagen flota. La sombra queda EN EL ANCLA, quieta, que es lo
             que vende el vuelo y lo que dice en qué baldosa está. */}
         <span
-          className={`auto-ancla auto-ancla--nave${corriendo ? " auto-ancla--volando" : ""}`}
+          className={`auto-ancla auto-ancla--nave${corriendo ? " auto-ancla--volando" : ""}${salto ? " auto-ancla--salto" : ""}`}
           style={
             {
               left: pct(naveX),

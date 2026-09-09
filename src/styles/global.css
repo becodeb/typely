@@ -2008,21 +2008,6 @@ a { color: inherit; text-decoration: none; }
    misma que tienen los bloques. Por esa muesca asoma la lengüeta del
    bloque de arranque (o la del bloque anterior), y eso es lo que hace
    ver que algo encastra ahí sin necesidad de contorno. */
-.auto-hueco {
-  --auto-tab: 11px;
-  width: 168px;
-  height: 48px;
-  border: 0;
-  background: linear-gradient(180deg, rgba(83, 107, 255, 0.17), rgba(83, 107, 255, 0.07));
-  box-shadow: inset 0 0 0 2px rgba(83, 107, 255, 0.16);
-  clip-path: polygon(
-    7px 0, 17px 0, 25px var(--auto-tab), 41px var(--auto-tab), 49px 0, calc(100% - 7px) 0,
-    100% 7px,
-    100% calc(100% - 7px), calc(100% - 7px) 100%,
-    7px 100%, 0 calc(100% - 7px),
-    0 7px
-  );
-}
 
 /* En la caja de piezas no encastran: se ven sueltas y separadas. */
 .auto-caja .auto-bloque {
@@ -2084,7 +2069,6 @@ a { color: inherit; text-decoration: none; }
   line-height: 1;
   padding: 0 4px;
 }
-.auto-hueco--cavidad { width: 150px; }
 /* Un asidero de teclado para los contenedores sin número ni sensor: se
    ve como el dibujo del lomo, pero recibe el foco. */
 .auto-repetir__asidero {
@@ -2224,6 +2208,12 @@ a { color: inherit; text-decoration: none; }
   pointer-events: none;
   translate: -50% -75%;
   transition: left 0.42s cubic-bezier(0.45, 0, 0.2, 1), top 0.42s cubic-bezier(0.45, 0, 0.2, 1);
+}
+/* Cruzar el borde no es caminar una baldosa: es atravesar el campo
+   entero. Con la transición normal parece un teletransporte lento, así
+   que ese traslado —y sólo ese— va corto y a velocidad pareja. */
+.auto-ancla--salto {
+  transition: left 0.16s cubic-bezier(0.3, 0, 0.3, 1), top 0.16s cubic-bezier(0.3, 0, 0.3, 1);
 }
 .auto-ancla img { position: static; display: block; width: 100%; }
 
@@ -2577,11 +2567,15 @@ a { color: inherit; text-decoration: none; }
 }
 .auto-mejora:disabled { cursor: default; }
 /* Lugar reservado para una categoría que todavía no se reveló. */
+/* Aire que reserva el lugar de una categoría sin revelar. No se dibuja:
+   antes era un contorno punteado, y una silueta vacía en una franja de
+   tarjetas es ruido, no información. */
 .auto-mejora--hueco {
   background: transparent;
-  border: 2px dashed rgba(130, 140, 190, 0.26);
+  border: 0;
   box-shadow: none;
   cursor: default;
+  visibility: hidden;
 }
 /* Saldo insuficiente: un pulso que conecta el precio con el contador.
    Nunca un modal (MVP.md §8). */
@@ -2615,7 +2609,7 @@ a { color: inherit; text-decoration: none; }
   .auto-bloque--marca { opacity: 0.85; }
   .auto-brillo { animation: none; opacity: 0.85; }
   .auto-brota, .auto-estallido, .auto-motor { animation: none; }
-  .auto-ancla, .auto-cuerpo, .auto-sombra { transition: none; }
+  .auto-ancla, .auto-ancla--salto, .auto-cuerpo, .auto-sombra { transition: none; }
   .auto-pieza { transition: none; }
   /* Con menos movimiento, los efectos sólo aparecen y se desvanecen. */
   .auto-absorbido, .auto-fogonazo, .auto-nada, .auto-mas, .auto-golpe, .auto-roto, .auto-esquirlas {
@@ -2707,6 +2701,56 @@ a { color: inherit; text-decoration: none; }
 .auto-repetir--sombrero > .auto-repetir__lomo,
 .auto-repetir--sombrero > .auto-repetir__brazo { cursor: default; }
 
+/* `Por siempre`: la pestaña que sobresale se muda ADENTRO.
+
+   La pestaña no es adorno, es la GRAMÁTICA del editor: sobresale donde
+   encastra algo y falta donde no encastra nada — es lo mismo que dice el
+   sombrero redondeado de `Mi rutina` arriba. Un `Por siempre` no termina
+   nunca, así que debajo de él no va nada (`destinoBloqueado`,
+   programa.ts) y la pestaña del brazo estaba MINTIENDO: prometía un
+   encastre que el editor ya no ofrece. Se le da fondo plano, y la pestaña
+   reaparece colgando del lomo hacia la cavidad, que es el único lugar
+   donde este bloque sí recibe algo. La silueta pasa a decir "cerrado
+   abajo, abierto adentro", que es exactamente la regla — y se lee sin
+   ningún cartel que la explique.
+
+   Nunca choca con `--sombrero`: `def` y `forever` son tipos distintos del
+   mismo campo, así que las dos clases jamás caen en el mismo bloque. Y
+   `forever` está restringido al nivel del lienzo (`cabeA`, programa.ts):
+   siempre es cadena verde o pila suelta, nunca está anidado. */
+.auto-repetir--siempre {
+  /* `.auto-repetir` lleva `margin-bottom: calc(var(--auto-tab) * -1)`
+     para que el bloque de abajo monte sobre su muesca. Sin muesca y sin
+     nada permitido abajo, ese margen negativo sólo desalinea. */
+  margin-bottom: 0;
+}
+.auto-repetir--siempre > .auto-repetir__brazo {
+  /* Rectángulo liso: sin muesca y sin el espacio que la alojaba. */
+  clip-path: none;
+  padding-bottom: 0;
+}
+.auto-repetir--siempre > .auto-repetir__cuerpo { position: relative; }
+.auto-repetir--siempre > .auto-repetir__cuerpo::before {
+  content: "";
+  position: absolute;
+  /* Los mismos 16px/24px/40px/48px y la misma profundidad `--auto-tab`
+     que la muesca del lomo y la del brazo, corridos por el ancho de la
+     `.auto-repetir__espina` (20px) para caer justo sobre el borde
+     izquierdo de la cavidad. Los 8px del cuello son el `padding-top` de
+     `.auto-repetir__cavidad`: así la punta aterriza exactamente en la
+     muesca del primer bloque de adentro, y con la cavidad vacía queda
+     colgando en el hueco, invitando a poner algo. */
+  left: 20px;
+  top: 0;
+  width: 68px;
+  height: calc(8px + var(--auto-tab));
+  background: var(--auto-tono, #ff8fc0);
+  clip-path: polygon(
+    16px 0, 48px 0, 48px 8px, 40px 100%, 24px 100%, 16px 8px
+  );
+  pointer-events: none;
+}
+
 /* Pila suelta: NO cuelga del bloque verde, así que no se ejecuta.
    Atenuada, nunca gris —el gris dice "no se puede"— y con la saturación
    casi intacta, que es lo que la separa del levantado (que ahora
@@ -2722,17 +2766,9 @@ a { color: inherit; text-decoration: none; }
 .auto-pila--suelta .auto-bloque,
 .auto-pila--suelta .auto-repetir__lomo,
 .auto-pila--suelta .auto-repetir__brazo { filter: saturate(0.92) brightness(0.97); }
-.auto-pila--suelta::before {
-  content: "";
-  position: absolute;
-  inset: -6px -6px -6px -8px;
-  border-radius: 18px;
-  background: rgba(83, 107, 255, 0.07);
-  box-shadow:
-    inset 0 0 0 2px rgba(83, 107, 255, 0.2),
-    0 0 16px rgba(83, 107, 255, 0.16);
-  pointer-events: none;
-}
+/* Una pila suelta ya se distingue por estar APAGADA (la regla de arriba).
+   Tenía además un marco alrededor y era de más: dos señales para la misma
+   cosa, y la de menos valor era la que dibujaba una caja. */
 
 /* Recentrar: 44 px, piso táctil (CLAUDE.md §6.5). Vive DENTRO del
    envoltorio del HUD, que ya es `position: fixed` calcado al viewport del
@@ -2807,6 +2843,29 @@ a { color: inherit; text-decoration: none; }
   transform: none;
   filter: grayscale(1) drop-shadow(0 3px 0 #6f7c96);
 }
+
+/* Mientras el programa corre, la caja de piezas se APAGA. Los botones ya
+   estaban `disabled`, pero eso no se ve: el chico apretaba una ficha, no
+   pasaba nada y no había forma de saber si estaba rota o si era el
+   momento. Ahora la caja entera se oscurece y dice sola "hasta que no
+   pares, esto no es tuyo todavía".
+
+   Es un tercer gris, y a propósito distinto de los otros dos: el de
+   "bloqueado" del mapa de mundos (media opacidad + candado, CLAUDE.md
+   §6.4/§12) y el de "sin memoria" de `.auto-caja--llena` (grisado a plena
+   opacidad + prohibido + pulso). Éste no grisea ni tacha: sólo BAJA la
+   luz, conservando el color de cada pieza, porque el estado es temporal —
+   no es una negativa, es un "ahora no". Va después de `--llena` para
+   ganarle por orden cuando las dos coinciden. */
+.auto-caja--corriendo { background: rgba(38, 50, 74, 0.3); }
+.auto-caja--corriendo .auto-bloque,
+.auto-caja--corriendo .auto-bloque:hover,
+.auto-caja--corriendo .auto-bloque:active {
+  transform: none;
+  cursor: default;
+  animation: none;
+  filter: brightness(0.5) saturate(0.75) drop-shadow(0 3px 0 rgba(18, 27, 45, 0.55));
+}
 @keyframes auto-tope-pulso {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
@@ -2840,16 +2899,6 @@ a { color: inherit; text-decoration: none; }
    distinguiendo de la marca de encastre por lo mismo de siempre —la
    marca es una silueta de bloque RELLENA que late, esto es una superficie
    apenas teñida y quieta. */
-.auto-contorno {
-  position: absolute;
-  border-radius: 14px;
-  border: 2px solid rgba(84, 232, 198, 0.6);
-  background: rgba(84, 232, 198, 0.14);
-  box-shadow:
-    0 0 0 4px rgba(84, 232, 198, 0.13),
-    inset 0 0 18px rgba(84, 232, 198, 0.2);
-  pointer-events: none;
-}
 
 /* Las flechas de "hay más piezas para allá": una por GRUPO que quedó
    fuera del viewport del lienzo (la cadena verde, cada `Mi rutina`, cada

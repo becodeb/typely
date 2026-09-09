@@ -42,7 +42,20 @@
 import { AJUSTES, MINERALES, type Mineral } from "../../data/automatizacion/balance";
 import { MAX_LLAMADAS_ANIDADAS } from "./limites";
 
+/* Las cuatro direcciones absolutas (`move_north`…`move_west`) son las que
+   hoy salen de la caja: la nave gira sola hacia donde se mueve, así que
+   el chico piensa "arriba" y no "girar, girar, avanzar".
+
+   `move_forward`, `move_back`, `turn_left` y `turn_right` SIGUEN siendo
+   tipos válidos y ejecutables: hay programas ya guardados que los usan y
+   `validarNodo` descarta el snapshot entero —y con él toda la partida—
+   si aparece un tipo que no reconoce. Se quitaron de la caja, no del
+   contrato. */
 export type TipoAccion =
+  | "move_north"
+  | "move_east"
+  | "move_south"
+  | "move_west"
   | "move_forward"
   | "move_back"
   | "turn_left"
@@ -159,6 +172,12 @@ export type NodoPrograma = NodoAccion | NodoCall | NodoContenedor | NodoContador
 export type Programa = NodoPrograma[];
 
 const ACCIONES: readonly TipoAccion[] = [
+  "move_north",
+  "move_east",
+  "move_south",
+  "move_west",
+  /* Compatibilidad: el par girar/avanzar ya no se ofrece en la caja,
+     pero sigue siendo válido para los programas ya guardados. */
   "move_forward",
   "move_back",
   "turn_left",
@@ -729,9 +748,55 @@ export function despuesDe(programa: Programa, id: string): Destino {
   return donde.contenedor ? { tipo: "dentro", id: donde.contenedor.id, rama: donde.rama } : { tipo: "final" };
 }
 
+/** Un `Por siempre` no termina nunca, así que CIERRA la cadena: todo lo
+ *  que se encadene debajo es código muerto. */
+export function cierraLaCadena(nodo: NodoPrograma | undefined | null): boolean {
+  return nodo?.type === "forever";
+}
+
+/** ¿Este destino cae DEBAJO de un `Por siempre`? Es la única regla nueva
+ *  de colocación, y vive acá —en el punto donde se decide dónde cae una
+ *  pieza— por dos motivos.
+ *
+ *  1. Es el chokepoint: `colocar` y `colocarCadena` son los dos únicos
+ *     caminos por los que una pieza entra al árbol, así que una sola
+ *     guarda cubre el arrastre, el teclado y el toque.
+ *  2. NO va en `validarNodo`/`validarLista`/`validarPrograma`, y eso es
+ *     deliberado, no un olvido: esas funciones devuelven `null` al
+ *     rechazar, `almacenamiento.ts` lee ese `null` como "snapshot
+ *     corrupto" y `cargar()` descarta LA PARTIDA ENTERA —campo,
+ *     minerales, mejoras—. Un programa ya guardado con un bloque después
+ *     de un `Por siempre` tiene que seguir cargando exactamente igual que
+ *     antes. Esos bloques ya eran inalcanzables en ejecución, así que no
+ *     se pierde nada dejándolos donde están. Si alguien alguna vez quiere
+ *     "ordenar esto" moviéndolo al validador: eso borra partidas.
+ *
+ *  `dentro` NUNCA se bloquea: meter bloques ADENTRO del `Por siempre` es
+ *  justamente para lo que está. */
+export function destinoBloqueado(programa: Programa, destino: Destino): boolean {
+  if (destino.tipo === "dentro") return false;
+  if (destino.tipo === "final") return cierraLaCadena(programa[programa.length - 1]);
+  const donde = listaDe(programa, destino.id);
+  if (!donde) return false;
+  const i = donde.lista.findIndex((n) => n.id === destino.id);
+  return cierraLaCadena(donde.lista[i - 1]);
+}
+
 /** Pone `nodo` en `destino`. Devuelve el MISMO programa si no se pudo:
- *  el anidamiento tiene tope, y `Por siempre` sólo va en la libreta. */
+ *  el anidamiento tiene tope, `Por siempre` sólo va en la libreta, y
+ *  debajo de un `Por siempre` no entra nada (`destinoBloqueado`). */
 export function colocar(programa: Programa, nodo: NodoPrograma, destino: Destino): Programa {
+  if (destinoBloqueado(programa, destino)) return programa;
+  return colocarSinMirarElFinal(programa, nodo, destino);
+}
+
+/** `colocar` sin la guarda del `Por siempre`. La necesita `colocarCadena`
+ *  para RE-encadenar los eslabones 2..n de una cadena que ya aprobó su
+ *  destino: si la cadena agarrada trae adentro un `Por siempre` con
+ *  bloques debajo (un programa viejo, ver `destinoBloqueado`), volver a
+ *  preguntar por cada eslabón la partiría a la mitad. La regla se aplica
+ *  al lugar que ELIGIÓ el chico, no a la costura interna. */
+function colocarSinMirarElFinal(programa: Programa, nodo: NodoPrograma, destino: Destino): Programa {
   if (destino.tipo === "final") return [...programa, nodo];
   if (destino.tipo === "dentro") return insertarEn(programa, nodo, destino.id, destino.rama ?? "body");
   return insertarAntes(programa, nodo, destino.id);
@@ -771,12 +836,15 @@ export function colocarCadena(programa: Programa, cadena: NodoPrograma[], destin
   if (cadena.length === 0) return programa;
   const prof = profundidadDestino(programa, destino);
   if (prof === null || !cabeA(cadena, prof)) return programa;
-  let salida = colocar(programa, cadena[0], destino);
+  // La misma regla que `colocar`, preguntada UNA vez por el destino que
+  // eligió el chico: debajo de un `Por siempre` no entra nada.
+  if (destinoBloqueado(programa, destino)) return programa;
+  let salida = colocarSinMirarElFinal(programa, cadena[0], destino);
   if (salida === programa) return programa;
   for (let i = 1; i < cadena.length; i++) {
     // `despuesDe` ya sabe decir "antes de mi hermano siguiente, o al
     // final de mi lista": es exactamente "pegado abajo del anterior".
-    const siguiente = colocar(salida, cadena[i], despuesDe(salida, cadena[i - 1].id));
+    const siguiente = colocarSinMirarElFinal(salida, cadena[i], despuesDe(salida, cadena[i - 1].id));
     if (siguiente === salida) return programa; // defensivo: `cabeA` ya lo cubrió
     salida = siguiente;
   }
@@ -845,6 +913,13 @@ export function desplazarNodo(programa: Programa, id: string, delta: -1 | 1): Pr
   const i = donde.lista.findIndex((n) => n.id === id);
   const j = i + delta;
   if (j < 0 || j >= donde.lista.length) return programa;
+  /* Bajar por debajo de un `Por siempre` no se puede, igual que no se
+     puede soltar ni tocar ahí: el intercambio no pasa por `colocar`, así
+     que la guarda hay que repetirla acá o el teclado sería la rendija por
+     la que se cuela justo lo que las otras tres puertas rechazan.
+     SÓLO se frena hacia abajo: subir siempre queda libre, incluso para
+     sacar un bloque de debajo de un `Por siempre` en un programa viejo. */
+  if (delta === 1 && cierraLaCadena(donde.lista[j])) return programa;
   const lista = [...donde.lista];
   [lista[i], lista[j]] = [lista[j], lista[i]];
   return conListaDe(programa, donde, lista);

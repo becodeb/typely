@@ -212,7 +212,10 @@ export const AJUSTES = {
     si: { moneda: "racimo" as Mineral, base: 20, multiplicador: 1, maxNivel: 1 },
     sino: { moneda: "racimo" as Mineral, base: 30, multiplicador: 1, maxNivel: 1 },
     mientras: { moneda: "racimo" as Mineral, base: 40, multiplicador: 1, maxNivel: 1 },
-    siempre: { moneda: "racimo" as Mineral, base: 60, multiplicador: 1, maxNivel: 1 },
+    /* `Por siempre` es la primera automatización de verdad, así que se
+       paga temprano y con punta: repetir a mano lo que un bloque puede
+       repetir solo es justo lo que este modo viene a sacar de encima. */
+    siempre: { moneda: "punta" as Mineral, base: 14, multiplicador: 1, maxNivel: 1 },
     /* `Mi rutina A/B/C` + `Hacer A/B/C` (PROGRESION.md §5, era 3). */
     rutinas: { moneda: "prisma" as Mineral, base: 60, multiplicador: 1, maxNivel: 1 },
     /* `Contador +1`, `Contador = 0`, sensor `contador es N` y sensor
@@ -246,7 +249,9 @@ export const AJUSTES = {
     si: { lado: 2, cosechado: ["racimo", 1] as [Mineral, number] },
     sino: { requiere: "si" },
     mientras: { requiere: "si" },
-    siempre: { requiere: "mientras" },
+    /* Sin prerrequisito y sin era: aparece casi enseguida, al lado de la
+       memoria, para que el chico deje de apretar "correr" cuanto antes. */
+    siempre: { acumulado: 6 },
     /* Prisma existe desde la 3×3 (§2): la era ya lo cubre `lado: 3`, pero
        se deja también `requiere: "mientras"` para que no aparezca antes
        de que la caja tenga sensores con qué sostener un `Si está listo`
