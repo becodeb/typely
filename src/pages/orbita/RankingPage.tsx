@@ -38,8 +38,8 @@ const ORO = "#c98a00";
 /* Atajo de desarrollo: ?demo=1 llena el ranking con filas de mentira.
    El podio es el único lugar donde las insignias se ven grandes y una al
    lado de la otra, y hasta ahora no había forma de mirarlo sin una cuenta
-   de verdad — se revisaba a ciegas. Mismo trato que el ?banda= y el ?bot=
-   de la partida: en producción la condición es constante false y el
+   de verdad — se revisaba a ciegas. Mismo trato que el ?bot= de la
+   partida: en producción la condición es constante false y el
    bundler se lleva puesto todo esto. */
 const FILAS_DEMO: ArcadeBoardRow[] = [
   { pos: 1, alias: "Nova", realName: null, score: 1240, rankId: "leyenda", wpmPeak: 78, mine: false },

@@ -157,7 +157,16 @@ export const AJUSTES = {
   intervaloMax: 5, //         s, techo (3.4 forzaba a un chico de 10 PPM a recibir
   //                          palabras de tres letras más seguido de lo que su
   //                          demanda pedía: moría a los 67 s)
-  simultaneasMax: 8, //       techo duro de palabras vivas (legibilidad)
+  /* Tope de palabras vivas: arranca en 3 pasada la amenaza 30 y suma una
+     cada `simultaneasCadaAmenaza`. Con el corpus de palabras largas era 8
+     (legibilidad) y una cada 20 de amenaza; con palabras de hasta seis
+     letras (08/09/2026) la pantalla aguanta 10, y hacía falta: un tipeador
+     de 85 PPM limpia tres palabras cortas en lo que antes tardaba una larga,
+     y con el tope viejo el juego no llegaba a entregarle su demanda —
+     duraba 190 s de mediana en vez de ~2:00. Bajar el piso de cadencia no
+     lo tocaba: el cuello era este tope, no el intervalo. */
+  simultaneasMax: 10,
+  simultaneasCadaAmenaza: 12,
 
   /* TECHO BLANDO (2026-09-07). No hay corte por duración: la partida termina
      solo al perder el último corazón. Pero la amenaza está topeada en 100 y
@@ -174,6 +183,22 @@ export const AJUSTES = {
   techoBlandoIntervaloMin: 0.2, // s: piso de la cadencia al que se tiende
   empujeRetroceso: 0.045, //  cuánto retrocede una palabra por letra correcta
 
+  /* CORPUS FIJO (decisión de Ezequiel, 08/09/2026): Tormenta es el mismo
+     juego para todos, sin mirar la isla en la que va el chico. La banda del
+     corpus sube con la amenaza (÷8) solo hasta acá — letras sueltas por
+     debajo de amenaza 8, sílabas y palabras cortas de ahí en más — y la
+     banda siguiente (palabras de 5-6) asoma como siempre. La dificultad la
+     sigue poniendo la PRESIÓN (cadencia, velocidad, simultáneas), que se
+     adapta sola; el vocabulario ya no. Los signos viven solo en la oleada
+     "tormenta de signos" (tormentaSignos.ts). */
+  bandaTope: 1,
+  /* Cada cuánta amenaza sube la banda del corpus: por debajo de 10 (unos
+     12 PPM de demanda) llueven letras sueltas con asomo de sílabas; de ahí
+     en más, sílabas y palabras cortas con asomo de palabras de 5-6. Era 8,
+     y el lector de 8 PPM (amenaza 7-8) quedaba justo en el borde: caía a
+     sílabas en su peor momento y la partida se le iba a 82 s. */
+  bandaCadaAmenaza: 10,
+
   /* Asomo de la banda siguiente ("lo aprendido y un poco más allá").
      Desde el primer segundo, no desde amenaza 30: un chico de banda 0 veía
      SOLO letras sueltas, porque nunca llegaba a la amenaza del asomo. */
@@ -181,12 +206,11 @@ export const AJUSTES = {
   asomoProbMax: 0.35,
   asomoAmenazaTope: 60, //  a esta amenaza el asomo ya está en su máximo
 
-  /* Mayúsculas — variedad de teclado. Las bandas bajas vienen en minúscula;
-     el motor sortea cuáles salen con mayúscula (Shift), y la página las
-     pinta de otro color para que se vea antes de tipear. */
+  /* Mayúsculas — variedad de teclado. El corpus viene todo en minúscula; el
+     motor sortea cuáles salen con mayúscula (Shift), y la página las pinta
+     de otro color para que se vea antes de tipear. */
   mayusculaLetraSuelta: 0.3,
   mayusculaInicial: 0.15,
-  mayusculaHastaBanda: 4, //  de la 5 en adelante ya traen sus propias mayúsculas
 
   /* Respiro anti-frustración: 2 corazones antes de este segundo → freno. */
   respiroAntesDe: 45,
@@ -416,8 +440,6 @@ export type EventoMotor =
 /* ==================================================================== */
 
 export interface OpcionesMotor {
-  /** Banda máxima desbloqueada por el modo historia (0..10). */
-  bandaMax: number;
   /** RNG inyectable — la simulación corre con semilla. */
   rng?: () => number;
   /** Ajustes parciales para experimentar (la simulación tunea acá). */
@@ -436,7 +458,7 @@ export class MotorTormenta {
   private teclaSignosAnterior: { id: number; t: number } | null = null;
   readonly aj: Ajustes;
   private readonly rng: () => number;
-  private readonly bandaMax: number;
+  private readonly bandaTope: number;
 
   /* Reloj propio del juego, en segundos JUGADOS. La página no llama a
      tick con la pestaña oculta (rAF se frena solo), así que una
@@ -527,10 +549,10 @@ export class MotorTormenta {
   private palabrasTipeadas = 0;
   ppmPico = 0;
 
-  constructor(opciones: OpcionesMotor) {
+  constructor(opciones: OpcionesMotor = {}) {
     this.aj = { ...AJUSTES, ...opciones.ajustes };
     this.rng = opciones.rng ?? Math.random;
-    this.bandaMax = Math.max(0, Math.min(CORPUS_BANDAS.length - 1, opciones.bandaMax));
+    this.bandaTope = Math.max(0, Math.min(CORPUS_BANDAS.length - 1, Math.round(this.aj.bandaTope)));
     this.corazones = this.aj.corazones;
     this.corazonesMax = this.aj.corazones;
     this.demanda = this.aj.calDemanda0;
@@ -889,7 +911,7 @@ export class MotorTormenta {
       ? aj.calTope
       : this.amenaza < 30
         ? 2
-        : Math.min(aj.simultaneasMax, 3 + Math.floor(this.amenaza / 20));
+        : Math.min(aj.simultaneasMax, 3 + Math.floor(this.amenaza / aj.simultaneasCadaAmenaza));
 
     /* ---- Nacimientos ---- */
     this.acumuladorSpawn += avance;
@@ -1154,7 +1176,7 @@ export class MotorTormenta {
       let r = rMedido;
       for (let i = 0; i < 3; i++) {
         const amenaza = Math.max(2, (r * (1 + aj.margenInicio)) / aj.ppmPorAmenaza);
-        const banda = Math.min(this.bandaMax, Math.floor(amenaza / 8));
+        const banda = Math.min(this.bandaTope, Math.floor(amenaza / aj.bandaCadaAmenaza));
         const largo = Math.max(1, LARGO_MEDIO_BANDA[banda] ?? 4);
         r = (largo / (sobrecarga + (largo - 1) / ritmo)) * 12 * castigo;
       }
@@ -1185,9 +1207,10 @@ export class MotorTormenta {
 
   private bandaActual(): number {
     const aj = this.aj;
-    /* ÷8 y no ÷12: a 40 PPM ya hay palabras largas y mensajes, a 60
-       tildes y signos. Con ÷12 a 40 PPM seguías en palabras de tres letras. */
-    const base = Math.min(this.bandaMax, Math.floor(this.amenaza / 8));
+    /* A amenaza `bandaCadaAmenaza` se pasa de letras sueltas a sílabas y
+       palabras cortas, y ahí frena `bandaTope`: el corpus es el mismo para
+       todos, lo que sigue subiendo es la presión. */
+    const base = Math.min(this.bandaTope, Math.floor(this.amenaza / aj.bandaCadaAmenaza));
     /* Asomo de la banda siguiente — zona de desarrollo próximo. Siempre
        presente (un chico de banda 0 tiene que ver palabritas, no solo
        letras) y más frecuente a medida que aprieta la amenaza. */
@@ -1196,7 +1219,7 @@ export class MotorTormenta {
        ("ventana" para un chico de 10 PPM) era un corazón perdido a los
        20 s de la partida real. */
     if (this.fase === "calibracion") return CORPUS_BANDAS[base].length ? base : 0;
-    const siguiente = Math.min(base + 1, this.bandaMax + 1, CORPUS_BANDAS.length - 1);
+    const siguiente = Math.min(base + 1, this.bandaTope + 1, CORPUS_BANDAS.length - 1);
     if (siguiente > base && CORPUS_BANDAS[siguiente].length) {
       const p =
         aj.asomoProbBase +
@@ -1217,15 +1240,13 @@ export class MotorTormenta {
       if (!inicialOcupada && !repetida) break;
       texto = items[Math.floor(this.rng() * items.length)];
     }
-    /* Mayúsculas: en las bandas bajas (que vienen en minúscula) algunas
-       salen con Shift — una letra suelta entera, o la inicial de una
-       palabra. La página las pinta distinto para que se anticipe. */
-    if (banda <= this.aj.mayusculaHastaBanda && /^[a-záéíóúüñ]/.test(texto)) {
-      if (texto.length === 1) {
-        if (this.rng() < this.aj.mayusculaLetraSuelta) texto = texto.toUpperCase();
-      } else if (this.rng() < this.aj.mayusculaInicial) {
-        texto = texto[0]!.toUpperCase() + texto.slice(1);
-      }
+    /* Mayúsculas: el corpus viene en minúscula y algunas salen con Shift —
+       una letra suelta entera, o la inicial de una palabra. La página las
+       pinta distinto para que se anticipe. */
+    if (texto.length === 1) {
+      if (this.rng() < this.aj.mayusculaLetraSuelta) texto = texto.toUpperCase();
+    } else if (this.rng() < this.aj.mayusculaInicial) {
+      texto = texto[0]!.toUpperCase() + texto.slice(1);
     }
 
     const palabra: PalabraViva = {

@@ -56,22 +56,23 @@ function rngCon(semilla) {
 /* ------------------------------------------------------------------ */
 /* El tipeador sintético                                               */
 /* ------------------------------------------------------------------ */
-/* wpm: velocidad sostenida · err: probabilidad de tecla errada ·
-   banda: hasta dónde desbloqueó en el modo historia. Los perfiles bajan
-   en error a medida que suben en velocidad, como los chicos reales. */
+/* wpm: velocidad sostenida · err: probabilidad de tecla errada. Los perfiles
+   bajan en error a medida que suben en velocidad, como los chicos reales.
+   Ya no llevan banda: el corpus es el mismo para todos (AJUSTES.bandaTope);
+   lo único que cambia entre un chico de primero y uno de sexto es la
+   presión que el motor les mide. */
 const PERFILES = [
-  { nombre: "1er grado lento ", wpm: 8, err: 0.14, banda: 0 },
-  { nombre: "1er grado típico", wpm: 15, err: 0.1, banda: 1 },
-  { nombre: "3er grado típico", wpm: 25, err: 0.08, banda: 3 },
-  { nombre: "5to grado típico", wpm: 40, err: 0.06, banda: 6 },
-  { nombre: "6to muy bueno   ", wpm: 60, err: 0.04, banda: 9 },
-  { nombre: "tecleador experto", wpm: 85, err: 0.03, banda: 10 },
+  { nombre: "1er grado lento ", wpm: 8, err: 0.14 },
+  { nombre: "1er grado típico", wpm: 15, err: 0.1 },
+  { nombre: "3er grado típico", wpm: 25, err: 0.08 },
+  { nombre: "5to grado típico", wpm: 40, err: 0.06 },
+  { nombre: "6to muy bueno   ", wpm: 60, err: 0.04 },
+  { nombre: "tecleador experto", wpm: 85, err: 0.03 },
 ];
 
 function simular(perfil, semilla) {
   const rng = rngCon(semilla);
   const motor = new MotorTormenta({
-    bandaMax: perfil.banda,
     rng: rngCon(semilla ^ 0x9e37),
     ajustes: AJUSTES_CLI,
   });
@@ -168,7 +169,7 @@ const seg = (ms) => (ms / 1000).toFixed(0) + "s";
 
 console.log(`Tormenta de palabras — ${N} partidas por perfil\n`);
 console.log(
-  "perfil            banda   duración (med · min–max)   amenaza  rango       ppm~   palabras  poderes",
+  "perfil            duración (med · min–max)   amenaza  rango       ppm~   palabras  poderes",
 );
 console.log("-".repeat(105));
 
@@ -202,7 +203,7 @@ for (const perfil of PERFILES) {
   const dentro = medianaOk;
   if (!dentro) todoBien = false;
   console.log(
-    `${perfil.nombre}   B${String(perfil.banda).padEnd(4)}` +
+    `${perfil.nombre}  ` +
       ` ${seg(durMed).padStart(5)} · ${seg(Math.min(...dur))}–${seg(durMax)}`.padEnd(28) +
       `${String(amenaza).padStart(5)}    ${rango.padEnd(10)}` +
       ` ${String(ppm).padStart(4)}   ${String(palabras).padStart(6)}  ${String(poderes).padStart(6)}` +

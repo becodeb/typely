@@ -6,7 +6,7 @@ import path from 'node:path';
 const outfile = path.resolve('.preview-orbita/sin-limite-test.mjs');
 await build({ entryPoints: ['src/utils/orbita/motor.ts'], bundle: true, format: 'esm', outfile, logLevel: 'silent' });
 const { MotorTormenta } = await import(pathToFileURL(outfile));
-const m = new MotorTormenta({ bandaMax: 4, rng: () => .4 });
+const m = new MotorTormenta({ rng: () => .4 });
 // Aislar el reloj de los daños: una partida invulnerable debe poder continuar.
 m.invulnerableHasta = Infinity;
 for (let i = 0; i < 18001; i++) {

@@ -7,7 +7,7 @@ const outfile = path.resolve('.preview-orbita/signos-test.mjs');
 await build({ entryPoints: ['src/utils/orbita/motor.ts'], bundle: true, format: 'esm', outfile, logLevel: 'silent' });
 const { MotorTormenta } = await import(pathToFileURL(outfile));
 const frase = 'tormenta de signos';
-const nuevo = () => new MotorTormenta({ bandaMax: 4, rng: () => .4 });
+const nuevo = () => new MotorTormenta({ rng: () => .4 });
 function avanzar(m, segundos) {
   const eventos = [];
   for (let i = 0; i < Math.round(segundos * 20); i++) eventos.push(...m.tick(50));

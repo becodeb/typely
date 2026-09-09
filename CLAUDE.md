@@ -1151,22 +1151,36 @@ cada tecla, porque el nivel sube dentro de `tecla()`.
   la que no cierra se guarda con `ranked=false` — no compite ni acuña. Los
   cristales los recomputa el servidor, nunca se acredita lo que diga el
   cliente sin tope.
-- **El corpus sale del currículum** (`src/data/orbitaCorpus.ts`: once bandas
-  desde los `targets[]` reales, en orden pedagógico) y el techo del alumno es
-  su banda desbloqueada +1 de asomo — nunca símbolos que jamás vio.
+- **Tormenta es el mismo juego para todos** (decisión de Ezequiel,
+  08/09/2026): el corpus NO depende de la isla en la que va el chico. Son
+  tres bandas fijas (`src/data/orbitaCorpus.ts`: letras sueltas, sílabas y
+  palabras de 2-4, palabras de 5-6 como asomo), sacadas de los `targets[]`
+  reales de cualquier isla y filtradas a pura letra minúscula sin tilde —
+  ni dígitos, ni signos, ni espacios. El motor sube de banda con la amenaza
+  solo hasta `AJUSTES.bandaTope` (1); lo que escala con la habilidad es la
+  presión (cadencia, velocidad, simultáneas), no el vocabulario. Los signos
+  aparecen ÚNICAMENTE en la oleada "tormenta de signos". La página ya no
+  consulta estrellas ni mundos abiertos, y `MotorTormenta` no recibe banda.
+  Recalibración que lo acompañó, con los dos exámenes pasando: la banda
+  sube a amenaza 10 (`bandaCadaAmenaza`; con 8 el lector de 8 PPM caía a
+  sílabas en su borde y duraba 82 s) y el tope de simultáneas es 10, una
+  más cada 12 de amenaza (`simultaneasMax`, `simultaneasCadaAmenaza`; con
+  8 y cada 20, calibrados para palabras largas, el experto de 85 PPM
+  limpiaba las cortas más rápido de lo que el tope dejaba entregar y
+  duraba 190 s). Medianas: 108/150/152/143/154/173 s para 8→85 PPM.
 - **El demo juega y no manda nada**: sin cuenta no hay ranking ni cristales.
 - **El docente puede pausar el modo por grupo** (`groups.arcade_enabled`,
   toggle en la pantalla de islas del grupo). El orbe se ve dormido, nunca
   desaparece ni queda como botón muerto.
 - La partida **se pausa sola con la pestaña oculta** (rAF + recorte de dt en
-  el motor): una interrupción de aula no regala impactos. Cuatro ganchos
+  el motor): una interrupción de aula no regala impactos. Tres ganchos
   existen SOLO en dev y no aparecen en producción: `?bot=N` corre el bucle
   por intervalo a N× (para verificar desde una pestaña oculta, donde no hay
   rAF, antes de que el cliente de Vite recargue), `window.__tormentaTecla`
-  tipea por el mismo camino que el teclado, `window.__tormentaVivas` da la
-  lista viva del MOTOR (el DOM entre dos pintadas de React miente), y
-  `?banda=8` fuerza la banda máxima de corpus (0-10) para probar símbolos o
-  correos sin pasarse cinco islas. Ojo con `?bot=4`: una partida sin teclas
+  tipea por el mismo camino que el teclado y `window.__tormentaVivas` da la
+  lista viva del MOTOR (el DOM entre dos pintadas de React miente). El
+  `?banda=N` que forzaba la banda del corpus se fue con las bandas por isla
+  (08/09/2026). Ojo con `?bot=4`: una partida sin teclas
   termina en 22 s de juego, o sea 5 s de pared — el bot hay que inyectarlo
   antes de que termine la cuenta regresiva.
 
