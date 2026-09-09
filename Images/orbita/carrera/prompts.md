@@ -146,3 +146,26 @@ y exporta `recta-frontal.webp`: 99 KB, alpha medio 0,000 en el 35 % superior.
 En pantalla solo hay escala uniforme y traslación. Las coordenadas de los
 corredores se calculan sobre los carriles pintados; no hay homografía ni
 otra imagen debajo del arco. Los originales anteriores quedan conservados.
+
+## Pórtico ancho apoyado en la pista (08/09/2026)
+
+Generado con la herramienta integrada de imágenes, tomando `meta-source.png`
+como referencia. La propuesta `exec-fb53d329-22f3-4724-85d2-2918b919e60a`
+requería retirar un damero dibujado. La corrección final es
+`exec-a41631e9-73f1-41ae-b42a-be449a08ad0c`, conservada en
+`meta-ancha-source.png`, sin modificar las fuentes anteriores.
+
+Prompt de arquitectura:
+
+> Create a replacement finish arch game sprite based on the referenced TYPELY crystal arch. Keep exactly the charming polished illustrated 3D material style, lilac stone, small mint/aqua crystals, subtle gold trims and a central crystal crown. Change architecture: a very wide, low bridge-like triumphal finish arch spanning five racing lanes, with slender support columns only at far left and far right. 1536x1024 landscape canvas, symmetrical straight frontal camera with slightly visible top surfaces of shallow flat column feet. Overall arch fills x 3% to 97%, y 12% to 88%. Column feet centers x 8% and 92%, their bottom contact edge at y 88%. The clear opening between columns must span x 15% to 85%, keeping the bottom seventy percent of its opening completely empty; gently curved thin arch beam across top, no bulky inward growth of columns. Broad opening, thin graceful piers. Small flat square feet, no stairs, no layered pedestal, no platform, no floor, no floating stones or grass clumps. Faint reflected cyan light at the feet for matching a luminous blue crystal racetrack. Transparent background and clear transparent opening, no sky, no checkerboard, no lettering, no watermark. This is a reusable sprite, not a scene. Do not just stretch the old arch: redraw its slim columns and broad curved beam in natural proportions.
+
+Prompt final de extracción, con la propuesta anterior como referencia:
+
+> Precise background extraction edit. Keep this wide TYPELY crystal arch's architecture, column and beam shape, colors and layout exactly unchanged. Replace all of the grey checkerboard and all whitish swirling wisps (including the large empty opening under the arch) with perfectly uniform pure black #000000 matte. No checkerboard or smoke anywhere. Preserve the colored arch only; retain its little cyan contact glows beneath the feet. Same landscape 1536x1024 composition, no text. Completely clean pure black outside the silhouette and under the arch.
+
+El importador recupera alpha con sharp y conserva el lienzo 3:2:
+`meta-ancha.webp`, 1536×1024, 151 KB, 76,8 % de píxeles vacíos.
+Los pies se anclan al 89 % de la altura. La pista continúa detrás del
+pórtico: bajo los apoyos mide 1,05 veces su ancho, con espacio central
+para los cinco corredores. Se agregan sombras de contacto discretas,
+sin plataformas, escalones ni deformaciones de las ilustraciones.

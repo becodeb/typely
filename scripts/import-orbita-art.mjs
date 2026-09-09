@@ -107,6 +107,8 @@ const PIEZAS = [
   // todos los carriles. La zona del texto se controla antes de exportar.
   { grupo: "carrera", base: "recta", tope: 2560, alfa: true, mate: "negro", arribaLimpio: .03, arribaFraccion: .35 },
   { grupo: "carrera", base: "recta-frontal", tope: 2560, alfa: true, mate: "negro", arribaLimpio: .03, arribaFraccion: .35 },
+  // El pórtico conserva el lienzo 3:2 para anclar ambos pies a la pista.
+  { grupo: "carrera", base: "meta-ancha", tope: 1536, alfa: true, mate: "negro" },
   ...["meta", "medalla-oro", "medalla-plata", "medalla-bronce"].map(base => ({ grupo: "carrera", base, tope: 1024, alfa: true, mate: "negro", recortar: true, encuadrar: true })),
   ...["banderin-rojo", "banderin-amarillo", "banderin-verde"].map(base => ({ grupo: "carrera", base, tope: 512, alfa: true, mate: "negro", recortar: true, encuadrar: true })),
   ...["chispa-1", "chispa-2", "chispa-3"].map(base => ({ grupo: "carrera", base, tope: 256, alfa: true, mate: "negro", recortar: true, encuadrar: true })),
