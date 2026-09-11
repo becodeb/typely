@@ -1205,6 +1205,21 @@ prueba("E4 · el campo tiene tope y no se puede comprar más allá", () => {
   for (let i = 0; i < 20; i++) M.comprar(e, "campo", azar);
   igual(e.lado, B.AJUSTES.ladoMaximo);
   igual(e.celdas.length, B.AJUSTES.ladoMaximo ** 2);
+  const antes = JSON.stringify(e);
+  cierto(!M.comprar(e, "campo", azar), "rechaza otra compra");
+  igual(JSON.stringify(e), antes, "no gasta saldo ni cambia el nivel o el campo");
+});
+
+prueba("E5 · la primera expansión garantiza un cuarzo maduro delante del muelle", () => {
+  for (const aleatorio of [() => 0, () => 0.999]) {
+    const e = M.estadoInicial(aleatorio);
+    e.saldos = rico();
+    cierto(M.comprar(e, "campo", aleatorio));
+    igual(e.celdas[0], { etapa: 3, variante: "racimo", restanteMs: 0 });
+    const eventos = correr(e, [acc("move_north"), acc("harvest")]);
+    igual(eventos[1].mineral, "racimo");
+    igual(eventos[1].tipo, "harvest");
+  }
 });
 
 /* ================================================================== */
@@ -1265,8 +1280,8 @@ prueba("M4 · cada mineral llega con su era: el prisma no existe antes de la 3x3
   e.saldos.punta = 50;
   e.celdas[M.indice(e, e.lado - 1, 0)].variante = null;
   igual(correr(e, [plantar("prisma")])[0].tipo, "plant_fail");
-  igual(M.plantables(campoDe(3)), ["prisma"]);
-  igual(M.plantables(campoDe(4)), ["prisma", "estrella"]);
+  igual(M.plantables(campoDe(3)), ["punta", "racimo", "prisma"]);
+  igual(M.plantables(campoDe(4)), ["punta", "racimo", "prisma", "estrella"]);
 });
 
 prueba("M5 · dos estrellas pegadas no crecen; separadas sí", () => {
@@ -1337,6 +1352,128 @@ prueba("M8 · un snapshot de la versión 1 se lee como versión 3 sin perder nad
   cierto(e2 !== null && e2.celdas[0].variante === null, "la tierra vacía también viaja");
 });
 
+function pasarTiempo(e, ms) {
+  while (ms > 0) {
+    const dt = Math.min(ms, B.AJUSTES.dtMaximoMs);
+    M.avanzarMundo(e, dt);
+    ms -= dt;
+  }
+}
+
+prueba("M9 · preparar tierra permite obtener el primer prisma sin regalar cosechas", () => {
+  const e = campoDe(3);
+  const idx = M.indice(e, e.nave.fila, e.nave.col);
+  e.saldos.punta = B.MINERALES.prisma.semilla.punta;
+  const saldos = { ...e.saldos };
+  const [limpieza] = correr(e, [acc("clear")]);
+  igual(limpieza.tipo, "clear");
+  igual(limpieza.premio, 0);
+  igual(e.celdas[idx], { etapa: 0, variante: null, restanteMs: 0 });
+  igual(e.saldos, saldos, "preparar una veta madura no paga ni consume semillas");
+  igual(e.cosechados, M.porMineral(0));
+  igual(e.acumulado, 0);
+  igual(e.cosechas, []);
+  pasarTiempo(e, 30_000);
+  igual(e.celdas[idx].variante, null, "la tierra preparada no rebrota sola");
+  igual(correr(e, [plantar("prisma")])[0].tipo, "plant");
+  igual(e.saldos.punta, 0);
+  pasarTiempo(e, 3 * M.msPorEtapaDe(e, "prisma"));
+  const [cosecha] = correr(e, [acc("harvest")]);
+  igual(cosecha.tipo, "harvest");
+  igual(cosecha.mineral, "prisma");
+  igual(e.cosechados.prisma, 1, "la primera cosecha ya es alcanzable");
+  igual(e.saldos.prisma, M.valorDe(e, "prisma"));
+});
+
+prueba("M10 · un campo vacío y sin saldo recupera chispas y cuarzos gratis", () => {
+  for (const mineral of ["punta", "racimo"]) {
+    const e = campoDe(3);
+    for (let fila = 0; fila < e.lado; fila++) {
+      for (let col = 0; col < e.lado; col++) {
+        e.nave = { fila, col, direccion: "north" };
+        correr(e, [acc("clear")]);
+      }
+    }
+    igual(e.saldos, M.porMineral(0));
+    cierto(e.celdas.every((c) => c.variante === null));
+    igual(correr(e, [plantar(mineral)])[0].tipo, "plant");
+    igual(e.saldos, M.porMineral(0), "la semilla silvestre no cuesta");
+    pasarTiempo(e, 3 * M.msPorEtapaDe(e, mineral));
+    igual(correr(e, [acc("harvest")])[0].tipo, "harvest");
+    igual(e.saldos[mineral], M.valorDe(e, mineral));
+  }
+});
+
+prueba("M11 · cada rechazo de plantación explica su causa y conserva el campo y saldo", () => {
+  const casos = [
+    { motivo: "ocupada", lado: 3, mineral: "prisma", vaciar: false },
+    { motivo: "semillas", lado: 3, mineral: "prisma", vaciar: true },
+    { motivo: "espacio", lado: 4, mineral: "estrella", vaciar: true },
+    { motivo: "bloqueado", lado: 2, mineral: "punta", vaciar: true },
+    { motivo: "bloqueado", lado: 3, mineral: "estrella", vaciar: true },
+  ];
+  for (const caso of casos) {
+    const e = campoDe(caso.lado);
+    const idx = M.indice(e, e.nave.fila, e.nave.col);
+    e.saldos = caso.motivo === "semillas" ? M.porMineral(0) : rico();
+    if (caso.vaciar) e.celdas[idx] = { etapa: 0, variante: null, restanteMs: 0 };
+    if (caso.motivo === "espacio") e.celdas[idx + 1] = { etapa: 0, variante: "estrella", restanteMs: M.msPorEtapaDe(e, "estrella") };
+    const antes = JSON.stringify(e);
+    const [evento] = correr(e, [plantar(caso.mineral)]);
+    igual(evento.tipo, "plant_fail");
+    igual(evento.motivo, caso.motivo);
+    igual(evento.premio, 0);
+    igual(JSON.stringify(e), antes, caso.motivo + ": no altera el estado");
+  }
+});
+
+prueba("M12 · preparar tierra está bloqueado antes de la 3×3", () => {
+  const e = campoDe(2);
+  const antes = JSON.stringify(e);
+  const [evento] = correr(e, [acc("clear")]);
+  igual(evento.tipo, "plant_fail");
+  igual(evento.motivo, "bloqueado");
+  igual(JSON.stringify(e), antes);
+});
+
+prueba("M13 · progreso y tiempo restante coinciden con la maduración real", () => {
+  for (const mineral of B.ORDEN_MINERALES) {
+    const e = campoDe(4);
+    correr(e, [acc("clear")]);
+    const idx = M.indice(e, e.nave.fila, e.nave.col);
+    igual(M.crecimientoDe(e, idx), { progreso: 0, segundos: 0, estado: "vacía" });
+    e.saldos = rico();
+    correr(e, [plantar(mineral)]);
+    const total = 3 * M.msPorEtapaDe(e, mineral);
+    igual(M.crecimientoDe(e, idx), { progreso: 0, segundos: Math.ceil(total / 1000), estado: "creciendo" });
+    pasarTiempo(e, total / 2);
+    const mitad = M.crecimientoDe(e, idx);
+    cierto(Math.abs(mitad.progreso - 0.5) < 1e-9, mineral + ": la barra va por la mitad");
+    igual(mitad.segundos, Math.ceil(total / 2000));
+    igual(mitad.estado, "creciendo");
+    pasarTiempo(e, total / 2 - 1);
+    igual(M.crecimientoDe(e, idx).estado, "creciendo", "no se anuncia lista antes de tiempo");
+    pasarTiempo(e, 1);
+    igual(M.crecimientoDe(e, idx), { progreso: 1, segundos: 0, estado: "lista" });
+  }
+});
+
+prueba("M14 · el indicador de estrellas sin espacio se congela hasta despejar la vecina", () => {
+  const e = campoDe(4);
+  const idx = M.indice(e, e.nave.fila, e.nave.col);
+  const restanteMs = M.msPorEtapaDe(e, "estrella");
+  e.celdas[idx] = { etapa: 0, variante: "estrella", restanteMs };
+  e.celdas[idx + 1] = { etapa: 0, variante: "estrella", restanteMs };
+  const bloqueado = M.crecimientoDe(e, idx);
+  igual(bloqueado.estado, "sin espacio");
+  pasarTiempo(e, 3 * restanteMs);
+  igual(M.crecimientoDe(e, idx), bloqueado, "el tiempo y el progreso no simulan crecimiento");
+  correr(e, [acc("move_east"), acc("clear")]);
+  igual(M.crecimientoDe(e, idx).estado, "creciendo");
+  pasarTiempo(e, 3 * restanteMs);
+  igual(M.crecimientoDe(e, idx), { progreso: 1, segundos: 0, estado: "lista" });
+});
+
 /* ================================================================== */
 console.log("\nECONOMÍA");
 
@@ -1378,7 +1515,13 @@ prueba("26 · la tienda se revela de a poco y gastar no esconde nada", () => {
   const e = M.estadoInicial(azar);
   /* La primera categoría es TIERRA, no memoria: con el campo en 1x1 más
      ranuras no sirven para nada hasta que haya a dónde ir. */
-  igual(M.reveladas(e), ["campo"], "el primer día se ve UNA categoría");
+  igual(M.reveladas(e), [], "primero se aprende a cosechar");
+  e.acumulado = 3; e.saldos.punta = 3;
+  igual(M.reveladas(e), ["siempre"]);
+  cierto(M.comprar(e, "siempre"));
+  cierto(M.reveladas(e).includes("crecimiento"));
+  e.saldos.punta = 6; cierto(M.comprar(e, "crecimiento"));
+  cierto(M.reveladas(e).includes("campo"));
   e.acumulado = B.AJUSTES.revelado.capacidad.acumulado;
   cierto(!M.reveladas(e).includes("capacidad"), "en 1x1 la memoria no sirve: no se muestra todavía");
   e.saldos = rico();
@@ -1413,6 +1556,34 @@ prueba("29 · las cosechas viejas salen de la ventana de la tasa", () => {
 });
 
 /* ================================================================== */
+
+prueba("I8 · editar instrucciones y rutinas no altera la corrida activa", () => {
+  const e = M.estadoInicial(azar);
+  const programa = [{ id: 'loop', type: 'forever', body: [{ id: 'call', type: 'call', rutina: 'A' }] }];
+  e.rutinas = [{ id: 'routine', type: 'def', rutina: 'A', body: [acc('harvest','original')] }];
+  const it = I.crearInterprete(programa,e);
+  programa[0].body.length = 0; e.rutinas[0].body[0].type = 'wait';
+  igual(it.siguiente().tipo,'harvest');
+  igual(it.siguiente().tipo,'harvest');
+});
+prueba("M15 · romper Cuarzo revela el sensor y sobrevive al guardado", () => {
+  const e = campoDe(2); const idx = M.indice(e,e.nave.fila,e.nave.col);
+  cierto(!M.reveladas(e).includes('si'));
+  e.celdas[idx] = { variante:'racimo',etapa:1,restanteMs:1000 };
+  M.ejecutarPaso(e,'h','harvest',azar);
+  cierto(M.reveladas(e).includes('si'));
+  const loaded = A.validarCampo(JSON.parse(JSON.stringify(e)));
+  igual(loaded.cuarzosRotos,1); cierto(M.reveladas(loaded).includes('si'));
+});
+prueba("E6 · primera automatización y expansión son alcanzables sin recursos regalados", () => {
+  const e=M.estadoInicial(azar);
+  const juntar=n=>{while(e.saldos.punta<n){for(let t=0;t<3000;t+=250)M.avanzarMundo(e,250);M.ejecutarPaso(e,'h','harvest',azar);}};
+  juntar(3); cierto(M.comprar(e,'siempre')); igual(e.saldos.punta,0);
+  juntar(6); cierto(M.comprar(e,'crecimiento')); igual(M.msPorEtapa(e),700);
+  juntar(12); cierto(M.comprar(e,'campo',azar)); igual(e.lado,2);
+  igual(M.capacidad(e),3); cierto(e.celdas.some(c=>c.variante==='racimo' && c.etapa===3));
+});
+
 const total = ok + fallos;
 console.log(
   "\n" + (fallos === 0 ? "\x1b[32m" : "\x1b[31m") + ok + "/" + total + " pruebas\x1b[0m" +

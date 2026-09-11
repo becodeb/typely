@@ -36,6 +36,8 @@
  */
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { campoDe, type Baldosa } from "../../data/automatizacion/campos";
+import { crecimientoDe } from "../../utils/automatizacion/motor";
+import { MINERALES } from "../../data/automatizacion/balance";
 import {
   ANCHO_CRISTAL,
   ANCHO_NAVE,
@@ -63,7 +65,7 @@ const ETAPA_ARCHIVO: Record<number, string> = { 1: "brote", 2: "creciendo", 3: "
  *  crece con cada evento para que dos seguidos se dibujen los dos. */
 export interface EventoCampo {
   n: number;
-  tipo: "harvest" | "empty_harvest" | "bump" | "wrap" | "break" | "plant" | "plant_fail";
+  tipo: "harvest" | "empty_harvest" | "bump" | "wrap" | "break" | "plant" | "plant_fail" | "clear";
   celda: number;
   /** El mineral que había (o el que se quiso plantar). */
   variante: VarianteCristal;
@@ -219,7 +221,18 @@ export function CampoCristales({
   return (
     <div className="auto-visor">
       <div className="auto-escena" style={{ "--auto-escala": ESCALA_ESCENA } as CSSProperties}>
-        <img className="auto-isla" src={campo.imagen} alt="" draggable={false} />
+        <img key={estado.lado} className="auto-isla" src={campo.imagen} alt="" draggable={false} />
+
+        {estado.celdas.map((c, i) => {
+          const b = baldosa(Math.floor(i / estado.lado), i % estado.lado);
+          const g = crecimientoDe(estado, i);
+          const texto = `${c.variante ? MINERALES[c.variante].nombre : "Tierra"}: ${g.estado}${g.estado === "creciendo" ? ` · ${g.segundos} s` : ""}`;
+          return <span key={`estado-${i}`} className={`auto-crecimiento auto-crecimiento--${g.estado === "lista" ? "listo" : "brote"}`}
+            style={{ left: pct(b.x), top: pct(b.y + baldosaPct * .19), width: pct(Math.min(22, baldosaPct * .8)) }} title={texto} aria-label={texto}>
+            <span className="auto-crecimiento__texto">{g.estado === "lista" ? "✓ Lista" : g.estado === "creciendo" ? `${g.segundos} s` : g.estado}</span>
+            {g.estado === "creciendo" && <span className="auto-crecimiento__riel"><span style={{ transform: `scaleX(${g.progreso})` }} /></span>}
+          </span>;
+        })}
 
         {estado.celdas.map((celda: Celda, i) => {
           const fila = Math.floor(i / estado.lado);
@@ -277,7 +290,7 @@ export function CampoCristales({
               {madura && <span className="auto-brillo" />}
               {/* Llegar a maduro estalla en destellos: "listo" también se
                   anuncia en el momento en que pasa. */}
-              {madura && estallido > 0 && <span key={`e${estallido}`} className="auto-estallido" />}
+              {madura && estallido > 0 && <img key={`e${estallido}`} className="auto-estallido auto-sprite" src="/assets/automatizacion/ui/destello.webp" alt="" />}
               {/* Cada cambio de etapa entra con un pop: la clave cambia
                   con la etapa y la animación se dispara sola. */}
               <img
@@ -311,7 +324,8 @@ export function CampoCristales({
               } as CSSProperties
             }
           >
-            <span className="auto-fogonazo" />
+            <img className="auto-fogonazo auto-sprite" src="/assets/automatizacion/ui/siembra.webp" alt="" />
+            <img className="auto-rayo-cosecha" src="/assets/automatizacion/ui/rayo-cosecha.webp" alt="" />
             <img
               className="auto-absorbido"
               src={`/assets/automatizacion/cristales/${evento.variante}-maduro.webp`}
@@ -352,7 +366,7 @@ export function CampoCristales({
               } as CSSProperties
             }
           >
-            <span className="auto-esquirlas" />
+            <img className="auto-esquirlas auto-sprite" src="/assets/automatizacion/ui/rotura.webp" alt="" />
             <img
               className="auto-roto"
               src={`/assets/automatizacion/cristales/${evento.variante}-${ETAPA_ARCHIVO[Math.max(1, evento.etapaPrevia)]}.webp`}
@@ -392,7 +406,9 @@ export function CampoCristales({
               width: pct(baldosaPct * 0.55),
               zIndex: Math.round(eventoB.y * 10) + 8,
             }}
-          />
+          >
+            <img src="/assets/automatizacion/ui/anillo.webp" alt="" />
+          </span>
         )}
 
         {/* La nave. El ancla lleva la posición (y su transición entre

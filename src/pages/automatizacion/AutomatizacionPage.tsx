@@ -21,12 +21,14 @@
  * sólo para que React note un cambio es basura pura para el recolector.
  */
 import { ArrowLeft } from "lucide-react";
+import "../../styles/vivero.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { BarraMejoras, type ClaveTienda } from "../../components/automatizacion/BarraMejoras";
 import { CampoCristales, type EventoCampo } from "../../components/automatizacion/CampoCristales";
 import { EditorBloques, crearNodo, type Pieza, type RefPila } from "../../components/automatizacion/EditorBloques";
-import { crearInterprete } from "../../utils/automatizacion/interprete";
+import { crearInterprete, type Interprete } from "../../utils/automatizacion/interprete";
+import { proximoObjetivo, textoCosto } from "../../data/automatizacion/descubrimientos";
 import { IcoContadorMas, IcoMineral, IcoProduccion } from "../../components/automatizacion/IconosAuto";
 import {
   AJUSTES,
@@ -40,6 +42,8 @@ import { assets } from "../../utils/assets";
 import {
   guardadorConFreno,
   repositorioLocal,
+  validarCampo,
+  leerAvisoGuardado,
 } from "../../utils/automatizacion/almacenamiento";
 import {
   actualizarRecord,
@@ -59,6 +63,9 @@ import {
   tasaReciente,
   tieneRepetir,
   type EstadoCampo,
+  crecimientoDe,
+  msPorEtapaDe,
+  valorDe,
 } from "../../utils/automatizacion/motor";
 import {
   buscarNodo,
@@ -120,6 +127,9 @@ function siguienteVeces(actual: Veces, opciones: readonly Veces[]): Veces {
 const mismoSensor = (a: Sensor, b: Sensor) =>
   a.tipo === b.tipo && (a.mineral ?? null) === (b.mineral ?? null) && !!a.no === !!b.no;
 
+const copiarEditor = (e: EstadoCampo) => JSON.stringify({ programa: e.programa, rutinas: e.rutinas, pilasSueltas: e.pilasSueltas, lienzo: e.lienzo });
+const nuevaMuestra = (e: EstadoCampo) => ({ inicio: e.relojMs, valor: 0, pasos: 0, vacias: 0, rotos: 0, plantas: 0 });
+
 export function AutomatizacionPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -130,11 +140,44 @@ export function AutomatizacionPage() {
     estadoRef.current = repositorioLocal.cargar(usuario) ?? estadoInicial();
   }
   const e = estadoRef.current;
+  const [anuncio, setAnuncio] = useState<{ titulo: string; texto: string; mineral: Mineral } | null>(null);
+  useEffect(() => {
+    if (!anuncio) return;
+    const timer = window.setTimeout(() => setAnuncio(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [anuncio]);
+
+  const [reinicios, setReinicios] = useState(0);
+  const reiniciar = () => {
+    detener();
+    guardador.current.cerrar();
+    repositorioLocal.borrar(usuario);
+    Object.assign(e, estadoInicial());
+    historial.current = { atras: [], adelante: [], actual: copiarEditor(e) };
+    muestra.current = nuevaMuestra(e);
+    setAnteriorMuestra(null); setEvento(null);
+    setMensaje("Toca Cosechar y después Empezar.");
+    guardador.current.pedir(usuario, e, true);
+    setReinicios(n => n + 1); repintar();
+  };
 
   const [version, setVersion] = useState(0);
   const repintar = useCallback(() => setVersion((v) => v + 1), []);
 
   const [corriendo, setCorriendo] = useState(false);
+  const [pausado, setPausado] = useState(false);
+  const pausaRef = useRef(false);
+  const interpreteRef = useRef<Interprete | null>(null);
+  const [velocidad, setVelocidad] = useState(1);
+  const velocidadRef = useRef(1);
+  velocidadRef.current = velocidad;
+  const [mensaje, setMensaje] = useState("La Chispa del muelle ya está lista para cosechar.");
+  const [ayuda, setAyuda] = useState(false);
+  const guiaRef = useRef<HTMLDialogElement>(null);
+  const [anteriorMuestra, setAnteriorMuestra] = useState<ReturnType<typeof nuevaMuestra> | null>(null);
+  const muestra = useRef(nuevaMuestra(e));
+  const historial = useRef({ atras: [] as string[], adelante: [] as string[], actual: copiarEditor(e) });
+  const archivoRef = useRef<HTMLInputElement>(null);
   const [nodoActivo, setNodoActivo] = useState<string | null>(null);
   /* El contador de la corrida, sólo para el HUD: vive en el intérprete
      (interprete.ts), nunca en `EstadoCampo` — arranca en null porque
@@ -149,6 +192,11 @@ export function AutomatizacionPage() {
   const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
   const guardador = useRef(guardadorConFreno(repositorioLocal));
 
+  useEffect(() => {
+    if (ayuda) guiaRef.current?.showModal();
+    else guiaRef.current?.close();
+  }, [ayuda]);
+
   /* ---------------- 1 · el reloj del mundo ---------------- */
   useEffect(() => {
     let anterior = performance.now();
@@ -161,7 +209,7 @@ export function AutomatizacionPage() {
 
       // Con la pestaña oculta rAF no corre, así que el mundo se congela
       // solo. El recorte de `avanzarMundo` cubre el salto del regreso.
-      if (!document.hidden) {
+      if (!document.hidden && !pausaRef.current) {
         const cambio = avanzarMundo(e, dt);
         acumulado += dt;
         // Repintar en cada cuadro sería tirar trabajo: el campo sólo
@@ -195,9 +243,11 @@ export function AutomatizacionPage() {
     if (temporizador.current) clearTimeout(temporizador.current);
     temporizador.current = null;
     setCorriendo(false);
+    setPausado(false);
+    pausaRef.current = false;
+    interpreteRef.current = null;
     setNodoActivo(null);
     setContadorActivo(null);
-    setEvento(null);
     /* La nave NO vuelve al muelle al detener: queda donde la dejó el
        programa. Es la única forma de ver dónde terminó de verdad, que es
        justo lo que hay que mirar cuando algo salió distinto de lo
@@ -208,12 +258,24 @@ export function AutomatizacionPage() {
     repintar();
   }, [e, repintar, usuario]);
 
-  const empezar = useCallback(() => {
-    if (corriendo || e.programa.length === 0) return;
+  const pausar = useCallback(() => {
+    corridaRef.current += 1;
+    if (temporizador.current) clearTimeout(temporizador.current);
+    temporizador.current = null;
+    pausaRef.current = true;
+    setPausado(true);
+    setCorriendo(false);
+    guardador.current.pedir(usuario, e, true);
+  }, [e, usuario]);
+
+  const empezar = useCallback((unPaso = false) => {
+    if (corriendo || (!interpreteRef.current && e.programa.length === 0)) return;
 
     corridaRef.current += 1;
     const token = corridaRef.current;
     setCorriendo(true);
+    pausaRef.current = false;
+    setPausado(false);
     setContadorActivo(0);
     /* La nave NO vuelve al muelle al empezar: la corrida arranca desde
        donde quedó parada. Es una decisión explícita del usuario —
@@ -225,25 +287,42 @@ export function AutomatizacionPage() {
        baldosa que hay debajo en ese momento, no con la de cuando se
        apretó Empezar. Los tics (vueltas vacías de un bucle) duran un
        cuarto de turno y sólo hacen latir al contenedor. */
-    const interprete = crearInterprete(e.programa, e);
+    if (!interpreteRef.current) {
+      if (muestra.current.pasos) setAnteriorMuestra({ ...muestra.current });
+      muestra.current = nuevaMuestra(e);
+      interpreteRef.current = crearInterprete(e.programa, e);
+    }
+    const interprete = interpreteRef.current;
+    const programar = (ms: number) => {
+      if (unPaso) {
+        // En depuración el mundo sólo avanza el tiempo de esta instrucción.
+        for (let pendiente = ms; pendiente > 0; pendiente -= AJUSTES.dtMaximoMs) avanzarMundo(e, Math.min(pendiente, AJUSTES.dtMaximoMs));
+        pausar();
+        repintar();
+      } else temporizador.current = setTimeout(siguiente, ms / velocidadRef.current);
+    };
     const siguiente = () => {
       if (token !== corridaRef.current) return; // corrida vieja: se ignora
+      if (document.hidden) { pausar(); return; }
       const p = interprete.siguiente();
       if (!p) {
+        setMensaje(`Programa terminado · ${muestra.current.valor} de valor recogido. La nave se queda en su última baldosa.`);
         detener();
         return;
       }
       setNodoActivo(p.nodoId);
       setContadorActivo(interprete.contador);
+      muestra.current.pasos += 1;
       if (p.tipo === "tick") {
-        temporizador.current = setTimeout(siguiente, Math.max(80, Math.round(msPorAccion(e) / 4)));
+        setMensaje("El bucle está esperando: todavía no ejecutó una acción útil.");
+        programar(Math.max(80, Math.round(msPorAccion(e) / 4)));
         return;
       }
       if (p.tipo === "counter") {
         // `Contador +1` / `Contador = 0`: un turno entero, sin evento de
         // campo — nunca llega a `ejecutarPaso` (PROGRESION.md §6).
         repintar();
-        temporizador.current = setTimeout(siguiente, msPorAccion(e));
+        programar(msPorAccion(e));
         return;
       }
       // La variedad se lee ANTES del paso: al cosechar, la veta vuelve a
@@ -254,6 +333,15 @@ export function AutomatizacionPage() {
       const variante = antes?.variante ?? p.mineral ?? "punta";
       const etapaPrevia = antes?.etapa ?? 0;
       const ev = ejecutarPaso(e, p.nodoId, p.tipo, Math.random, p.mineral);
+      if (ev.tipo === "harvest") { muestra.current.valor += ev.premio; setMensaje(`+${ev.premio} de ${MINERALES[variante].nombre}. ${MINERALES[variante].rebrotaSolo ? "Ya está rebrotando." : "La tierra está vacía: vuelve a plantar."}`); }
+      else if (ev.tipo === "empty_harvest") { muestra.current.vacias++; setMensaje(ev.motivo === "creciendo" ? "Todavía está creciendo. Espera a «Lista» o usa un sensor." : "Aquí no hay nada plantado. Prepara tu bloque Plantar."); }
+      else if (ev.tipo === "break") { muestra.current.rotos++; setMensaje(`${MINERALES[variante].nombre} se rompió por cosecharlo verde. Usa «Si está listo».`); }
+      else if (ev.tipo === "plant_fail") { muestra.current.vacias++; setMensaje(ev.motivo === "ocupada" ? "La baldosa está ocupada. Usa Preparar tierra antes de plantar." : ev.motivo === "semillas" ? "No alcanza para las semillas. Cosecha recursos o replanta Chispa/Cuarzo gratis." : ev.motivo === "espacio" ? "Hay otra Estrella al lado: deja una baldosa de separación." : "Esta siembra aún no está disponible."); }
+      else if (ev.tipo === "plant") { muestra.current.plantas++; setMensaje(`${MINERALES[variante].nombre} plantado. Mira la cuenta atrás de la baldosa.`); }
+      else if (ev.tipo === "clear") setMensaje("Tierra preparada. Plantar Chispa y Cuarzo es gratis; los otros minerales necesitan semillas.");
+      else if (ev.tipo === "wrap") setMensaje("Cruzaste el borde: la nave reaparece en el lado opuesto de la misma fila o columna.");
+      else if (ev.tipo === "wait") setMensaje("Esperando un turno: los cristales siguen creciendo.");
+      else setMensaje(`Nave en fila ${e.nave.fila + 1}, columna ${e.nave.col + 1}.`);
       /* `move`, `turn` y `wait` no dejan nada que dibujar en el campo: la
          posición y el rumbo ya viajan en el estado. `wrap` sí PASA, y
          tiene que pasar: es el único aviso que recibe el campo de que
@@ -271,12 +359,19 @@ export function AutomatizacionPage() {
         });
       }
       repintar();
-      temporizador.current = setTimeout(siguiente, msPorAccion(e));
+      programar(msPorAccion(e));
     };
     // Un respiro antes del primer paso: el chico tiene que ver salir la
     // nave del muelle, no encontrarla ya en movimiento.
-    temporizador.current = setTimeout(siguiente, 260);
-  }, [corriendo, detener, e, repintar]);
+    if (unPaso) siguiente();
+    else temporizador.current = setTimeout(siguiente, 260);
+  }, [corriendo, detener, e, repintar, pausar]);
+
+  useEffect(() => {
+    const alOcultarse = () => { if (document.hidden && corriendo) { pausar(); setMensaje("Pausa al cambiar de pestaña. Pulsa Continuar para retomar."); } };
+    document.addEventListener("visibilitychange", alOcultarse);
+    return () => document.removeEventListener("visibilitychange", alOcultarse);
+  }, [corriendo, pausar]);
 
   useEffect(() => {
     // Al desmontar no puede quedar ni un temporizador ni una corrida.
@@ -295,9 +390,29 @@ export function AutomatizacionPage() {
    * punto de guardado + repintado, común a las nueve operaciones de acá
    * abajo. */
   const guardarYRepintar = useCallback(() => {
+    const nuevo = copiarEditor(e);
+    if (nuevo !== historial.current.actual) {
+      historial.current.atras.push(historial.current.actual);
+      if (historial.current.atras.length > 50) historial.current.atras.shift();
+      historial.current.actual = nuevo;
+      historial.current.adelante = [];
+      // The interpreter owns its snapshot until Detener or completion.
+    }
     guardador.current.pedir(usuario, e, true);
     repintar();
   }, [e, repintar, usuario]);
+
+  const viajarHistorial = (direccion: "atras" | "adelante") => {
+    const h = historial.current;
+    const destino = h[direccion].pop();
+    if (!destino) return;
+    h[direccion === "atras" ? "adelante" : "atras"].push(copiarEditor(e));
+    Object.assign(e, JSON.parse(destino));
+    h.actual = destino;
+    guardador.current.pedir(usuario, e, true);
+    repintar();
+    setMensaje("Programa restaurado. Los recursos y el campo no se deshacen.");
+  };
 
   /** La lista viva de una pila, por su referencia. `[]` si esa rutina o
    *  pila suelta ya no existe: nunca revienta, sólo no encuentra nada. */
@@ -376,7 +491,6 @@ export function AutomatizacionPage() {
 
   const agregar = useCallback(
     (pieza: Pieza, pila?: RefPila, destino?: Destino) => {
-      if (corriendo) return;
       const nodo: NodoPrograma = crearNodo(pieza, nuevoId());
       // La memoria es de TODO el lienzo (PROGRESION.md §11): la cadena
       // verde, las rutinas y las pilas sueltas.
@@ -423,7 +537,6 @@ export function AutomatizacionPage() {
    *  adentro de `destinoPila` (la misma pila también vale: reordenar). */
   const moverCadena = useCallback(
     (origen: RefPila, id: string, destinoPila: RefPila, destino: Destino) => {
-      if (corriendo) return;
       const corte = cortarEn(listaDeRef(origen), id);
       if (!corte) return;
       const mismaPila = origen.donde === destinoPila.donde && (origen.donde === "verde" || (origen as { id: string }).id === (destinoPila as { id: string }).id);
@@ -446,7 +559,6 @@ export function AutomatizacionPage() {
    *  envuelve es nueva. */
   const soltarCadena = useCallback(
     (origen: RefPila, id: string, x: number, y: number) => {
-      if (corriendo) return;
       const corte = cortarEn(listaDeRef(origen), id);
       if (!corte) return;
       if (!cabeA(corte.agarrado, 0)) return; // el lienzo es profundidad 0
@@ -467,7 +579,6 @@ export function AutomatizacionPage() {
    *  de `e` en cada repintado, nunca de un contador aparte. */
   const borrarCadena = useCallback(
     (origen: RefPila, id: string) => {
-      if (corriendo) return;
       const corte = cortarEn(listaDeRef(origen), id);
       if (!corte) return;
       fijarListaDeRef(origen, corte.restante);
@@ -481,7 +592,6 @@ export function AutomatizacionPage() {
    *  `Mi rutina`, que jamás es pila suelta (L14). */
   const soltarNueva = useCallback(
     (pieza: Pieza, x: number, y: number) => {
-      if (corriendo) return;
       const nodo = crearNodo(pieza, nuevoId());
       if (capacidadUsadaCampo(e) + costoDeNodo(nodo) > capacidad(e)) return;
       if (agregarRutinaSiCorresponde(nodo)) {
@@ -517,10 +627,14 @@ export function AutomatizacionPage() {
 
   const quitar = useCallback(
     (id: string) => {
+      if (e.rutinas.some(r => r.id === id)) {
+        e.rutinas = e.rutinas.filter(r => r.id !== id);
+        delete e.lienzo.rutinas[id];
+      }
       editarPorId(id, (lista) => quitarNodo(lista, id));
       guardarYRepintar();
     },
-    [editarPorId, guardarYRepintar],
+    [corriendo, e, editarPorId, guardarYRepintar],
   );
 
   const desplazar = useCallback(
@@ -565,11 +679,16 @@ export function AutomatizacionPage() {
   /* ---------------- compras ---------------- */
   const comprarMejora = useCallback(
     (clave: ClaveTienda) => {
-      if (corriendo) return false;
       const ok = clave.startsWith("evo_")
         ? evolucionar(e, clave.slice(4) as Mineral)
         : comprar(e, clave as ClaveMejora);
       if (ok) {
+        setAnuncio({
+          titulo: clave === "campo" ? "¡Tu isla creció!" : "¡Nuevo descubrimiento!",
+          texto: clave === "campo" ? (e.lado === 2 ? "Llegaron las flechas y el Cuarzo." : "Más tierra para tus ideas.") : "Ya puedes probar tu mejora.",
+          mineral: e.lado >= 4 ? "estrella" : e.lado >= 3 ? "prisma" : e.lado >= 2 ? "racimo" : "punta",
+        });
+        setMensaje(clave === "campo" ? `Tu isla creció a ${e.lado} × ${e.lado}. Hay tierra nueva arriba y a la derecha. Revisa tu recorrido.` : "Descubrimiento disponible. Mira tu caja de bloques y el siguiente objetivo.");
         guardador.current.pedir(usuario, e, true);
         repintar();
       }
@@ -581,6 +700,10 @@ export function AutomatizacionPage() {
   /* ---------------- pintura ---------------- */
   void version; // el contador es la señal de repintado
   const tasa = tasaReciente(e);
+  const objetivo = proximoObjetivo(e);
+  const aqui = indice(e, e.nave.fila, e.nave.col);
+  const lectura = crecimientoDe(e, aqui);
+  const mineralAqui = e.celdas[aqui]?.variante;
   /* Un contador por mineral, y sólo los que ya existen en esta isla o
      que alguna vez se juntaron: la cabecera crece con el juego. */
   const minerales = ORDEN_MINERALES.filter((m) => mineralDisponible(e, m) || e.saldos[m] > 0);
@@ -599,6 +722,7 @@ export function AutomatizacionPage() {
         >
           <ArrowLeft size={17} /> Volver
         </button>
+        <h1 className="auto-titulo">Vivero <small>Isla {e.lado} × {e.lado}</small></h1>
 
         <div className="auto-saldos">
           {minerales.map((m) => (
@@ -609,16 +733,18 @@ export function AutomatizacionPage() {
             >
               <IcoMineral mineral={m} className="w-8 h-8" />
               {e.saldos[m]}
+              <small className="auto-nombre-recurso">{MINERALES[m].nombre}</small>
             </span>
           ))}
-          <span className="auto-dato text-3xl" aria-label={`${tasa.toFixed(1)} de valor por minuto`}>
+          {e.relojMs >= 15000 && <span className="auto-dato text-3xl" aria-label={`${tasa.toFixed(1)} de valor por minuto`}>
             <IcoProduccion className="w-6 h-6" />
             {tasa.toFixed(tasa < 10 ? 1 : 0)}
             <small className="text-sm font-bold" style={{ color: "#52658f" }}>
               /min
             </small>
           </span>
-          {corriendo && contadorActivo !== null && (
+          }
+          {piezasCompradas(e).contador && corriendo && contadorActivo !== null && (
             <span className="auto-dato text-3xl" aria-label={`Contador: ${contadorActivo}`}>
               <IcoContadorMas className="w-6 h-6" />
               {contadorActivo}
@@ -627,7 +753,35 @@ export function AutomatizacionPage() {
         </div>
       </header>
 
+      <nav className="auto-herramientas" aria-label="Herramientas del programa">
+        <span>Tu programa</span>
+        {import.meta.env.DEV && <button type="button" className="auto-control" onClick={reiniciar}>Reiniciar prueba</button>}
+        <button type="button" className="auto-control" disabled={!historial.current.atras.length} onClick={() => viajarHistorial("atras")}>Deshacer</button>
+        <button type="button" className="auto-control" disabled={!historial.current.adelante.length} onClick={() => viajarHistorial("adelante")}>Rehacer</button>
+        <button type="button" className="auto-control" aria-expanded={ayuda} onClick={() => setAyuda(!ayuda)}>Guía y progreso</button>
+        <button type="button" className="auto-control" onClick={() => {
+          const url = URL.createObjectURL(new Blob([JSON.stringify(e, null, 2)], { type: "application/json" }));
+          const a = document.createElement("a"); a.href = url; a.download = "typely-vivero.json"; a.click();
+          window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }}>Guardar copia</button>
+        <button type="button" className="auto-control" disabled={corriendo} onClick={() => archivoRef.current?.click()}>Abrir copia</button>
+        <input ref={archivoRef} type="file" accept="application/json,.json" hidden onChange={async ev => {
+          const file = ev.target.files?.[0]; ev.target.value = "";
+          if (!file || corriendo) return;
+          if (file.size > 1_000_000) { setMensaje("La copia es demasiado grande (máximo 1 MB)."); return; }
+          try {
+            const recuperado = validarCampo(JSON.parse(await file.text()));
+            if (!recuperado) throw new Error("invalid");
+            if (!window.confirm("¿Reemplazar la partida actual por esta copia? Guarda primero una copia de tu partida si quieres conservarla.")) return;
+            detener(); Object.assign(e, recuperado);
+            historial.current = { atras: [], adelante: [], actual: copiarEditor(e) };
+            guardarYRepintar(); setMensaje("Copia recuperada. Revisa el programa antes de empezar.");
+          } catch { setMensaje("No se pudo abrir: el archivo no contiene una partida válida de Vivero. Tu partida sigue intacta."); }
+        }} />
+      </nav>
+
       <EditorBloques
+        key={reinicios}
         programa={e.programa}
         rutinas={e.rutinas}
         pilasSueltas={e.pilasSueltas}
@@ -636,7 +790,9 @@ export function AutomatizacionPage() {
         tieneRepetir={tieneRepetir(e)}
         piezas={piezasCompradas(e)}
         plantables={plantables(e)}
-        corriendo={corriendo}
+        corriendo={false}
+        lado={e.lado}
+        guiarCosecha={e.acumulado === 0 && e.programa.length === 0}
         nodoActivo={nodoActivo}
         onAgregar={agregar}
         onQuitar={quitar}
@@ -650,32 +806,59 @@ export function AutomatizacionPage() {
       />
 
       <section className="auto-campo" aria-label="El campo">
+        <aside className="auto-objetivo auto-vidrio" role={anuncio ? "status" : undefined}>
+          {anuncio ? <div className="auto-celebracion"><IcoMineral mineral={anuncio.mineral} /><div><h2>{anuncio.titulo}</h2><p>{anuncio.texto}</p></div><button className="auto-control" onClick={() => setAnuncio(null)} aria-label="Cerrar descubrimiento">×</button></div>
+            : <><small>Siguiente descubrimiento</small><h2>{objetivo.titulo}</h2><p>{objetivo.detalle}</p></>}
+        </aside>
         <CampoCristales estado={e} evento={evento} corriendo={corriendo} />
+        <div className="auto-inspector">
+          <strong>{mineralAqui ? MINERALES[mineralAqui].nombre : "Tierra vacía"} · {lectura.estado}{lectura.estado === "creciendo" ? ` · ${lectura.segundos} s` : ""}</strong>
+          <small>Debajo de la nave · fila {e.nave.fila + 1}, columna {e.nave.col + 1}</small>
+          <p role="status" aria-live="polite">{mensaje}</p>
+          {leerAvisoGuardado() && <p role="alert">{leerAvisoGuardado()}</p>}
+        </div>
+        <div className="auto-ejecucion">
         <button
           type="button"
-          className={`auto-empezar${corriendo ? " auto-empezar--detener" : ""}`}
-          onClick={corriendo ? detener : empezar}
-          disabled={!corriendo && e.programa.length === 0}
+          className={`auto-empezar${!corriendo && e.acumulado === 0 && e.programa.length ? " auto-guia-pulso" : ""}${corriendo ? " auto-empezar--detener" : ""}`}
+          onClick={corriendo ? pausar : () => empezar()}
+          disabled={!corriendo && !pausado && e.programa.length === 0}
+          aria-describedby="auto-instruccion-empezar"
         >
           {corriendo ? (
             <>
               <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
                 <rect x="3" y="3" width="16" height="16" rx="3" fill="currentColor" />
               </svg>
-              Detener
+              Pausar
             </>
           ) : (
             <>
               <svg width="24" height="26" viewBox="0 0 24 26" aria-hidden="true">
                 <path d="M3 2l18 11L3 24z" fill="currentColor" />
               </svg>
-              Empezar
+              {pausado ? "Continuar" : "Empezar"}
             </>
           )}
         </button>
+        <button type="button" className="auto-control" disabled={corriendo || !e.programa.length} onClick={() => empezar(true)}>Un paso</button>
+        <button type="button" className="auto-control" disabled={!corriendo && !pausado} onClick={detener}>Detener</button>
+        <select aria-label="Ritmo de ejecución" className="auto-control" value={velocidad} onChange={ev => setVelocidad(Number(ev.target.value))}><option value={1}>Normal</option><option value={0.5}>Lento · ½</option></select>
+        </div>
+        <div className="auto-metricas" id="auto-instruccion-empezar">{!e.programa.length && !pausado ? "Añade Cosechar debajo de Inicio para empezar. " : corriendo || pausado ? "Puedes editar; los cambios se usarán en la próxima corrida. " : ""}{muestra.current.pasos} pasos · {muestra.current.valor} recogido · {muestra.current.vacias} sin efecto · {muestra.current.rotos} rotos{anteriorMuestra ? ` | Anterior: ${anteriorMuestra.valor} recogido / ${anteriorMuestra.pasos} pasos` : ""}</div>
       </section>
 
-      <BarraMejoras estado={e} onComprar={comprarMejora} />
+      <BarraMejoras estado={e} onComprar={comprarMejora} bloqueada={false} />
+      <dialog ref={guiaRef} className="auto-guia auto-vidrio" aria-label="Guía y progreso" onClose={() => setAyuda(false)}>
+        <header><h2>Tu cuaderno de Vivero</h2><button type="button" className="auto-control" onClick={() => setAyuda(false)}>Cerrar</button></header>
+        <div className="auto-guia__pasos">
+          <article><img src="/assets/automatizacion/ui/inicio.webp" alt="" /><h3>1. Arma</h3><p>Toca Cosechar. Va debajo de Inicio.</p></article>
+          <article><img src="/assets/automatizacion/ui/velocidad.webp" alt="" /><h3>2. Prueba</h3><p>Pulsa Empezar y mira tu nave.</p></article>
+          <article><img src="/assets/automatizacion/ui/crecimiento.webp" alt="" /><h3>3. Descubre</h3><p>Usa tus cristales para mejorar la isla.</p></article>
+        </div>
+        <h3>Tus minerales</h3><div className="auto-guia__minerales">{minerales.map(m => <article key={m}><img src={`/assets/automatizacion/cristales/${m}-maduro.webp`} alt="" /><h4>{MINERALES[m].nombre}</h4><p>{MINERALES[m].rebrotaSolo ? "Vuelve a crecer solo." : "Plántalo otra vez."} {MINERALES[m].seRompeVerde ? "Espera a que esté listo." : "No se rompe."}</p><details><summary>Ver números</summary><p>{valorDe(e, m)} por cosecha · {(msPorEtapaDe(e, m) * 3 / 1000).toFixed(1)} s · semillas: {textoCosto(MINERALES[m].semilla ?? {})}.</p></details></article>)}</div>
+        <details><summary>Mover, pausar y guardar</summary><p>Arrastra con un dedo; acerca con dos. Deshacer recupera bloques, no cristales. Puedes editar mientras la nave trabaja: usará los cambios al empezar otra corrida.</p><p>Pausar congela el mundo. Detener termina la corrida. La nave sigue desde donde quedó.</p><p>Tu partida se guarda en este navegador. Usa Guardar copia para llevarla a otra computadora.</p></details>
+      </dialog>
     </main>
   );
 }

@@ -145,19 +145,19 @@ export const AJUSTES = {
   capacidadInicial: 3,
 
   /** Cuánto tarda la nave en ejecutar UNA instrucción, sin mejoras. */
-  msPorAccion: 650,
+  msPorAccion: 450,
   /** Cada nivel de "velocidad" multiplica ese tiempo por esto. */
-  factorVelocidad: 0.78,
+  factorVelocidad: 0.70,
   /** Piso duro: por debajo de esto la nave se vuelve ilegible. */
   msPorAccionMinimo: 180,
 
   /** Cuánto tarda una veta de CHISPA en pasar de una etapa a la
    *  siguiente. Tres segundos: el ciclo entero se ve en una sesión
    *  corta. Los otros minerales lo multiplican (MINERALES). */
-  msPorEtapa: 3_000,
+  msPorEtapa: 1_000,
   /** Cada nivel de "crecimiento" multiplica ese tiempo por esto. */
-  factorCrecimiento: 0.82,
-  msPorEtapaMinimo: 700,
+  factorCrecimiento: 0.70,
+  msPorEtapaMinimo: 180,
 
   /* --- topes de ejecución (IMPLEMENTACION.md §6) --------------------
      Aunque no exista `Por siempre`, un programa tiene que terminar. Un
@@ -198,24 +198,24 @@ export const AJUSTES = {
     /** Cada nivel agranda el campo un lado: 1×1 → 2×2 → … Es la compra
      *  más cara de su momento y la única que cambia el mundo. */
     campo: {
-      precios: [{ punta: 5 }, { punta: 40 }, { racimo: 60 }, { prisma: 120 }] as Costo[],
+      precios: [{ punta: 12 }, { punta: 40 }, { racimo: 60 }, { prisma: 120 }] as Costo[],
       maxNivel: 3,
     },
     capacidad: { moneda: "punta" as Mineral, base: 8, multiplicador: 1.8, maxNivel: 12 },
     velocidad: { moneda: "punta" as Mineral, base: 16, multiplicador: 2.0, maxNivel: 6 },
-    crecimiento: { moneda: "punta" as Mineral, base: 20, multiplicador: 2.1, maxNivel: 6 },
+    crecimiento: { moneda: "punta" as Mineral, base: 6, multiplicador: 2.1, maxNivel: 6 },
     /* Las piezas no son niveles: se compran una vez y aparecen en la
        caja. Cada una se paga con el mineral de la etapa anterior a la
        que la necesita (PROGRESION.md §5). */
-    repetir: { moneda: "punta" as Mineral, base: 28, multiplicador: 1, maxNivel: 1 },
+    repetir: { moneda: "punta" as Mineral, base: 8, multiplicador: 1, maxNivel: 1 },
     esperar: { moneda: "punta" as Mineral, base: 15, multiplicador: 1, maxNivel: 1 },
-    si: { moneda: "racimo" as Mineral, base: 20, multiplicador: 1, maxNivel: 1 },
+    si: { moneda: "racimo" as Mineral, base: 3, multiplicador: 1, maxNivel: 1 },
     sino: { moneda: "racimo" as Mineral, base: 30, multiplicador: 1, maxNivel: 1 },
     mientras: { moneda: "racimo" as Mineral, base: 40, multiplicador: 1, maxNivel: 1 },
     /* `Por siempre` es la primera automatización de verdad, así que se
        paga temprano y con punta: repetir a mano lo que un bloque puede
        repetir solo es justo lo que este modo viene a sacar de encima. */
-    siempre: { moneda: "punta" as Mineral, base: 14, multiplicador: 1, maxNivel: 1 },
+    siempre: { moneda: "punta" as Mineral, base: 3, multiplicador: 1, maxNivel: 1 },
     /* `Mi rutina A/B/C` + `Hacer A/B/C` (PROGRESION.md §5, era 3). */
     rutinas: { moneda: "prisma" as Mineral, base: 60, multiplicador: 1, maxNivel: 1 },
     /* `Contador +1`, `Contador = 0`, sensor `contador es N` y sensor
@@ -236,22 +236,22 @@ export const AJUSTES = {
      hasta que haya a dónde ir: la tierra va primero porque es la única
      compra que el chico puede entender sin haber jugado todavía. */
   revelado: {
-    campo: {},
+    campo: { requiere: "crecimiento" },
     capacidad: { lado: 2, acumulado: 6 },
-    crecimiento: { acumulado: 20 },
+    crecimiento: { requiere: "siempre" },
     velocidad: { lado: 2, acumulado: 34 },
-    repetir: { lado: 2, acumulado: 50 },
+    repetir: { lado: 2, acumulado: 8 },
     /* Los bloques de control llegan cuando el campo ya creó la
        necesidad: `Esperar` con la 2×2; `Si` cuando ya hay cuarzo en el
        campo (que se rompe si no se mira); cada uno de los siguientes,
        después del anterior. */
     esperar: { lado: 2, acumulado: 12 },
-    si: { lado: 2, cosechado: ["racimo", 1] as [Mineral, number] },
+    si: { lado: 2 },
     sino: { requiere: "si" },
     mientras: { requiere: "si" },
     /* Sin prerrequisito y sin era: aparece casi enseguida, al lado de la
        memoria, para que el chico deje de apretar "correr" cuanto antes. */
-    siempre: { acumulado: 6 },
+    siempre: { acumulado: 3 },
     /* Prisma existe desde la 3×3 (§2): la era ya lo cubre `lado: 3`, pero
        se deja también `requiere: "mientras"` para que no aparezca antes
        de que la caja tenga sensores con qué sostener un `Si está listo`

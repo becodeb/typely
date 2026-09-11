@@ -78,6 +78,7 @@ import {
   IcoMineral,
   IcoNo,
   IcoPlantar,
+  IcoPrepararTierra,
   IcoRepetir,
   IcoRutina,
   IcoSensorBorde,
@@ -142,6 +143,7 @@ const COLOR: Record<TipoAccion, string> = {
   turn_left: "#9b7cff",
   turn_right: "#9b7cff",
   harvest: "#f5b73c",
+  clear: "#bc8877",
   plant: "#5cc98a",
   wait: "#8fa3c8",
 };
@@ -190,6 +192,7 @@ const NOMBRE: Record<TipoAccion, string> = {
   turn_left: "Girar a la izquierda",
   turn_right: "Girar a la derecha",
   harvest: "Cosechar",
+  clear: "Preparar tierra",
   plant: "Plantar",
   wait: "Esperar",
 };
@@ -270,6 +273,7 @@ function Dibujo({ tipo }: { tipo: TipoAccion }) {
   if (tipo === "turn_left") return <IcoGirarIzq />;
   if (tipo === "turn_right") return <IcoGirarDer />;
   if (tipo === "plant") return <IcoPlantar />;
+  if (tipo === "clear") return <IcoPrepararTierra />;
   if (tipo === "wait") return <IcoEsperar />;
   return <IcoCosechar />;
 }
@@ -299,12 +303,46 @@ function DibujoSensor({ sensor }: { sensor: Sensor }) {
   );
 }
 
+/** Una sola silueta de encastre, cinco colores semánticos.
+ *  El color agrupa la intención del bloque; el icono y la etiqueta distinguen
+ *  las piezas dentro de cada familia. Mantener una geometría única evita que
+ *  una imagen de bloque empuje o desplace la muesca de la siguiente pieza.
+ */
+const TONO_BLOQUE = {
+  movimiento: "#3b8fd9",
+  campo: "#e8a832",
+  control: "#e56b9e",
+  datos: "#20b8ad",
+  rutinas: "#7566db",
+} as const;
+
+type ColorBloque = 1 | 2 | 3 | 4 | 5;
+
+function colorDeBloque(nodo: NodoPrograma): ColorBloque {
+  if (nodo.type === "def" || nodo.type === "call") return 5;
+  if (nodo.type === "counter_add" || nodo.type === "counter_reset") return 4;
+  if (esContenedor(nodo)) return 3;
+  if (nodo.type === "harvest" || nodo.type === "clear" || nodo.type === "plant" || nodo.type === "wait") return 2;
+  return 1;
+}
+
+function tonoDeBloque(nodo: NodoPrograma): string {
+  const tonos: Record<ColorBloque, string> = {
+    1: TONO_BLOQUE.movimiento,
+    2: TONO_BLOQUE.campo,
+    3: TONO_BLOQUE.control,
+    4: TONO_BLOQUE.datos,
+    5: TONO_BLOQUE.rutinas,
+  };
+  return tonos[colorDeBloque(nodo)];
+}
+
 function colorDe(nodo: NodoPrograma): string {
-  if (nodo.type === "def" || nodo.type === "call") return COLOR_LLAMADA[nodo.rutina];
-  if (nodo.type === "counter_add" || nodo.type === "counter_reset") return COLOR_CONTADOR[nodo.type];
-  if (esContenedor(nodo)) return COLOR_CONTENEDOR[nodo.type];
-  if (nodo.type === "plant" && nodo.mineral) return COLOR_PLANTAR[nodo.mineral];
-  return COLOR[nodo.type];
+  return tonoDeBloque(nodo);
+}
+
+function claseDeBloque(nodo: NodoPrograma, extra = "") {
+  return `auto-bloque auto-bloque--color-${colorDeBloque(nodo)}${extra}`;
 }
 
 /** El valor de una ranura numérica, tal cual se muestra: el dígito, o el
@@ -408,6 +446,8 @@ interface Props {
   /** Qué minerales tienen bloque de plantar hoy (los que la isla ya permite). */
   plantables: Mineral[];
   corriendo: boolean;
+  lado?: number;
+  guiarCosecha?: boolean;
   nodoActivo: string | null;
   /** Tocar en la caja: sin `pila`/`destino`, al final de la cadena verde
    *  (o adentro del último contenedor si está vacío). Arrastrar desde la
@@ -435,7 +475,10 @@ interface Props {
 }
 
 /** Tamaño del ancla verde: la cadena cuelga justo debajo, pegada. */
-const ALTO_INICIO = 64;
+// La carcasa de inicio mide 60 px y, como cualquier bloque, la pestaña ocupa
+// los últimos 11 px. La cadena empieza en el borde superior de esa pestaña
+// para que la primera muesca reciba el conector sin dejar una junta flotante.
+const ALTO_INICIO = 49;
 /** Margen inicial de la vista: el ancla no queda pegada a la esquina. */
 const MARGEN = 40;
 const ZOOM_MIN = 0.6;
@@ -517,6 +560,7 @@ export function EditorBloques(props: Props) {
      design.md): con `0 0` el punto (0,0) de esa capa es siempre su propia
      esquina superior izquierda, así que convertir pantalla→lienzo es sólo
      dividir por el zoom, sin restar la mitad del ancho. */
+  const [camaraSuave, setCamaraSuave] = useState(false);
   const [vista, setVista] = useState({ z: 1, x: MARGEN, y: MARGEN });
   const vistaRef = useRef(vista);
   vistaRef.current = vista;
@@ -527,6 +571,7 @@ export function EditorBloques(props: Props) {
    *  sin esto el zoom siempre tira hacia el origen y se pierde de vista lo
    *  que se estaba mirando. */
   const acercarEn = useCallback((nextZ: number | ((z: number) => number), sx?: number, sy?: number) => {
+    setCamaraSuave(false);
     setVista((v) => {
       const pedido = typeof nextZ === "function" ? nextZ(v.z) : nextZ;
       const z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, pedido));
@@ -544,7 +589,7 @@ export function EditorBloques(props: Props) {
 
   /** Vuelve a encuadrar el ancla del bloque verde: el recorte de decisión
    *  #9 (design.md) para no perderlo nunca de vista. */
-  const recentrar = useCallback(() => setVista({ z: 1, x: MARGEN, y: MARGEN }), []);
+  const recentrar = useCallback(() => { setCamaraSuave(true); setVista({ z: 1, x: MARGEN, y: MARGEN }); }, []);
 
   /** Trae a la vista un punto del lienzo, sin tocar el zoom: es lo que
    *  hace tocar una de las flechas de "hay más piezas para allá". Lo deja
@@ -552,6 +597,7 @@ export function EditorBloques(props: Props) {
    *  medio: una pila cuelga hacia abajo, así que centrar su ancla dejaría
    *  la mitad de los bloques debajo del borde otra vez. */
   const irAlPunto = useCallback((p: Punto) => {
+    setCamaraSuave(true);
     const r = lienzoRef.current?.getBoundingClientRect();
     if (!r) return;
     setVista((v) => ({ ...v, x: r.width / 2 - p.x * v.z, y: r.height * ALTO_ENFOQUE - p.y * v.z }));
@@ -595,6 +641,7 @@ export function EditorBloques(props: Props) {
     if (enHud(ev.target)) return;
     if (ev.target instanceof Element && ev.target.closest("button, [data-nodo]")) return;
     ev.preventDefault();
+    setCamaraSuave(false);
     paneoRef.current = { sx: ev.clientX, sy: ev.clientY, bx: vistaRef.current.x, by: vistaRef.current.y };
   }, []);
 
@@ -641,7 +688,12 @@ export function EditorBloques(props: Props) {
     const separacion = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
     function alTocarPellizco(ev: TouchEvent) {
       if (propsRef.current.corriendo || ev.touches.length !== 2) return;
-      base = { dist: separacion(ev.touches), z: vistaRef.current.z };
+      paneoRef.current = null;
+      pendiente.current = null;
+      arrastreRef.current = null; setArrastre(null);
+      destinoRef.current = null; setDestino(null);
+      ignorarClick.current = true;
+      base = { dist: Math.max(1, separacion(ev.touches)), z: vistaRef.current.z };
     }
     function alMoverPellizco(ev: TouchEvent) {
       if (!base || ev.touches.length !== 2) return;
@@ -656,10 +708,12 @@ export function EditorBloques(props: Props) {
     el.addEventListener("touchstart", alTocarPellizco, { passive: true });
     el.addEventListener("touchmove", alMoverPellizco, { passive: false });
     el.addEventListener("touchend", alSoltarPellizco, { passive: true });
+    el.addEventListener("touchcancel", alSoltarPellizco, { passive: true });
     return () => {
       el.removeEventListener("touchstart", alTocarPellizco);
       el.removeEventListener("touchmove", alMoverPellizco);
       el.removeEventListener("touchend", alSoltarPellizco);
+      el.removeEventListener("touchcancel", alSoltarPellizco);
     };
   }, [acercarEn]);
 
@@ -1102,7 +1156,10 @@ export function EditorBloques(props: Props) {
   const marca = arrastre ? (
     <div
       key="marca"
-      className={`auto-bloque auto-bloque--marca${esContenedor(arrastre.cadena[0]) ? " auto-bloque--marca-ancha" : ""}`}
+      className={claseDeBloque(
+        arrastre.cadena[0],
+        ` auto-bloque--marca${esContenedor(arrastre.cadena[0]) ? " auto-bloque--marca-ancha" : ""}`,
+      )}
       data-marca=""
       style={{ "--auto-color": colorDe(arrastre.cadena[0]) } as CSSProperties}
       aria-hidden="true"
@@ -1177,7 +1234,7 @@ export function EditorBloques(props: Props) {
         onKeyDown={teclas(nodo.id, refPila)}
         aria-label={`${nombreDe(nodo)}. Tocar para cambiar; flechas para mover el bloque`}
       >
-        <ContenidoVeces valor={valor} />
+        <ContenidoVeces valor={valor} /><span aria-hidden="true">▾</span>
       </button>
     );
   }
@@ -1219,8 +1276,8 @@ export function EditorBloques(props: Props) {
       return (
         <div
           key={nodo.id}
-          className={`auto-repetir${levantado ? " auto-repetir--levantado" : ""}${activo ? " auto-repetir--activo" : ""}${nodo.type === "def" ? " auto-repetir--sombrero" : ""}${nodo.type === "forever" ? " auto-repetir--siempre" : ""}`}
-          style={{ "--auto-tono": nodo.type === "def" ? COLOR_LLAMADA[nodo.rutina] : COLOR_CONTENEDOR[nodo.type] } as CSSProperties}
+          className={`auto-repetir auto-repetir--color-${colorDeBloque(nodo)}${levantado ? " auto-repetir--levantado" : ""}${activo ? " auto-repetir--activo" : ""}${nodo.type === "def" ? " auto-repetir--sombrero" : ""}${nodo.type === "forever" ? " auto-repetir--siempre" : ""}`}
+          style={{ "--auto-tono": tonoDeBloque(nodo) } as CSSProperties}
           data-nodo={puedeArrastrar ? nodo.id : undefined}
           data-clase={puedeArrastrar ? "contenedor" : undefined}
           data-pila={puedeArrastrar ? claveDePila(refFijo!) : undefined}
@@ -1228,6 +1285,7 @@ export function EditorBloques(props: Props) {
           data-levantado={levantado ? "" : undefined}
         >
           <div className="auto-repetir__lomo" data-parte="lomo" onPointerDown={asa}>
+            <span className="auto-etiqueta-control">{nodo.type === "repeat" ? "Repetir" : nodo.type === "forever" ? "Por siempre" : nodo.type === "while" ? "Mientras" : nodo.type === "if" ? "Si" : "Rutina"}</span>
             {/* El Por siempre lleva su dibujo en el asidero de teclado; los
                 demás, suelto en el lomo. Un solo ∞, no dos. */}
             {(nodo.type !== "forever" || estatico) && (
@@ -1256,6 +1314,7 @@ export function EditorBloques(props: Props) {
                   aria-label={`${nombreSensor(nodo.sensor)}. Tocar para cambiar el sensor; flechas para mover el bloque`}
                 >
                   <DibujoSensor sensor={nodo.sensor} />
+                  <span className="auto-etiqueta-sensor">{nombreSensor(nodo.sensor)} ▾</span>
                 </button>
               ))}
             {(nodo.type === "while" || nodo.type === "if") && nodo.sensor.tipo === "contador" &&
@@ -1300,6 +1359,7 @@ export function EditorBloques(props: Props) {
           {nodo.type === "if" && nodo.sino && (
             <>
               <div className="auto-repetir__brazo auto-repetir__brazo--medio" data-parte="brazo-medio" onPointerDown={asa}>
+                <span className="auto-etiqueta-control">Si no</span>
                 <IcoSino className="w-[20px] h-[20px] opacity-90" />
               </div>
               {dibujarCavidad(nodo, "sino", nivel, estatico, refHijos)}
@@ -1315,7 +1375,7 @@ export function EditorBloques(props: Props) {
     if (nodo.type === "call") {
       // Hoja como `Plantar`: se distingue de sus hermanas por el color de
       // su letra, no por un dibujo distinto (COLOR_LLAMADA en colorDe).
-      const clase = `auto-bloque${activo ? " auto-bloque--activo" : ""}${levantado ? " auto-bloque--levantado" : ""}`;
+      const clase = claseDeBloque(nodo, `${activo ? " auto-bloque--activo" : ""}${levantado ? " auto-bloque--levantado" : ""}`);
       const estilo = { "--auto-color": colorDe(nodo) } as CSSProperties;
       if (estatico) {
         return (
@@ -1378,7 +1438,7 @@ export function EditorBloques(props: Props) {
     }
 
     if (nodo.type === "counter_add" || nodo.type === "counter_reset") {
-      const clase = `auto-bloque${activo ? " auto-bloque--activo" : ""}${levantado ? " auto-bloque--levantado" : ""}`;
+      const clase = claseDeBloque(nodo, `${activo ? " auto-bloque--activo" : ""}${levantado ? " auto-bloque--levantado" : ""}`);
       const estilo = { "--auto-color": colorDe(nodo) } as CSSProperties;
       if (estatico) {
         return (
@@ -1407,7 +1467,7 @@ export function EditorBloques(props: Props) {
     }
 
     const accion = nodo as NodoAccion;
-    const clase = `auto-bloque${activo ? " auto-bloque--activo" : ""}${levantado ? " auto-bloque--levantado" : ""}`;
+    const clase = claseDeBloque(nodo, `${activo ? " auto-bloque--activo" : ""}${levantado ? " auto-bloque--levantado" : ""}`);
     const estilo = { "--auto-color": colorDe(accion) } as CSSProperties;
     if (estatico) {
       return (
@@ -1431,6 +1491,7 @@ export function EditorBloques(props: Props) {
         aria-label={`${nombreDe(accion)}. Arrastrar para mover; flechas para moverlo con el teclado; Suprimir para quitarlo`}
       >
         <Dibujo tipo={accion.type} />
+        <span className="auto-etiqueta-bloque">{nombreDe(accion)}</span>
       </button>
     );
   }
@@ -1441,11 +1502,9 @@ export function EditorBloques(props: Props) {
        `move_forward`, `move_back` y los dos giros siguen siendo válidos
        y ejecutables para los programas ya guardados, pero ya no se
        ofrecen acá. */
-    "move_north",
-    "move_east",
-    "move_south",
-    "move_west",
+    ...((props.lado ?? 2) >= 2 ? ["move_north", "move_east", "move_south", "move_west"] as const : []),
     "harvest",
+    ...(plantables.length ? (["clear"] as const) : []),
     ...plantables.map((m) => `plant:${m}` as const),
     ...(compradas.esperar ? (["wait"] as const) : []),
     ...(tieneRepetir ? (["repeat"] as const) : []),
@@ -1539,12 +1598,16 @@ export function EditorBloques(props: Props) {
             <button
               key={p}
               type="button"
-              className={`auto-bloque${esContenedor(muestra) ? " auto-bloque--control" : ""}`}
+              className={claseDeBloque(
+                muestra,
+                `${props.guiarCosecha && p === "harvest" ? " auto-guia-pulso" : ""}${esContenedor(muestra) ? " auto-bloque--control" : ""}`,
+              )}
               style={{ "--auto-color": colorDe(muestra) } as CSSProperties}
               disabled={corriendo}
               onPointerDown={(ev) => agarrar(ev, { desde: "caja", tipo: p })}
               onClick={alClick(() => intentarAgregar(p))}
               aria-label={`Agregar ${nombreDe(muestra).toLowerCase()}${lleno ? ". Sin memoria disponible" : ""}`}
+              title={nombreDe(muestra)}
             >
               {esContenedor(muestra) ? (
                 <>
@@ -1558,6 +1621,7 @@ export function EditorBloques(props: Props) {
               ) : (
                 <Dibujo tipo={muestra.type} />
               )}
+              <span className="auto-etiqueta-bloque">{nombreDe(muestra)}</span>
               {lleno && <IcoNo className="auto-bloque__tope" />}
             </button>
           );
@@ -1575,7 +1639,7 @@ export function EditorBloques(props: Props) {
       >
         <div
           ref={capaRef}
-          className="auto-lienzo__capa"
+          className={`auto-lienzo__capa${camaraSuave ? " auto-lienzo__capa--suave" : ""}`}
           style={{ transform: `translate(${vista.x}px, ${vista.y}px) scale(${vista.z})` }}
         >
           {/* El ancla verde: fija, con forma de sombrero, sin `data-nodo`
@@ -1594,7 +1658,7 @@ export function EditorBloques(props: Props) {
             role="img"
             aria-label="Bloque de arranque: acá empieza el programa"
           >
-            <IcoInicio className="w-[28px] h-[28px]" />
+            <IcoInicio className="w-[28px] h-[28px]" /><span>Inicio</span>
           </div>
 
           {/* La cadena verde: lo ÚNICO que ejecuta. Cuelga pegada del ancla. */}

@@ -292,6 +292,7 @@ export function validarCampo(v: unknown): EstadoCampo | null {
 
   return {
     schemaVersion: 3,
+    cuarzosRotos: numeroFinito(s.cuarzosRotos) ? Math.max(0, Math.floor(s.cuarzosRotos)) : 0,
     lado: s.lado,
     /* La nave no se persiste: siempre se vuelve al muelle. */
     nave: origen(s.lado),
@@ -321,15 +322,28 @@ export interface RepositorioCampo {
   borrar(usuario: string | null): void;
 }
 
+let avisoGuardado: string | null = null;
+let avisoRecuperacion: string | null = null;
+export function leerAvisoGuardado(): string | null { return avisoGuardado ?? avisoRecuperacion; }
+
 export const repositorioLocal: RepositorioCampo = {
   cargar(usuario) {
+    avisoGuardado = null;
+    avisoRecuperacion = null;
     try {
       const crudo = localStorage.getItem(clave(usuario));
       if (!crudo) return null;
-      return validarCampo(JSON.parse(crudo));
+      let campo: EstadoCampo | null = null;
+      try { campo = validarCampo(JSON.parse(crudo)); } catch { /* preservar debajo */ }
+      if (!campo) {
+        localStorage.setItem(`${clave(usuario)}:recuperacion`, crudo);
+        avisoRecuperacion = "La partida guardada no era válida. Conservamos el archivo original para recuperación y abrimos una partida nueva.";
+      }
+      return campo;
     } catch {
       /* Storage lleno, deshabilitado o JSON roto: se juega igual, con un
          campo nuevo. Nunca se rompe la pantalla por no poder leer. */
+      avisoGuardado = "No se pudo leer el guardado. Descarga una copia antes de cerrar el juego.";
       return null;
     }
   },
@@ -338,7 +352,9 @@ export const repositorioLocal: RepositorioCampo = {
     try {
       const { nave: _nave, ...resto } = estado;
       localStorage.setItem(clave(usuario), JSON.stringify(resto));
+      avisoGuardado = null;
     } catch {
+      avisoGuardado = "No se pudo guardar en este navegador. Usa Guardar copia antes de cerrar para no perder tu partida.";
       /* Sin storage el mundo sigue vivo en memoria hasta que cierren la
          pestaña. Peor sería tirar un error en medio de una cosecha. */
     }

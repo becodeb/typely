@@ -61,6 +61,7 @@ export type TipoAccion =
   | "turn_left"
   | "turn_right"
   | "harvest"
+  | "clear"
   | "plant"
   | "wait";
 
@@ -183,6 +184,7 @@ const ACCIONES: readonly TipoAccion[] = [
   "turn_left",
   "turn_right",
   "harvest",
+  "clear",
   "plant",
   "wait",
 ];

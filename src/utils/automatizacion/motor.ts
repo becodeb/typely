@@ -121,6 +121,7 @@ export interface Cosecha {
 
 export interface EstadoCampo {
   schemaVersion: 3;
+  cuarzosRotos?: number;
   lado: number;
   nave: EstadoNave;
   celdas: Celda[];
@@ -173,6 +174,7 @@ export type TipoEvento =
   | "break"
   | "plant"
   | "plant_fail"
+  | "clear"
   | "wait";
 
 export interface EventoPaso {
@@ -186,6 +188,7 @@ export interface EventoPaso {
   celda?: number;
   /** El mineral que se cosechó, se rompió o se plantó. */
   mineral?: Mineral;
+  motivo?: "ocupada" | "semillas" | "espacio" | "bloqueado" | "creciendo" | "vacia";
 }
 
 /* ------------------------------------------------------------------ */
@@ -283,7 +286,18 @@ export function mineralDisponible(e: EstadoCampo, m: Mineral): boolean {
 
 /** Los minerales que hoy se pueden plantar con un bloque. */
 export function plantables(e: EstadoCampo): Mineral[] {
-  return ORDEN_MINERALES.filter((m) => MINERALES[m].semilla !== null && mineralDisponible(e, m));
+  return e.lado < 3 ? [] : ORDEN_MINERALES.filter((m) => mineralDisponible(e, m));
+}
+
+/** Una sola lectura para el inspector y el indicador de cada baldosa. */
+export function crecimientoDe(e: EstadoCampo, idx: number) {
+  const c = e.celdas[idx];
+  if (!c?.variante) return { progreso: 0, segundos: 0, estado: "vacía" as const };
+  if (c.etapa === 3) return { progreso: 1, segundos: 0, estado: "lista" as const };
+  const etapaMs = msPorEtapaDe(e, c.variante);
+  const restante = c.restanteMs + (2 - c.etapa) * etapaMs;
+  const bloqueada = MINERALES[c.variante].espaciado && vecinaCon(e, idx, c.variante);
+  return { progreso: Math.max(0, Math.min(1, 1 - restante / (3 * etapaMs))), segundos: Math.ceil(restante / 1000), estado: bloqueada ? "sin espacio" as const : "creciendo" as const };
 }
 
 export function tieneRepetir(e: EstadoCampo): boolean {
@@ -509,19 +523,33 @@ export function ejecutarPaso(
   const idx = indice(e, e.nave.fila, e.nave.col);
   const celda = e.celdas[idx];
 
+  if (tipo === "clear") {
+    if (e.lado < 3) return { nodoId, tipo: "plant_fail", antes, despues: quieto(), premio: 0, celda: idx, motivo: "bloqueado" };
+    celda.variante = null;
+    celda.etapa = 0;
+    celda.restanteMs = 0;
+    return { nodoId, tipo: "clear", antes, despues: quieto(), premio: 0, celda: idx };
+  }
+
   if (tipo === "plant") {
     const m = mineral;
-    const semilla = m ? MINERALES[m].semilla : null;
+    // Los brotes silvestres se reponen gratis: nunca se pierde la fuente
+    // de semillas aunque se prepare toda la isla y se gaste el saldo.
+    const semilla = m ? (MINERALES[m].semilla ?? {}) : null;
     const sePuede =
       !!m &&
       !!celda &&
       celda.variante === null &&
       semilla !== null &&
       mineralDisponible(e, m) &&
+      e.lado >= 3 &&
       alcanza(e, semilla) &&
       !(MINERALES[m].espaciado && vecinaCon(e, idx, m));
     if (!sePuede || !m || !semilla) {
-      return { nodoId, tipo: "plant_fail", antes, despues: quieto(), premio: 0, celda: idx, mineral: m };
+      const motivo = !m || e.lado < 3 || !mineralDisponible(e, m) ? "bloqueado"
+        : celda?.variante !== null ? "ocupada"
+        : semilla && !alcanza(e, semilla) ? "semillas" : "espacio";
+      return { nodoId, tipo: "plant_fail", antes, despues: quieto(), premio: 0, celda: idx, mineral: m, motivo };
     }
     pagar(e, semilla);
     celda.variante = m;
@@ -532,15 +560,16 @@ export function ejecutarPaso(
 
   // harvest
   if (!celda || celda.variante === null || celda.etapa === 0) {
-    return { nodoId, tipo: "empty_harvest", antes, despues: quieto(), premio: 0, celda: idx };
+    return { nodoId, tipo: "empty_harvest", antes, despues: quieto(), premio: 0, celda: idx, motivo: celda?.variante ? "creciendo" : "vacia" };
   }
   const v = celda.variante;
   if (celda.etapa < 3) {
     if (!MINERALES[v].seRompeVerde) {
-      return { nodoId, tipo: "empty_harvest", antes, despues: quieto(), premio: 0, celda: idx, mineral: v };
+      return { nodoId, tipo: "empty_harvest", antes, despues: quieto(), premio: 0, celda: idx, mineral: v, motivo: "creciendo" };
     }
     // Cosechado verde: se rompe. Vuelve a cero (o a tierra) y no paga.
     reiniciar(e, celda, azar);
+    if (v === "racimo") e.cuarzosRotos = (e.cuarzosRotos ?? 0) + 1;
     return { nodoId, tipo: "break", antes, despues: quieto(), premio: 0, celda: idx, mineral: v };
   }
 
@@ -609,6 +638,7 @@ export function actualizarRecord(e: EstadoCampo): number {
  *  está al tope; la UI responde con el pulso que conecta precio y
  *  contador, nunca con un modal. */
 export function comprar(e: EstadoCampo, clave: ClaveMejora, azar: () => number = Math.random): boolean {
+  if (clave === "campo" && e.lado >= AJUSTES.ladoMaximo) return false;
   const actual = nivel(e, clave);
   const precio = precioMejora(clave, actual);
   if (precio === null || !alcanza(e, precio)) return false;
@@ -662,6 +692,8 @@ export function expandirCampo(e: EstadoCampo, azar: () => number = Math.random):
   }
 
   e.celdas = celdas;
+  // El primer cuarzo no depende del azar: aparece listo delante del muelle.
+  if (nuevo === 2) e.celdas[0] = { etapa: 3, variante: "racimo", restanteMs: 0 };
   e.nave = origen(nuevo);
   return true;
 }
@@ -671,7 +703,8 @@ export function expandirCampo(e: EstadoCampo, azar: () => number = Math.random):
  *  un mineral: nunca cinco candados el primer día (MVP.md §8). */
 export function reveladas(e: EstadoCampo): string[] {
   return Object.entries(AJUSTES.revelado)
-    .filter(([, regla]) => {
+    .filter(([clave, regla]) => {
+      if (clave === "si" && !e.mejoras.si && !(e.cuarzosRotos ?? 0)) return false;
       if (regla.lado !== undefined && e.lado < regla.lado) return false;
       if (regla.acumulado !== undefined && e.acumulado < regla.acumulado) return false;
       if (regla.cosechado && (e.cosechados[regla.cosechado[0]] ?? 0) < regla.cosechado[1]) return false;

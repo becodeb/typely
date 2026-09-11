@@ -1,8 +1,8 @@
 /* Los dibujos de los bloques y de las mejoras.
  *
- * Van en SVG y no como imágenes por la misma razón que los bloques van
- * en CSS: tienen que cambiar de tamaño y de color según el estado, y una
- * imagen no hace ninguna de las dos cosas.
+ * La carcasa de cada bloque vive en CSS y las etiquetas en HTML. Los símbolos
+ * usan SVG cuando necesitan color dinámico y assets raster cuando la pieza
+ * tiene arte ilustrado; así el bloque puede estirarse sin deformar el dibujo.
  *
  * Ninguno lleva texto. Un bloque se reconoce por dibujo, forma y color
  * (MVP.md §3, "lectura mínima"); el nombre existe sólo como `aria-label`
@@ -22,73 +22,62 @@ const trazo = {
   strokeLinejoin: "round" as const,
 };
 
-export function IcoAvanzar({ className }: Props) {
+/** Arte raster de los bloques; la carcasa y la etiqueta siguen siendo CSS/HTML. */
+function BloqueAsset({ nombre, className, style }: Props & { nombre: string }) {
   return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <path d="M17 29V9M17 5l-9 9M17 5l9 9" {...trazo} />
-    </svg>
+    <img
+      src={`/assets/automatizacion/bloques/${nombre}.webp`}
+      className={className}
+      style={style}
+      alt=""
+      aria-hidden="true"
+      draggable={false}
+    />
   );
 }
 
+export function IcoAvanzar({ className }: Props) {
+  return <BloqueAsset nombre="avanzar" className={className} />;
+}
+
 export function IcoRetroceder({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <path d="M17 5v20M17 29l-9-9M17 29l9-9" {...trazo} />
-    </svg>
-  );
+  return <BloqueAsset nombre="atras" className={className} />;
 }
 
 /* Las cuatro direcciones absolutas. Son la misma flecha girada de a 90°,
    a propósito: se leen como un solo grupo, y el chico reconoce el bloque
    por la punta de la flecha sin tener que leer el nombre. */
 export function IcoArriba({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <path d="M17 29V9M17 5l-9 9M17 5l9 9" {...trazo} />
-    </svg>
-  );
+  return <BloqueAsset nombre="arriba" className={className} />;
+}
+
+function Flecha({ className, giro }: Props & { giro: number }) {
+  return <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
+    <g transform={`rotate(${giro} 17 17)`}>
+      <path d="M14 29h6a2 2 0 0 0 2-2V17h6c2 0 2-2 1-3L19 4a3 3 0 0 0-4 0L5 14c-1 1-1 3 1 3h6v10a2 2 0 0 0 2 2Z" fill="currentColor" />
+      <path d="m10 13 7-7 7 7M16 20v5" fill="none" stroke="var(--auto-color, #65a8ef)" strokeWidth="2" strokeLinecap="round" opacity=".5" />
+    </g>
+  </svg>;
 }
 
 export function IcoDerecha({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <path d="M5 17h20M29 17l-9-9M29 17l-9 9" {...trazo} />
-    </svg>
-  );
+  return <BloqueAsset nombre="derecha" className={className} />;
 }
 
 export function IcoAbajo({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <path d="M17 5v20M17 29l-9-9M17 29l9-9" {...trazo} />
-    </svg>
-  );
+  return <BloqueAsset nombre="abajo" className={className} />;
 }
 
 export function IcoIzquierda({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <path d="M29 17H9M5 17l9-9M5 17l9 9" {...trazo} />
-    </svg>
-  );
+  return <BloqueAsset nombre="izquierda" className={className} />;
 }
 
 export function IcoGirarIzq({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <path d="M25 29V19a8 8 0 0 0-8-8H8" {...trazo} />
-      <path d="M14 5 7 11l7 6" {...trazo} />
-    </svg>
-  );
+  return <BloqueAsset nombre="girar-izquierda" className={className} />;
 }
 
 export function IcoGirarDer({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <path d="M9 29V19a8 8 0 0 1 8-8h9" {...trazo} />
-      <path d="m20 5 7 6-7 6" {...trazo} />
-    </svg>
-  );
+  return <BloqueAsset nombre="girar-derecha" className={className} />;
 }
 
 /** La nave levantando el cristal con su rayo: es literalmente lo que
@@ -101,131 +90,59 @@ export function IcoGirarDer({ className }: Props) {
  *  facetas del cristal van del color del bloque para que no sea un
  *  óvalo blanco. */
 export function IcoCosechar({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      {/* el cono de luz */}
-      <path d="M12.5 9.5h9L29 32H5z" fill="currentColor" opacity="0.32" />
-      {/* el platillo: cúpula y casco */}
-      <path d="M13.4 6.2a3.6 3.6 0 0 1 7.2 0z" fill="currentColor" />
-      <ellipse cx="17" cy="8.4" rx="10" ry="3.1" fill="currentColor" />
-      <ellipse cx="17" cy="9.1" rx="6" ry="1.4" fill="var(--auto-color, #f5b73c)" opacity="0.55" />
-      {/* el cristal, subiendo por el rayo */}
-      <path d="M17 14.5l5 5.2v7.6l-5 5.2-5-5.2v-7.6z" fill="currentColor" />
-      <path
-        d="M17 14.5v18M12 19.7h10"
-        fill="none"
-        stroke="var(--auto-color, #f5b73c)"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        opacity="0.75"
-      />
-    </svg>
-  );
+  return <BloqueAsset nombre="cosechar" className={className} />;
 }
 
 export function IcoRepetir({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <path d="M7 17a10 10 0 1 1 3.6 7.7" {...trazo} />
-      <path d="M2.6 12 7.4 17 12 12" {...trazo} />
-    </svg>
-  );
+  return <BloqueAsset nombre="repetir" className={className} />;
 }
 
 /** Esperar: un reloj de arena. La paciencia explícita. */
 export function IcoEsperar({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <path d="M9 4h16M9 30h16M11 4c0 7 6 8 6 13s-6 6-6 13M23 4c0 7-6 8-6 13s6 6 6 13" {...trazo} strokeWidth="4" />
-      <path d="M14 26h6l-3-4z" fill="currentColor" />
-    </svg>
-  );
+  return <BloqueAsset nombre="esperar" className={className} />;
 }
 
 /** Por siempre: el lazo sin fin. */
 export function IcoSiempre({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <path d="M17 17c-3-5-5-7-8.5-7a7 7 0 1 0 0 14c3.5 0 5.5-2 8.5-7s5-7 8.5-7a7 7 0 1 1 0 14c-3.5 0-5.5-2-8.5-7Z" {...trazo} strokeWidth="4.6" />
-    </svg>
-  );
+  return <BloqueAsset nombre="por-siempre" className={className} />;
 }
 
 /** Si: la flecha que se bifurca. Una rama sigue, la otra se desvía. */
-export function IcoSi({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <path d="M17 30V15M17 15l-9-8M17 15l9-8" {...trazo} strokeWidth="4.6" />
-      <path d="M4 10l4-3 1 5M30 10l-4-3-1 5" {...trazo} strokeWidth="3.6" />
-    </svg>
-  );
+export function IcoSi({ className, style }: Props) {
+  return <BloqueAsset nombre="si" className={className} style={style} />;
 }
 
 /** Si no: la otra rama. */
-export function IcoSino({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <path d="M8 6v10a6 6 0 0 0 6 6h12" {...trazo} strokeWidth="4.2" />
-      <path d="M21 16l6 6-6 6" {...trazo} strokeWidth="4.2" />
-    </svg>
-  );
+export function IcoSino({ className, style }: Props) {
+  return <BloqueAsset nombre="sino" className={className} style={style} />;
 }
 
 /** Mientras: la vuelta que sigue mientras el sensor diga que sí. */
 export function IcoMientras({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <path d="M27 17a10 10 0 1 1-3.6-7.7" {...trazo} strokeWidth="4.6" />
-      <path d="M31.4 12 26.6 17 22 12" {...trazo} strokeWidth="4.6" />
-      <path d="M12.5 17.5l3 3 5.5-6" {...trazo} strokeWidth="3.6" />
-    </svg>
-  );
+  return <BloqueAsset nombre="mientras" className={className} />;
 }
 
 /** Mi rutina: una libreta más chica adentro de la libreta grande — la
  *  definición que se puede llamar más de una vez sin volver a escribirla. */
 export function IcoRutina({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <path d="M8 5h14a3 3 0 0 1 3 3v18l-4-3-4 3-4-3-4 3-4-3V8a3 3 0 0 1 3-3z" {...trazo} strokeWidth="3.4" />
-      <path d="M11 13h12M11 18h8" {...trazo} strokeWidth="3" />
-    </svg>
-  );
+  return <BloqueAsset nombre="rutina" className={className} />;
 }
 
 /** Hacer: la flecha que salta a leer esa libreta chica y vuelve. */
 export function IcoHacer({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <path d="M6 17h14" {...trazo} strokeWidth="4.6" />
-      <path d="M14 9l8 8-8 8" {...trazo} strokeWidth="4.6" />
-      <path d="M24 8v18" {...trazo} strokeWidth="4.2" />
-    </svg>
-  );
+  return <BloqueAsset nombre="hacer-rutina" className={className} />;
 }
 
 /** Contador +1: un dial con la flecha subiendo — el odómetro que suma
  *  uno. Turquesa por `--auto-color` en el bloque, como cualquier hoja. */
 export function IcoContadorMas({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <circle cx="17" cy="19" r="10.5" {...trazo} strokeWidth="4" />
-      <path d="M17 23v-9M13 17l4-4 4 4" {...trazo} strokeWidth="4" />
-    </svg>
-  );
+  return <BloqueAsset nombre="contador-mas" className={className} />;
 }
 
 /** Contador = 0: el mismo dial, con el centro marcado y una flecha que
  *  vuelve — el reinicio, distinto de un vistazo del `+1`. */
-export function IcoContadorCero({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <circle cx="17" cy="18" r="10.5" {...trazo} strokeWidth="4" />
-      <circle cx="17" cy="18" r="2.8" fill="currentColor" />
-      <path d="M17 7.5a10.5 10.5 0 0 1 9 5.1" {...trazo} strokeWidth="3.4" />
-      <path d="M29 8 26.4 13 21.8 10.4" {...trazo} strokeWidth="3.4" />
-    </svg>
-  );
+export function IcoContadorCero({ className, style }: Props) {
+  return <BloqueAsset nombre="contador-cero" className={className} style={style} />;
 }
 
 /* --------------------------- sensores --------------------------- */
@@ -234,73 +151,36 @@ export function IcoContadorCero({ className }: Props) {
  *  de colores planos que usan las demás pastillas (no `currentColor`:
  *  la pastilla vive sobre fondo blanco). El valor elegido se muestra
  *  aparte, en la ranura numérica — este dibujo no lleva número. */
-export function IcoSensorContador({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <rect x="5" y="8" width="24" height="18" rx="6" fill="#ffe6a8" stroke="#e0a72a" strokeWidth="1.8" />
-      <circle cx="17" cy="17" r="5.2" fill="#fff" stroke="#e0a72a" strokeWidth="1.6" />
-      <path d="M17 13.5v3.8l2.6 1.8" fill="none" stroke="#e0a72a" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+export function IcoSensorContador({ className, style }: Props) {
+  return <img src="/assets/automatizacion/ui/contador.webp" className={className} style={style} alt="" draggable={false} />;
 }
 
 /** `tamaño del campo`: la isla vista de arriba, en una grilla de cuatro.
  *  Dibujado en `currentColor` porque vive DENTRO de una ranura numérica
  *  —reemplaza al dígito, nunca lo acompaña— y tiene que heredar el color
  *  del texto de ese botón (`.auto-repetir__veces`). */
-export function IcoTamanoCampo({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <rect x="4" y="4" width="12" height="12" rx="2.4" fill="currentColor" />
-      <rect x="18" y="4" width="12" height="12" rx="2.4" fill="currentColor" opacity="0.55" />
-      <rect x="4" y="18" width="12" height="12" rx="2.4" fill="currentColor" opacity="0.55" />
-      <rect x="18" y="18" width="12" height="12" rx="2.4" fill="currentColor" opacity="0.85" />
-    </svg>
-  );
+export function IcoTamanoCampo({ className, style }: Props) {
+  return <img src="/assets/automatizacion/ui/tamano.webp" className={className} style={style} alt="" draggable={false} />;
 }
 
 /** Está listo: el cristal con una tilde. */
-export function IcoSensorListo({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <path d="M13 4l5 5.5v9l-5 5.5-5-5.5v-9z" fill="#7ff0e0" stroke="#25c8df" strokeWidth="1.8" strokeLinejoin="round" />
-      <path d="M13 4v20M8 9.5h10" stroke="#fff" strokeWidth="1.3" opacity="0.9" />
-      <circle cx="25" cy="24" r="7.5" fill="#54e8c6" />
-      <path d="M21.5 24l2.6 2.6 4.6-5" fill="none" stroke="#0d3b46" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+export function IcoSensorListo({ className, style }: Props) {
+  return <BloqueAsset nombre="sensor-listo" className={className} style={style} />;
 }
 
 /** Está vacía: el anillo del zócalo sin nada adentro. */
-export function IcoSensorVacia({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <ellipse cx="17" cy="20" rx="12" ry="6.5" fill="#d8bff5" stroke="#b48ae0" strokeWidth="1.8" />
-      <ellipse cx="17" cy="20" rx="7" ry="3.6" fill="#b48ae0" opacity="0.6" />
-      <path d="M17 7.5q.5 2.4 2.9 2.9-2.4.5-2.9 2.9-.5-2.4-2.9-2.9 2.4-.5 2.9-2.9Z" fill="#fff" opacity="0.9" />
-    </svg>
-  );
+export function IcoSensorVacia({ className, style }: Props) {
+  return <img src="/assets/automatizacion/ui/vacia.webp" className={className} style={style} alt="" draggable={false} />;
 }
 
 /** Hay borde adelante: la nave contra la pared del campo. */
-export function IcoSensorBorde({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <path d="M17 26V12M17 8l-6 6M17 8l6 6" fill="none" stroke="#7c66bd" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M5 5h24" stroke="#e0459a" strokeWidth="4" strokeLinecap="round" />
-      <path d="M8 5v3M14 5v3M20 5v3M26 5v3" stroke="#e0459a" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
+export function IcoSensorBorde({ className, style }: Props) {
+  return <img src="/assets/automatizacion/ui/borde.webp" className={className} style={style} alt="" draggable={false} />;
 }
 
 /** La barra del "no": cruza cualquier sensor. */
-export function IcoNo({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <circle cx="17" cy="17" r="14" fill="none" stroke="#e0344a" strokeWidth="3.2" />
-      <path d="M7 27L27 7" stroke="#e0344a" strokeWidth="3.2" strokeLinecap="round" />
-    </svg>
-  );
+export function IcoNo({ className, style }: Props) {
+  return <img src="/assets/automatizacion/ui/no.webp" className={className} style={style} alt="" draggable={false} />;
 }
 
 /** Una pieza de control tal como se ve en la caja, para la tienda: una
@@ -315,12 +195,6 @@ export function IcoPieza({ color, className, children }: Props & { color: string
 
 /** Paleta de cada mineral para el ícono de la moneda: cara iluminada,
  *  cara en sombra, corona, halo. El mismo tallado, cuatro piedras. */
-const PALETA: Record<Mineral, { izq: [string, string]; der: [string, string]; corona: string; cara: string; halo: string }> = {
-  punta: { izq: ["#bff7ff", "#4fc9e8"], der: ["#5ad8f0", "#2b8fd6"], corona: "#a5edff", cara: "#d8f7ff", halo: "#7fe8ff" },
-  racimo: { izq: ["#efe4ff", "#a67cf5"], der: ["#b58cff", "#6e45d6"], corona: "#dcc8ff", cara: "#efe4ff", halo: "#c9a8ff" },
-  prisma: { izq: ["#ffe4f3", "#ff7fc0"], der: ["#ff8fca", "#e0459a"], corona: "#ffc9e8", cara: "#ffeaf6", halo: "#ffa8dc" },
-  estrella: { izq: ["#fff5cc", "#ffc83d"], der: ["#ffd25a", "#e8a20c"], corona: "#ffe9a0", cara: "#fff7d6", halo: "#ffdc6e" },
-};
 
 /** El cristal en bruto: la moneda del campo, una por mineral.
  *
@@ -334,50 +208,7 @@ const PALETA: Record<Mineral, { izq: [string, string]; der: [string, string]; co
  *  sustancia en dos estados —bruto y puro— y NO son la misma billetera.
  *  El chico tiene que poder distinguirlas de un vistazo. */
 export function IcoMineral({ mineral, className, style }: Props & { mineral: Mineral }) {
-  const id = `cr-${mineral}`;
-  const p = PALETA[mineral];
-  return (
-    <svg viewBox="0 0 32 32" className={className} style={style} aria-hidden="true">
-      <defs>
-        <linearGradient id={`${id}-izq`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor={p.izq[0]} />
-          <stop offset="1" stopColor={p.izq[1]} />
-        </linearGradient>
-        <linearGradient id={`${id}-der`} x1="1" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={p.der[0]} />
-          <stop offset="1" stopColor={p.der[1]} />
-        </linearGradient>
-        <linearGradient id={`${id}-corona`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#ffffff" />
-          <stop offset="1" stopColor={p.corona} />
-        </linearGradient>
-      </defs>
-
-      {/* halo, muy tenue: le da el aire de piedra que brilla sola */}
-      <ellipse cx="16" cy="17" rx="12" ry="13" fill={p.halo} opacity="0.18" />
-
-      {/* corona: las dos caras de arriba */}
-      <path d="M16 2.5 9.2 10h13.6z" fill={`url(#${id}-corona)`} />
-      <path d="M16 2.5 22.8 10 16 10z" fill={p.cara} opacity="0.85" />
-
-      {/* cuerpo: cara iluminada y cara en sombra */}
-      <path d="M9.2 10h6.8v19.5z" fill={`url(#${id}-izq)`} />
-      <path d="M22.8 10h-6.8v19.5z" fill={`url(#${id}-der)`} />
-
-      {/* aristas: finas y claras, nunca un contorno negro */}
-      <path
-        d="M16 2.5 9.2 10l6.8 19.5L22.8 10zM9.2 10h13.6M16 2.5V10"
-        fill="none"
-        stroke="#ffffff"
-        strokeWidth="1.1"
-        strokeLinejoin="round"
-        opacity="0.9"
-      />
-
-      {/* chispa especular arriba a la izquierda, como el resto del arte */}
-      <path d="M12.4 12.2q.5 2.6 2.6 3.2-2.1.6-2.6 3.2-.5-2.6-2.6-3.2 2.1-.6 2.6-3.2Z" fill="#fff" opacity="0.9" />
-    </svg>
-  );
+  return <img src={`/assets/automatizacion/ui/${mineral}.webp`} className={className} style={style} alt="" draggable={false} />;
 }
 
 /** La chispa, la moneda del primer día. */
@@ -390,25 +221,18 @@ export function IcoCristal(props: Props) {
  *  El brote va en blanco con facetas del color del bloque, como el
  *  cristal del bloque cosechar. */
 export function IcoPlantar({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <path d="M17 3v11M17 14l-5-5M17 14l5-5" {...trazo} strokeWidth="4.6" />
-      <path d="M17 17l4 4.2v5.6L17 31l-4-4.2v-5.6z" fill="currentColor" />
-      <path d="M17 17v14M13 21.2h8" fill="none" stroke="var(--auto-color, #888)" strokeWidth="1.4" opacity="0.75" />
-      <path d="M5 31h6M23 31h6" {...trazo} strokeWidth="3.4" opacity="0.8" />
-    </svg>
-  );
+  return <BloqueAsset nombre="plantar" className={className} />;
+}
+
+/** Preparar tierra: herramienta que despeja la baldosa antes de plantar. */
+export function IcoPrepararTierra({ className }: Props) {
+  return <BloqueAsset nombre="preparar-tierra" className={className} />;
 }
 
 /** Evolucionar: un cristal que sube de nivel. Chispa arriba a la
  *  derecha y una flecha corta. */
-export function IcoEvolucion({ className }: Props) {
-  return (
-    <svg viewBox="0 0 20 20" className={className} aria-hidden="true">
-      <circle cx="10" cy="10" r="9" fill="#fff" stroke="#25c8df" strokeWidth="1.6" />
-      <path d="M10 14.5v-8M10 6.5l-3.2 3.2M10 6.5l3.2 3.2" fill="none" stroke="#25c8df" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+export function IcoEvolucion({ className, style }: Props) {
+  return <img src="/assets/automatizacion/ui/evolucion.webp" className={className} style={style} alt="" draggable={false} />;
 }
 
 export function IcoProduccion({ className }: Props) {
@@ -429,70 +253,25 @@ export function IcoProduccion({ className }: Props) {
    pasar si compra esto. */
 
 /** La isla vista igual que en el campo, con la baldosa nueva encendida. */
-export function IcoCampo({ className }: Props) {
-  // Rombos isométricos de 16×8, con el canto violeta debajo.
-  const baldosa = (cx: number, cy: number, fill: string, stroke: string) => (
-    <path d={`M${cx} ${cy - 4}l8 4-8 4-8-4z`} fill={fill} stroke={stroke} strokeWidth="1.4" strokeLinejoin="round" />
-  );
-  return (
-    <svg viewBox="0 0 36 36" className={className} aria-hidden="true">
-      {/* el canto de la isla */}
-      <path d="M2 16.5v5l16 8 16-8v-5l-16 8z" fill="#b48ae0" />
-      <path d="M2 16.5v5l16 8v-5z" fill="#9f74d3" />
-      {/* las tres baldosas de siempre */}
-      {baldosa(18, 8.5, "#d8bff5", "#b48ae0")}
-      {baldosa(10, 12.5, "#d8bff5", "#b48ae0")}
-      {baldosa(18, 16.5, "#d8bff5", "#b48ae0")}
-      {/* la baldosa nueva, con la junta de luz turquesa */}
-      {baldosa(26, 12.5, "#eafffb", "#25c8df")}
-      <path d="M26 5.6q.6 2.4 2.9 2.9-2.3.5-2.9 2.9-.6-2.4-2.9-2.9 2.3-.5 2.9-2.9Z" fill="#fff" />
-      <circle cx="29" cy="28" r="6.5" fill="#25c8df" />
-      <path d="M29 24.8v6.4M25.8 28h6.4" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
-    </svg>
-  );
+export function IcoCampo({ className, style }: Props) {
+  return <img src="/assets/automatizacion/ui/campo.webp" className={className} style={style} alt="" draggable={false} />;
 }
 
 /** La hilera de luces de memoria del taller, con una luz más que se
  *  enciende: exactamente lo que cambia al comprar. */
-export function IcoMemoria({ className }: Props) {
-  return (
-    <svg viewBox="0 0 36 36" className={className} aria-hidden="true">
-      <rect x="2" y="11" width="32" height="14" rx="7" fill="#e6dcff" stroke="#b9a3e8" strokeWidth="1.6" />
-      <circle cx="9.5" cy="18" r="3.6" fill="#25c8df" />
-      <circle cx="18" cy="18" r="3.6" fill="#25c8df" />
-      <circle cx="26.5" cy="18" r="3.6" fill="#fff" stroke="#b9a3e8" strokeWidth="1.4" strokeDasharray="2.2 1.6" />
-      <circle cx="29" cy="28" r="6.5" fill="#25c8df" />
-      <path d="M29 24.8v6.4M25.8 28h6.4" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
-    </svg>
-  );
+export function IcoMemoria({ className, style }: Props) {
+  return <img src="/assets/automatizacion/ui/memoria.webp" className={className} style={style} alt="" draggable={false} />;
 }
 
 /** La nave —platillo con cúpula, la misma silueta del bloque cosechar—
  *  dejando estela. */
-export function IcoVelocidad({ className }: Props) {
-  return (
-    <svg viewBox="0 0 36 36" className={className} aria-hidden="true">
-      <path d="M3 14h8M1.5 19.5h11M4 25h7" stroke="#9b7cff" strokeWidth="3" strokeLinecap="round" opacity="0.8" />
-      <path d="M18.5 15.5a5 5 0 0 1 10 0z" fill="#b9a3e8" />
-      <path d="M18.5 15.5a5 5 0 0 1 10 0z" fill="#d8ecff" opacity="0.6" />
-      <ellipse cx="23.5" cy="19" rx="11" ry="4.2" fill="#fff" stroke="#7c66bd" strokeWidth="1.6" />
-      <ellipse cx="23.5" cy="19.6" rx="6" ry="1.6" fill="#54e8c6" opacity="0.8" />
-      <circle cx="30.5" cy="22.5" r="1.6" fill="#25c8df" />
-    </svg>
-  );
+export function IcoVelocidad({ className, style }: Props) {
+  return <img src="/assets/automatizacion/ui/velocidad.webp" className={className} style={style} alt="" draggable={false} />;
 }
 
 /** El cristal —la silueta de la moneda— junto a un reloj que corre. */
-export function IcoCrecimiento({ className }: Props) {
-  return (
-    <svg viewBox="0 0 36 36" className={className} aria-hidden="true">
-      <path d="M13 3l6 6.5v10L13 26l-6-6.5v-10z" fill="#7ff0e0" stroke="#25c8df" strokeWidth="1.8" strokeLinejoin="round" />
-      <path d="M13 3v23M7 9.5h12" stroke="#fff" strokeWidth="1.4" opacity="0.9" />
-      <circle cx="27" cy="25.5" r="7.5" fill="#fff" stroke="#7c66bd" strokeWidth="2" />
-      <path d="M27 21.2v4.6l3.2 2" stroke="#7c66bd" strokeWidth="2.2" strokeLinecap="round" fill="none" />
-      <path d="M23 15.5l1.5 3M31 15.5l-1.5 3" stroke="#7c66bd" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
+export function IcoCrecimiento({ className, style }: Props) {
+  return <img src="/assets/automatizacion/ui/crecimiento.webp" className={className} style={style} alt="" draggable={false} />;
 }
 
 /** El bloque `Repetir` tal como se va a ver en la caja de piezas: una
@@ -550,28 +329,13 @@ export function IcoPiezaRutinas({ className }: Props) {
 /** El ancla del lienzo: un cohete despegando, sobre el bloque verde fijo.
  *  Sin texto —el bloque mismo dice "acá empieza"— y a pura silueta, para
  *  que se lea a 28 px igual que el resto de los dibujos de bloque. */
-export function IcoInicio({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <path
-        d="M17 4c4 3 6 8 6 13 0 3-1 6-6 13-5-7-6-10-6-13 0-5 2-10 6-13z"
-        fill="currentColor"
-      />
-      <circle cx="17" cy="14" r="3" fill="var(--auto-tono, #22c7b8)" />
-      <path d="M11 22l-4 6M23 22l4 6" {...trazo} strokeWidth="3.4" />
-    </svg>
-  );
+export function IcoInicio({ className, style }: Props) {
+  return <img src="/assets/automatizacion/ui/inicio.webp" className={className} style={style} alt="" draggable={false} />;
 }
 
 /** Recentrar: la mira que vuelve a encuadrar el ancla del lienzo. */
-export function IcoRecentrar({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <circle cx="17" cy="17" r="9" {...trazo} strokeWidth="3.2" />
-      <circle cx="17" cy="17" r="2.4" fill="currentColor" />
-      <path d="M17 2v6M17 26v6M2 17h6M26 17h6" {...trazo} strokeWidth="3.2" />
-    </svg>
-  );
+export function IcoRecentrar({ className, style }: Props) {
+  return <img src="/assets/automatizacion/ui/centrar.webp" className={className} style={style} alt="" draggable={false} />;
 }
 
 /** La flecha de "hay más piezas para allá": marca un grupo de bloques que
@@ -580,27 +344,15 @@ export function IcoRecentrar({ className }: Props) {
  *  ángulo en pantalla se lee directamente del `atan2` sin sumarle
  *  ninguna corrección. Las tres rayitas de atrás son estela: dicen
  *  "esto viene de lejos", no sólo "para allá". */
-export function IcoLejos({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <path d="M13 17h13M20 10l7 7-7 7" {...trazo} strokeWidth="4.2" />
-      <path d="M9 17h1.5M5 17h1.5" {...trazo} strokeWidth="4.2" opacity="0.6" />
-    </svg>
-  );
+export function IcoLejos({ className, style }: Props) {
+  return <img src="/assets/automatizacion/ui/lejos.webp" className={className} style={style} alt="" draggable={false} />;
 }
 
 /** El tachito: la papelera del lienzo (tarea 3.1). Tapa con asa y tres
  *  costillas adentro del cuerpo, la misma silueta de siempre para que se
  *  lea como "basura" sin necesidad de texto. */
-export function IcoTachito({ className }: Props) {
-  return (
-    <svg viewBox="0 0 34 34" className={className} aria-hidden="true">
-      <path d="M9 11h16l-1.5 16.4a2 2 0 0 1-2 1.85H12.5a2 2 0 0 1-2-1.85L9 11z" fill="currentColor" />
-      <path d="M6 11h22" {...trazo} strokeWidth="3.4" />
-      <path d="M13 8.2c0-1.5 1.4-2.7 3.1-2.7h1.6c1.7 0 3.1 1.2 3.1 2.7" {...trazo} strokeWidth="3" />
-      <path d="M14 15.5v9M17 15.5v9M20 15.5v9" stroke="#fff" strokeWidth="2" strokeLinecap="round" opacity="0.85" />
-    </svg>
-  );
+export function IcoTachito({ className, style }: Props) {
+  return <img src="/assets/automatizacion/ui/papelera.webp" className={className} style={style} alt="" draggable={false} />;
 }
 
 /** El destello de cuatro puntas del mundo: marca el zócalo vacío donde

@@ -12,7 +12,7 @@
  * Cuando el saldo no alcanza no hay modal: la tarjeta hace un pulso que
  * conecta el precio con el contador de arriba.
  */
-import { useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import {
   IcoCampo,
   IcoContadorMas,
@@ -43,6 +43,7 @@ import {
   type Mineral,
 } from "../../data/automatizacion/balance";
 import { alcanza, nivel, reveladas, type EstadoCampo } from "../../utils/automatizacion/motor";
+import { faltaPara, USOS_MEJORA, proximoObjetivo, requisitoDe } from "../../data/automatizacion/descubrimientos";
 
 /** Una tarjeta de la tienda: una mejora clásica o la evolución de un mineral. */
 export type ClaveTienda = ClaveMejora | `evo_${Mineral}`;
@@ -115,14 +116,14 @@ const NOMBRE: Record<ClaveMejora, string> = {
  *  resto de las piezas, en el orden en que el campo las hace necesarias,
  *  y las evoluciones al final, en el orden de la cadena de minerales. */
 const ORDEN: ClaveTienda[] = [
-  "campo",
-  "capacidad",
   "siempre",
   "crecimiento",
+  "campo",
+  "capacidad",
   "velocidad",
-  "repetir",
-  "esperar",
   "si",
+  "esperar",
+  "repetir",
   "sino",
   "mientras",
   "rutinas",
@@ -155,30 +156,36 @@ function describir(costo: Costo): string {
 export function BarraMejoras({
   estado,
   onComprar,
+  bloqueada = false,
 }: {
   estado: EstadoCampo;
   onComprar: (clave: ClaveTienda) => boolean;
+  bloqueada?: boolean;
 }) {
   const [corto, setCorto] = useState<string | null>(null);
+  const [verTodas, setVerTodas] = useState(false);
+  const arbolRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => { if (verTodas) arbolRef.current?.showModal(); else arbolRef.current?.close(); }, [verTodas]);
   const visibles = reveladas(estado);
   /* Una pieza ya comprada vive en la caja: su tarjeta con tilde sería
      ruido, y con seis piezas la franja no entra. Se va de la tienda. */
   const esPieza = (c: ClaveTienda) => c in AJUSTES.mejoras && AJUSTES.mejoras[c as ClaveMejora].maxNivel === 1;
-  const tarjetas = ORDEN.filter(
+  const disponibles = ORDEN.filter(
     (c) => visibles.includes(c) && !(esPieza(c) && nivel(estado, c as ClaveMejora) >= 1),
   );
+  const siguiente = proximoObjetivo(estado).clave;
+  const tarjetas = verTodas ? ORDEN : [disponibles.includes(siguiente as ClaveTienda) ? siguiente as ClaveTienda : disponibles[0]].filter(Boolean);
 
-  if (tarjetas.length === 0) return null;
 
-  return (
-    <div className="auto-mejoras auto-vidrio" aria-label="Mejoras">
-      {tarjetas.map((clave) => {
+
+  const dibujarTarjetas = () => tarjetas.map((clave) => {
         const esEvo = clave.startsWith("evo_");
         const mineral = esEvo ? (clave.slice(4) as Mineral) : null;
         const n = mineral ? (estado.niveles[mineral] ?? 1) : nivel(estado, clave as ClaveMejora);
         const precio = mineral ? precioEvolucion(mineral, n) : precioMejora(clave as ClaveMejora, n);
         const tope = precio === null;
-        const puede = !tope && alcanza(estado, precio);
+        const revelada = visibles.includes(clave);
+        const puede = revelada && !tope && alcanza(estado, precio);
         const recien = !mineral && n === 0 && clave !== "campo";
         const nombre = mineral ? `Evolucionar ${MINERALES[mineral].nombre.toLowerCase()}` : NOMBRE[clave as ClaveMejora];
 
@@ -191,7 +198,8 @@ export function BarraMejoras({
               (recien && puede ? " auto-mejora--nueva" : "") +
               (corto === clave ? " auto-mejora--corto" : "")
             }
-            disabled={tope}
+            disabled={tope || bloqueada || !revelada}
+            title={bloqueada ? "Detén el programa para comprar" : mineral ? `Mejora el valor y el crecimiento de ${MINERALES[mineral].nombre}` : USOS_MEJORA[clave as ClaveMejora]}
             aria-label={
               tope
                 ? `${nombre}: al máximo`
@@ -224,20 +232,17 @@ export function BarraMejoras({
             ) : (
               DIBUJO[clave as ClaveMejora]()
             )}
+            <span className="auto-mejora__texto"><strong>{nombre}{clave === "campo" && !tope ? ` · ${estado.lado + 1} × ${estado.lado + 1}` : ""}</strong><small>{mineral ? "Más valor por cosecha" : USOS_MEJORA[clave as ClaveMejora]}</small><small>{!revelada ? requisitoDe(estado, clave) : bloqueada ? "Pausa para comprar" : tope ? "✓ Descubierto" : faltaPara(estado, precio)}</small></span>
             <span className="auto-mejora__precio">{tope ? "✓" : <Precio costo={precio} />}</span>
           </button>
         );
-      })}
-
-      {/* Un hueco por cada categoría que todavía no se reveló, hasta
-          cinco por fila. NO se dibuja: es aire que reserva el lugar para
-          que la franja no salte entera cuando aparece una categoría
-          nueva. Antes tenía un contorno punteado que decía "acá cabe
-          algo"; era una promesa que el chico no había pedido y ensuciaba
-          la franja. El espacio se queda, el dibujo no. */}
-      {Array.from({ length: Math.max(0, 5 - tarjetas.length) }, (_, i) => (
-        <div key={`hueco-${i}`} className="auto-mejora auto-mejora--hueco" aria-hidden="true" />
-      ))}
-    </div>
-  );
+      });
+  return <div className="auto-mejoras auto-vidrio" aria-label="Mejoras">
+    <button className="auto-control auto-descubrir" type="button" aria-haspopup="dialog" onClick={() => setVerTodas(true)}>Árbol de descubrimientos</button>
+    {!verTodas && dibujarTarjetas()}
+    <dialog ref={arbolRef} className="auto-guia auto-vidrio" aria-label="Árbol de descubrimientos" onClose={() => setVerTodas(false)}>
+      <header><h2>De una cosecha a una isla que trabaja sola</h2><button className="auto-control" onClick={() => setVerTodas(false)}>Volver a mi isla</button></header>
+      <div className="auto-arbol">{verTodas && dibujarTarjetas()}</div>
+    </dialog>
+  </div>;
 }
