@@ -169,3 +169,48 @@ Los pies se anclan al 89 % de la altura. La pista continúa detrás del
 pórtico: bajo los apoyos mide 1,05 veces su ancho, con espacio central
 para los cinco corredores. Se agregan sombras de contacto discretas,
 sin plataformas, escalones ni deformaciones de las ilustraciones.
+
+## Recta con banquinas y encuadre nativo (12/09/2026)
+
+Fuente: `recta-banquinas-source.png`, generada con la herramienta integrada
+de imágenes (`exec-6af0f63d-2bf3-4410-be09-5705a1c88fbf`). Se conserva
+`recta-banquinas-guia.png` como contrato de geometría; la referencia de
+materiales fue `recta-frontal-source.png`. Se solicitaron 3072×2048; la
+salida nativa fue 1536×1024. Se usa sin ampliar: 1366 px de ancho en ambas
+resoluciones pedidas y 1440 px en monitor. La mejora de nitidez viene del
+encuadre nuevo y de evitar la ampliación anterior, no de inventar píxeles.
+
+Prompt final:
+
+> Crear el nuevo suelo de Carrera de cohetes TYPELY. La imagen 1 es una GUÍA GEOMÉTRICA ESTRICTA. La imagen 2 es SOLO referencia de los materiales de cristal, NO de la composición. Pintá materiales sobre la guía 1 sin desplazar NI UNA de sus seis líneas. Entregar en ALTA RESOLUCIÓN 3072x2048. Cinco andariveles de cristal azul, violeta, azul, violeta, azul. Las dos bandas exteriores grises de la guía son BANQUINAS peatonales de piedra lavanda oscura y cristal, al mismo nivel del suelo: NO son carriles. Conservar su anchura considerable a AMBOS lados, separadas de los cinco carriles por los bordes cian; estas banquinas sostendrán dos columnas de meta agregadas por el juego. Cinco carriles únicamente, dos banquinas claramente distintas. Líneas finas y muy nítidas, pequeños paneles facetados bien definidos, reflejos discretos. Material infantil 3D pulido, limpio, NO difuminado ni con profundidad de campo: toda la pista debe estar enfocada desde el extremo hasta abajo. Paneles chicos proporcionados, nunca manchas estiradas. La punta de la guía comienza exactamente al 12.7% de altura y todos los carriles deben ocupar MUCHO MÁS del lienzo que en la imagen 2. Conservar perspectiva de la guía, incluyendo los carriles que salen de los laterales abajo. Todo el exterior del suelo debe ser NEGRO PURO #000000 liso para recuperar transparencia. Sin escalones, plataforma adicional, arco, naves, personajes, texto ni estrellas. No agregar luces grandes ni guirnaldas a las banquinas, mantenerlas como piso de apoyo plano con juntas de baldosas.
+
+`node scripts/import-orbita-art.mjs carrera` conserva el lienzo, recupera
+alpha con sharp autorizado y exporta `recta-banquinas.webp`: 1536×1024,
+182 KB, alpha medio 0,000 en el 10 % superior. Los cinco carriles comparten
+anclajes con las naves. Ambos pies de `meta-ancha.webp` quedan fuera de
+la calzada y dentro de las banquinas: el examen de Carrera verifica esos
+límites y el espacio del casco de los rivales exteriores.
+
+## Circuito de cristal y cerámica lunar (12/09/2026)
+
+Rediseño pedido por Ezequiel, con libertad para el arte y las animaciones.
+Fuente `recta-lunar-source.png`, herramienta integrada de imágenes,
+generación `exec-bbf66bfe-52fc-4886-898f-fc475305de1d`.
+Referencias: `recta-banquinas-guia.png` y `recta-banquinas-source.png`.
+
+Prompt final:
+
+> Rediseñar por completo los materiales de esta pista de TYPELY, ilustración 3D de videojuego infantil de alta calidad. IMAGEN 1 es guía GEOMÉTRICA OBLIGATORIA: conservar exactamente cinco carriles, las seis líneas, los dos hombros/banquinas y la silueta, punto lejano al 12.7% de altura. IMAGEN 2 es solamente la versión anterior: NO repetir su mosaico caótico de triángulos ni su violeta eléctrico excesivo. NUEVO ESTILO: circuito de cristal tallado y cerámica lunar, elegante y lúdico; cinco bandas azules y pervinca de cristal translúcido profundo y pulido, paneles grandes pero proporcionados, lisos con leves curvaturas en las esquinas, juntas transversales espaciadas muy finas, reflejos largos suaves controlados. Separadores de carriles como finos perfiles de cristal menta lechosa con filete nacarado, volumen y pequeño bisel real. Pequeñas flechas e incrustaciones de luz alineadas al centro de cada carril. Banquinas a ambos lados como superficies de piedra lavanda azulada oscura pulida con baldosas grandes sobrias y un delicado filete dorado en su borde exterior; lugar de apoyo plano para un arco que el juego añadirá. Borde exterior del puente ligeramente grueso y biselado, sin escalones. Iluminación cyan y perla, acentos violetas más suaves. Alta nitidez, nada de bokeh, toda la pista enfocada; sin líneas rayadas ruidosas, sin confeti, sin parches facetados. Calidad Pixar juguete de cristal, no vector, no diseño Tron. Conservar rigurosamente la geometría y ancho de la primera guía y dejar las banquinas completamente transitables y vacías. NEGRO PURO #000000 fuera de la silueta para recuperar alpha, sin cielo, sin arco, sin naves, sin carteles ni texto. 3072×2048 solicitado; no agrandar una imagen pequeña, generar detalle nuevo.
+
+La salida nativa es 1536×1024. `recta-lunar.webp` conserva esa resolución
+(182 KB), con alpha recuperado por sharp autorizado: 26,5 % vacío y
+alpha medio 0,000 en el 10 % superior. No se agranda ni se deforma.
+Se midieron los separadores de esta salida para ajustar `pistaCarrera.ts`:
+ancho aproximado 230 px en y=180; los pies del arco quedan en las banquinas.
+El original, la guía y las versiones anteriores permanecen intactos.
+
+Las naves reutilizan las vistas dibujadas del hangar: derecha para los
+dos andariveles izquierdos, izquierda para los dos derechos y neutra
+para el alumno. El casco tiene una inclinación leve hacia el suelo.
+Los modelos prestados a rivales sin nave especial solo afectan esta vista;
+se conserva la nave equipada de cada rival y del fantasma propio.
