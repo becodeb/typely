@@ -169,3 +169,24 @@ Los pies se anclan al 89 % de la altura. La pista continúa detrás del
 pórtico: bajo los apoyos mide 1,05 veces su ancho, con espacio central
 para los cinco corredores. Se agregan sombras de contacto discretas,
 sin plataformas, escalones ni deformaciones de las ilustraciones.
+
+## Recta con banquinas y encuadre nativo (12/09/2026)
+
+Fuente: `recta-banquinas-source.png`, generada con la herramienta integrada
+de imágenes (`exec-6af0f63d-2bf3-4410-be09-5705a1c88fbf`). Se conserva
+`recta-banquinas-guia.png` como contrato de geometría; la referencia de
+materiales fue `recta-frontal-source.png`. Se solicitaron 3072×2048; la
+salida nativa fue 1536×1024. Se usa sin ampliar: 1366 px de ancho en ambas
+resoluciones pedidas y 1440 px en monitor. La mejora de nitidez viene del
+encuadre nuevo y de evitar la ampliación anterior, no de inventar píxeles.
+
+Prompt final:
+
+> Crear el nuevo suelo de Carrera de cohetes TYPELY. La imagen 1 es una GUÍA GEOMÉTRICA ESTRICTA. La imagen 2 es SOLO referencia de los materiales de cristal, NO de la composición. Pintá materiales sobre la guía 1 sin desplazar NI UNA de sus seis líneas. Entregar en ALTA RESOLUCIÓN 3072x2048. Cinco andariveles de cristal azul, violeta, azul, violeta, azul. Las dos bandas exteriores grises de la guía son BANQUINAS peatonales de piedra lavanda oscura y cristal, al mismo nivel del suelo: NO son carriles. Conservar su anchura considerable a AMBOS lados, separadas de los cinco carriles por los bordes cian; estas banquinas sostendrán dos columnas de meta agregadas por el juego. Cinco carriles únicamente, dos banquinas claramente distintas. Líneas finas y muy nítidas, pequeños paneles facetados bien definidos, reflejos discretos. Material infantil 3D pulido, limpio, NO difuminado ni con profundidad de campo: toda la pista debe estar enfocada desde el extremo hasta abajo. Paneles chicos proporcionados, nunca manchas estiradas. La punta de la guía comienza exactamente al 12.7% de altura y todos los carriles deben ocupar MUCHO MÁS del lienzo que en la imagen 2. Conservar perspectiva de la guía, incluyendo los carriles que salen de los laterales abajo. Todo el exterior del suelo debe ser NEGRO PURO #000000 liso para recuperar transparencia. Sin escalones, plataforma adicional, arco, naves, personajes, texto ni estrellas. No agregar luces grandes ni guirnaldas a las banquinas, mantenerlas como piso de apoyo plano con juntas de baldosas.
+
+`node scripts/import-orbita-art.mjs carrera` conserva el lienzo, recupera
+alpha con sharp autorizado y exporta `recta-banquinas.webp`: 1536×1024,
+182 KB, alpha medio 0,000 en el 10 % superior. Los cinco carriles comparten
+anclajes con las naves. Ambos pies de `meta-ancha.webp` quedan fuera de
+la calzada y dentro de las banquinas: el examen de Carrera verifica esos
+límites y el espacio del casco de los rivales exteriores.
