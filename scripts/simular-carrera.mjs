@@ -9,8 +9,23 @@ const raiz = path.resolve(import.meta.dirname, "..");
 const salida = path.join(raiz, ".preview-orbita");
 mkdirSync(salida, { recursive: true });
 const bundle = path.join(salida, "carrera-examen.bundle.mjs");
-await build({ stdin: { contents: 'export * from "./src/utils/orbita/carrera"; export * from "./src/data/carreraTextos";', resolveDir: raiz }, bundle: true, format: "esm", outfile: bundle, logLevel: "silent" });
-const { MotorCarrera, TEXTOS_CARRERA, elegirTextoCarrera } = await import(pathToFileURL(bundle).href);
+await build({ stdin: { contents: 'export * from "./src/utils/orbita/carrera"; export * from "./src/data/carreraTextos"; export * from "./src/utils/orbita/pistaCarrera";', resolveDir: raiz }, bundle: true, format: "esm", outfile: bundle, logLevel: "silent" });
+const { MotorCarrera, TEXTOS_CARRERA, elegirTextoCarrera, camaraCarrera } = await import(pathToFileURL(bundle).href);
+// El arco debe dejar libres los cinco carriles y apoyar sobre las banquinas.
+// Los límites .135 y .024 salen de la silueta de meta-ancha-source.png.
+for (const [ancho,alto] of [[1366,468],[1366,612],[1440,600]]) {
+  const c = camaraCarrera(ancho,alto);
+  assert(c.imagen.ancho <= 1536, 'La pista no puede ampliar sus píxeles');
+  assert(c.techoMeta >= 18, 'El arco no invade la lectura');
+  assert(c.llegada < c.salida, 'Queda recorrido delante del arco');
+  assert(c.anchoLlegada/2 < c.arco*(.5-.135), 'Ningún pie ocupa un carril');
+  assert(c.arco*(.5-.024) < c.anchoLlegada*.8, 'Los pies apoyan dentro de las banquinas');
+  for(let carril=0;carril<5;carril++) {
+    const nave=c.corredor(1,carril);
+    const mitadCasco=65*nave.escala;
+    assert(Math.abs(nave.x-ancho/2)+mitadCasco < c.arco*(.5-.135), 'También pasa el casco del rival exterior');
+  }
+}
 assert.equal(TEXTOS_CARRERA.length, 60);
 const largosApi = JSON.parse(readFileSync(path.join(raiz,"api/src/carreraTextos.json"),"utf8"));
 assert.deepEqual(largosApi,Object.fromEntries(TEXTOS_CARRERA.map(t=>[t.id,t.texto.length])),"Regenerá los largos del servidor si cambió el corpus");

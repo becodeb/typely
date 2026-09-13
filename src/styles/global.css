@@ -2396,7 +2396,7 @@ a { color: inherit; text-decoration: none; }
 .car-avance { color: #a0f5de; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .car-progreso { height: 4px; border-radius: 4px; margin-top: 10px; background: #c5d4ff1a; overflow: hidden; }
 .car-progreso i { display: block; width: 100%; height: 100%; background: #7dffce; transform-origin: left; }
-.car-escena { position: relative; min-height: 0; width: 94%; margin: 8px auto 0; pointer-events: none; }
+.car-escena { grid-area: 3/1; position: relative; min-height: 0; width: 100%; margin: 8px auto 0; pointer-events: none; }
 .car-recta { position: absolute; max-width: none; opacity: .88; }
 .car-meta { position: absolute; aspect-ratio: 3/2; translate: -50% 0; z-index: 20; }
 .car-meta > img { position: relative; width: 100%; height: 100%; }
@@ -2414,12 +2414,28 @@ a { color: inherit; text-decoration: none; }
 .car-corredor .orb-mascota { width: 30%; left: 85%; top: 48%; }
 .car-chispa { position: absolute; left: 38%; top: 84%; width: 24%; opacity: 0; }
 .car-destello { position: absolute; left: 8%; top: 0; width: 84%; opacity: 0; }
-.car-largada { display: flex; gap: 10px; align-items: center; text-align: center; transition: opacity .3s; }
+/* Semáforo en primer plano: ocupa la misma fila que la escena, sin
+   mover el párrafo ni tapar los controles. El motor gobierna cada fase. */
+.car-largada { grid-area: 3/1; position: relative; z-index: 140; min-height: 0; margin-top: 8px; display: grid; place-items: center; text-align: center; pointer-events: none; transition: opacity .25s,visibility .25s; }
+.car-largada::before { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at center,#121940ee 15%,#101638b0 65%,#111a4540); transition: opacity .25s; }
 .car-largada[data-lista="true"] { opacity: 0; visibility: hidden; }
-.car-largada > div { display: flex; gap: 4px; }
-.car-largada img { width: 28px; aspect-ratio: 1; object-fit: contain; opacity: .18; }
-.car-largada img[data-encendido="true"] { opacity: 1; }
-.car-largada strong { display: block; font: 600 14px var(--font-display); }
+.car-largada[data-fase="3"]::before { opacity: 0; }
+.car-largada__contenido { position: relative; width: min(520px,82vw); color: #f4f4ff; animation: carEntradaSemaforo .4s cubic-bezier(.2,.8,.3,1) both; }
+.car-largada__rotulo { margin: 0 0 16px; color: #c3ccff; font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; }
+.car-semaforo { display: flex; justify-content: center; align-items: center; gap: 30px; width: max-content; margin: auto; padding: 22px 38px; border: 2px solid #a5a6d4; border-radius: 40px; background: linear-gradient(#41446c,#171f40); box-shadow: inset 0 3px 0 #e1d9ff70,inset 0 -5px 0 #080f3290,0 10px 0 #0b1237,0 18px 42px #040920aa; }
+.car-foco { --car-luz: #ff626f; position: relative; display: block; width: 76px; aspect-ratio: 1; border: 5px solid #0b112e; border-radius: 50%; background: #161c38; box-shadow: 0 1px 0 #d2d3ff60,inset 0 4px 12px #02051e; }
+.car-foco--amarillo { --car-luz: #ffda66; }
+.car-foco--verde { --car-luz: #6dffd0; }
+.car-foco i { display: block; width: 100%; height: 100%; border-radius: inherit; opacity: .16; background: radial-gradient(circle at 37% 28%,#fff 0%,var(--car-luz) 25%,var(--car-luz) 62%,#172140 100%); transition: opacity .12s,box-shadow .12s; }
+.car-foco[data-encendido="true"] i { opacity: 1; box-shadow: 0 0 22px var(--car-luz),0 0 50px color-mix(in srgb,var(--car-luz) 45%,transparent); }
+.car-largada__mensaje { margin-top: 20px; }
+.car-largada__numero { display: block; min-height: 96px; font: 800 clamp(60px,10vh,90px)/1.05 var(--font-display); text-shadow: 0 4px 0 #57518f,0 8px 22px #080f35; animation: carPulsoCuenta .32s ease-out both; }
+.car-largada__mensaje p { margin: 2px 0 0; font: 600 19px/1.3 var(--font-display); color: #e0e7ff; }
+.car-largada[data-fase="3"] .car-largada__numero { color: #8dffce; text-shadow: 0 4px 0 #216d63,0 0 35px #41ffc77a; }
+.car-largada[data-fase="3"] .car-semaforo { transform: translateY(-7px) scale(.96); transition: transform .25s; }
+.car-largada[data-pausada="true"] * { animation-play-state: paused !important; }
+@keyframes carEntradaSemaforo { from { opacity: 0; transform: translateY(-24px) scale(.85); } to { opacity: 1; transform: none; } }
+@keyframes carPulsoCuenta { from { opacity: .4; transform: scale(1.25); } to { opacity: 1; transform: scale(1); } }
 .car-voz { position: absolute; bottom: 10px; left: 50%; translate: -50% 0; z-index: 4; }
 .car-capa { position: absolute; inset: 0; z-index: 200; display: grid; place-items: center; padding: 14px; background: #090e35d9; }
 .car-pausa, .car-resultado { width: min(570px,94vw); max-height: 88dvh; overflow-y: auto; padding: 28px 36px; text-align: center; }
@@ -2435,7 +2451,7 @@ a { color: inherit; text-decoration: none; }
 .car-acciones button:last-child { grid-column: 1/-1; }
 @keyframes carCursor { 50% { border-color: transparent; } }
 @media (max-height: 740px) { .car-barra { padding-block: 10px; } .car-lectura { margin-top: 4px; padding-block: 12px; } }
-@media (prefers-reduced-motion: reduce) { .car-letra--actual { animation: none; } .car-largada { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .car-letra--actual, .car-largada * { animation: none; } .car-largada, .car-largada::before, .car-largada * { transition: none !important; } .car-largada[data-fase="3"] .car-semaforo { transform: none; } }
 
 /* ---- El carrusel de minijuegos ---- */
 .orb-hub { position: relative; height: 100dvh; overflow: hidden; background: #141b4d; isolation: isolate; }

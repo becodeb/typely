@@ -9,6 +9,7 @@ import { camaraCarrera } from "../../utils/orbita/pistaCarrera";
 import { JUEGOS_ORBITA, recordarJuego } from "../../data/orbitaJuegos";
 import { MotorCarrera, type EventoCarrera, type FantasmaCarrera, type ResultadoCarrera } from "../../utils/orbita/carrera";
 import { NaveOrbita } from "../../components/orbita/NaveOrbita";
+import { LargadaCarrera } from "../../components/orbita/LargadaCarrera";
 import { MascotaOrbita } from "../../components/orbita/MascotaOrbita";
 import { navePorId } from "../../data/orbitaNaves";
 import { colorEstela, efectoCosmetico } from "../../data/orbitaCosmeticos";
@@ -117,7 +118,7 @@ export default function CarreraPage() {
       }
       posicionar(naveAlumno.current,m.progreso,2);
       m.fantasmas.forEach((f,i)=>posicionar(naves.current.get(f.id),f.progreso,[0,1,3,4][i]!));
-      const luz = Math.min(2,Math.floor(m.cuentaMs/800)-1);
+      const luz = Math.min(3,Math.floor(m.cuentaMs/800));
       if (luz !== ultimaLuz) { ultimaLuz=luz; if(sonidoRef.current)blip(220+luz*180,330+luz*180,.03); }
       if (ahora-ultimoHud >= 100) {ultimoHud=ahora;refrescar(n=>n+1);}
       if (!m.resultado && !document.hidden) raf=requestAnimationFrame(cuadro);
@@ -188,19 +189,20 @@ export default function CarreraPage() {
     <div className="car-barra"><button className="orb-pildora orb-pildora--boton" onClick={()=>navigate("/orbita")}><ArrowLeft size={17}/> Órbita</button><div className="car-titulo"><span>ÓRBITA</span><h1>Carrera de cohetes</h1></div><div className="car-instrumentos"><div className="car-instrumento"><span>TIEMPO</span><b>{reloj(m?.tiempoMs ?? 0)}</b></div><div className="car-instrumento"><span>RITMO</span><b>{m?.ppm ?? 0}<small> PPM</small></b></div><button className="orb-pildora orb-pildora--boton" aria-label={sonido ? "Apagar sonido" : "Prender sonido"} onClick={()=>setSonido(v=>{try{localStorage.setItem(SONIDO_KEY,v ? "0":"1");}catch{/* Sin almacenamiento. */}return !v;})}>{sonido ? <Volume2 size={19}/> : <VolumeX size={19}/>}</button></div></div>
     <input ref={entrada} className="car-entrada" autoCapitalize="off" autoCorrect="off" autoComplete="off" spellCheck={false} aria-label="Escribí el texto de la carrera" tabIndex={-1}/>
     <section className="car-lectura" aria-label="Texto para escribir">
-      <div className="car-cabecera-texto"><p className="car-consigna">Escribí para impulsar tu nave</p>{!resultado && <div data-lista={!!m?.largada && m.tiempoMs>=650} className="car-largada" role="status"><div>{["rojo","amarillo","verde"].map((color,i)=><img key={color} data-encendido={!!m && m.cuentaMs >= (i+1)*800} src={`/assets/orbita/carrera/banderin-${color}.webp`} alt={color}/>)}</div><strong className="orb-dato">{!rivales ? "Preparando la pista…" : m?.largada ? "¡Ya!" : "Preparate"}</strong></div>}</div><p className="car-texto">{texto.texto.split(/( )/).map((palabra,i)=><span className={palabra === " " ? undefined : "car-palabra"} key={i}>{[...palabra].map(ch=>{
+      <div className="car-cabecera-texto"><p className="car-consigna">Escribí para impulsar tu nave</p></div><p className="car-texto">{texto.texto.split(/( )/).map((palabra,i)=><span className={palabra === " " ? undefined : "car-palabra"} key={i}>{[...palabra].map(ch=>{
         const indice=letra++, roja=m && indice>=m.indice && indice<m.indice+m.rojas.length;
         return <span key={indice} className={roja ? "car-letra--error" : indice<(m?.indice ?? 0) ? "car-letra--bien" : indice===(m?.indice ?? 0) ? "car-letra--actual" : ""}>{roja ? m.rojas[indice-m.indice] === " " ? "␣" : m.rojas[indice-m.indice] : ch}</span>;
       })}</span>)}{m && m.rojas.slice(Math.max(0,m.texto.length-m.indice)).map((ch,i)=><span className="car-letra--error" key={`extra-${i}`}>{ch === " " ? "␣" : ch}</span>)}</p>
       <div className="car-pie-lectura"><p className="car-ayuda orb-dato" aria-live="polite">{m?.rojas.length ? "Borrá las letras rojas con Backspace para seguir." : !m?.largada ? "Leé el texto y preparate para salir." : "Seguí el texto. Cada letra te acerca a la meta."}</p><span className="car-avance">{Math.round((m?.progreso ?? 0)*100)} %</span></div><div className="car-progreso" aria-hidden="true"><i style={{transform:`scaleX(${m?.progreso ?? 0})`}}/></div>
     </section>
     <div className="car-escena" ref={escena} aria-hidden="true">
-      <img ref={recta} className="car-recta" src="/assets/orbita/carrera/recta-frontal.webp" alt=""/>
+      <img ref={recta} className="car-recta" src="/assets/orbita/carrera/recta-banquinas.webp" alt=""/>
       <div ref={meta} className="car-meta"><img src="/assets/orbita/carrera/meta-ancha.webp" alt=""/></div>
       {(rivales ?? []).map(r=><div className="car-corredor car-corredor--fantasma" key={r.id} ref={el=>{if(el)naves.current.set(r.id,el);else naves.current.delete(r.id);}}><span className="car-alias orb-dato">{r.alias}</span>{casco(r)}</div>)}
       <div className="car-corredor car-corredor--alumno" ref={naveAlumno}><span className="car-alias car-alias--vos orb-dato">VOS</span>{casco(null)}<img className="car-chispa" src="/assets/orbita/carrera/chispa-1.webp" alt=""/><img className="car-destello" src="/assets/orbita/hub/destello.webp" alt=""/></div>
     </div>
 
+    {!resultado && <LargadaCarrera cuentaMs={m?.cuentaMs ?? 0} tiempoMs={m?.tiempoMs ?? 0} preparada={!!rivales} pausada={pausada}/> }
     <div ref={voz} className="car-voz"/>
     {m?.inactivo && !resultado && <div className="car-capa"><section className="orb-vidrio tarjeta-marca car-pausa" role="dialog" aria-modal="true" aria-labelledby="car-seguimos"><h2 id="car-seguimos">¿Seguimos?</h2><p>Tu nave y los fantasmas te esperan.</p><button autoFocus className="orb-boton-vidrio" onClick={()=>{procesar(m.reanudar());entrada.current?.focus();}}>Seguir corriendo</button><p>También podés apretar cualquier tecla.</p></section></div>}
     {resultado && <div className="car-capa"><section className="orb-vidrio tarjeta-marca car-resultado" role="dialog" aria-modal="true" aria-labelledby="car-fin" onKeyDown={e=>{

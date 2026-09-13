@@ -1081,3 +1081,16 @@ ahora tiene una superficie índigo, con largada, ayuda y progreso integrados;
 el título usa Baloo con volumen y el rótulo Órbita. Prompts en
 `carrera/prompts.md`. Verificación visual con cuatro fantasmas en largada,
 recorrido y llegada, a 1366×768 y 1366×912.
+
+**Corrección de banquinas, nitidez y largada (12/09/2026):**
+`recta-banquinas.webp` reemplaza la recta anterior en Carrera. Tiene cinco
+carriles y dos banquinas lavanda; los pies del arco apoyan en estas últimas,
+fuera de los bordes cian. El encuadre nuevo permite mostrar la fuente de
+1536×1024 sin ampliación ni deformación. El examen `simular-carrera.mjs`
+comprueba la resolución, los apoyos y el paso de los cinco cascos. La
+largada ahora usa `LargadaCarrera.tsx`: semáforo grande en primer plano,
+cuenta 3–2–1, verde y «¡Ya!», con entrada animada y salida suave. El mismo
+reloj del motor gobierna la cuenta, los sonidos y la habilitación del
+teclado; se respetan las pausas y movimiento reducido. El párrafo y los
+controles quedan visibles durante la cuenta. La carcasa y las lentes son
+interfaz en CSS; la pista sigue siendo una ilustración generada.
