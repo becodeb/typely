@@ -1094,3 +1094,22 @@ reloj del motor gobierna la cuenta, los sonidos y la habilitación del
 teclado; se respetan las pausas y movimiento reducido. El párrafo y los
 controles quedan visibles durante la cuenta. La carcasa y las lentes son
 interfaz en CSS; la pista sigue siendo una ilustración generada.
+
+**Revisión completa de Carrera (12/09/2026):** se reemplaza la textura
+facetada por `carrera/recta-lunar.webp`, cristal pulido con juntas suaves,
+perfiles biselados y banquinas de cerámica. Fuente nativa 1536×1024,
+sin ampliación, con prompt y referencias en `carrera/prompts.md`.
+La meta se aleja un poco para dar más recorrido y ambos apoyos quedan
+dentro de las banquinas. Las vistas laterales dibujadas del hangar dan
+perspectiva a los rivales; los que usan la nave inicial reciben modelos
+visuales variados, sin modificar sus cuentas ni su velocidad real.
+El fantasma propio conserva la nave del alumno.
+
+La presentación suaviza el desplazamiento entre teclas. Una capa canvas
+acotada, gobernada por el rAF existente, dibuja estelas según el impulso,
+luces de guía y confeti de llegada. Las pausas congelan sus posiciones;
+movimiento reducido elimina partículas y balanceo. Se guarda la carrera
+al cruzar, y la celebración de aproximadamente un segundo precede al
+resultado sin sumar tiempo ni generar otro envío. El semáforo incorpora
+rótulos, carga sincronizada y entrada/salida animadas; el resultado y la
+medalla tienen una aparición suave. No se modificó el motor ni el corpus.

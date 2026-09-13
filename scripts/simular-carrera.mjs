@@ -9,8 +9,24 @@ const raiz = path.resolve(import.meta.dirname, "..");
 const salida = path.join(raiz, ".preview-orbita");
 mkdirSync(salida, { recursive: true });
 const bundle = path.join(salida, "carrera-examen.bundle.mjs");
-await build({ stdin: { contents: 'export * from "./src/utils/orbita/carrera"; export * from "./src/data/carreraTextos"; export * from "./src/utils/orbita/pistaCarrera";', resolveDir: raiz }, bundle: true, format: "esm", outfile: bundle, logLevel: "silent" });
-const { MotorCarrera, TEXTOS_CARRERA, elegirTextoCarrera, camaraCarrera } = await import(pathToFileURL(bundle).href);
+await build({ stdin: { contents: 'export * from "./src/utils/orbita/carrera"; export * from "./src/data/carreraTextos"; export * from "./src/utils/orbita/pistaCarrera"; export * from "./src/utils/orbita/visualCarrera";', resolveDir: raiz }, bundle: true, format: "esm", outfile: bundle, logLevel: "silent" });
+const { MotorCarrera, TEXTOS_CARRERA, elegirTextoCarrera, camaraCarrera, navesRivales, suavizarCarrera } = await import(pathToFileURL(bundle).href);
+// La flota presta modelos distintos sin cambiar el equipo de las cuentas.
+const flota=[{id:'propio'},{id:'a',ship:'orbita-01'},{id:'b',ship:'orbita-01'},{id:'c',ship:'orbita-01'}];
+const antesFlota=JSON.stringify(flota), modelos=navesRivales(flota,'nave-fenix');
+assert.equal(modelos[0],'nave-fenix');assert.equal(new Set(modelos).size,4);
+assert(!modelos.includes('orbita-01'));assert.equal(JSON.stringify(flota),antesFlota);
+assert.equal(navesRivales([{id:'a',ship:'nave-eclipse'}],'orbita-01')[0],'nave-eclipse');
+assert.notEqual(navesRivales([{id:'a'},{id:'b',ship:'nave-aurora'}],'orbita-01')[0],'nave-aurora');
+// Interpolación estable a distintas tasas de cuadros, sin sobrepasar el
+// avance real ni moverse durante una pausa. Reducir movimiento es inmediato.
+let lento=0,rapido=0;
+for(let i=0;i<30;i++)lento=suavizarCarrera(lento,1,1000/30,false);
+for(let i=0;i<120;i++)rapido=suavizarCarrera(rapido,1,1000/120,false);
+assert(Math.abs(lento-rapido)<.0001);assert(lento<=1 && lento>.999);
+assert.equal(suavizarCarrera(.2,.8,0,false),.2);
+assert.equal(suavizarCarrera(.2,.8,16,true),.8);
+const retroceso=suavizarCarrera(.8,.2,16,false);assert(retroceso<.8 && retroceso>.2);
 // El arco debe dejar libres los cinco carriles y apoyar sobre las banquinas.
 // Los límites .135 y .024 salen de la silueta de meta-ancha-source.png.
 for (const [ancho,alto] of [[1366,468],[1366,612],[1440,600]]) {

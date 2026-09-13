@@ -1,16 +1,16 @@
-/* Anclajes del arte recta-banquinas.webp, medidos sobre 1536 × 1024.
+/* Anclajes del arte recta-lunar.webp, medidos sobre 1536 × 1024.
  * El suelo conserva su proporción y no se amplía en los tamaños de juego.
  * Las banquinas son piso de apoyo: nunca forman parte de los cinco carriles. */
 export function camaraCarrera(ancho: number, alto: number) {
   const escalaImagen = Math.min(1, ancho/1536);
-  const yFondo = 130, anchoFondo = 62, yMeta = 210;
-  const pendiente = (2720-anchoFondo)/(1024-yFondo);
+  const yFondo = 130, anchoFondo = 90, yMeta = 180;
+  const pendiente = (2590-anchoFondo)/(1024-yFondo);
   const anchoLlegada = (anchoFondo+pendiente*(yMeta-yFondo))*escalaImagen;
   // El vano deja margen a las naves exteriores. Los pies ocupan las
   // banquinas lavanda, más allá de los dos bordes cian de la calzada.
-  const arco = anchoLlegada/.60;
+  const arco = anchoLlegada/.62;
   const llegada = Math.max(alto*.43, arco/1.5*.89+18);
-  const salida = alto*.84;
+  const salida = Math.min(alto*.8, alto-90);
   const anchoSalida = anchoLlegada+pendiente*(salida-llegada);
   return {
     arco, llegada, salida, anchoLlegada, techoMeta: llegada-arco/1.5*.89,

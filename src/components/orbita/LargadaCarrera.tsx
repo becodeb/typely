@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 interface Props {
   cuentaMs: number;
   tiempoMs: number;
@@ -14,10 +16,11 @@ export function LargadaCarrera({cuentaMs, tiempoMs, preparada, pausada}: Props) 
     data-fase={fase} data-pausada={pausada}>
     <div className="car-largada__contenido">
       <p className="car-largada__rotulo">Carrera de cohetes · Largada</p>
-      <div className="car-semaforo" aria-hidden="true">
-        {["rojo", "amarillo", "verde"].map(luz =>
-          <span className={`car-foco car-foco--${luz}`} key={luz} data-encendido={preparada && luz === color}><i/></span>
+      <div className="car-semaforo" aria-hidden="true" style={{"--car-cuenta":Math.min(1,cuentaMs/2400)} as CSSProperties}>
+        {["rojo", "amarillo", "verde"].map((luz,i) =>
+          <div className="car-senal" key={luz}><span className={`car-foco car-foco--${luz}`} data-encendido={preparada && luz === color}><i/></span><span>{["PREPARATE","ATENCIÓN","¡SALÍ!"][i]}</span></div>
         )}
+        <span className="car-semaforo__carga"><i/></span>
       </div>
       <div className="car-largada__mensaje" role="status" aria-live="polite" aria-atomic="true">
         <strong key={`${preparada}-${fase}`} className="car-largada__numero">{!preparada ? "Un momento…" : fase === 3 ? "¡Ya!" : 3-fase}</strong>

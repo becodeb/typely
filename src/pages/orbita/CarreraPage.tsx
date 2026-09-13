@@ -7,7 +7,9 @@ import { hidratarPerfil, perfilLocal, registrarPartida, sincronizaArcade } from 
 import { elegirTextoCarrera } from "../../data/carreraTextos";
 import { camaraCarrera } from "../../utils/orbita/pistaCarrera";
 import { JUEGOS_ORBITA, recordarJuego } from "../../data/orbitaJuegos";
-import { MotorCarrera, type EventoCarrera, type FantasmaCarrera, type ResultadoCarrera } from "../../utils/orbita/carrera";
+import { MotorCarrera, type EventoCarrera, type ResultadoCarrera } from "../../utils/orbita/carrera";
+import { navesRivales, suavizarCarrera, type RivalCarrera as Rival } from "../../utils/orbita/visualCarrera";
+import { crearEfectosCarrera, type VueloCarrera } from "../../utils/orbita/efectosCarrera";
 import { NaveOrbita } from "../../components/orbita/NaveOrbita";
 import { LargadaCarrera } from "../../components/orbita/LargadaCarrera";
 import { MascotaOrbita } from "../../components/orbita/MascotaOrbita";
@@ -15,7 +17,6 @@ import { navePorId } from "../../data/orbitaNaves";
 import { colorEstela, efectoCosmetico } from "../../data/orbitaCosmeticos";
 import { blip, SONIDO_KEY, sonidoActivado } from "../../utils/orbita/sonido";
 
-interface Rival extends FantasmaCarrera { ship?: string | null; trail?: string | null; pet?: string | null }
 const mediana = (ppm = 25): Rival[] => [{ id: "mediana", alias: "el ritmo de tu grado", ppm }];
 const reloj = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2,"0")}`;
 
@@ -35,6 +36,11 @@ export default function CarreraPage() {
   const sonidoRef = useRef(sonido); sonidoRef.current = sonido;
   const efectos = useRef(new Set<Animation>());
   const generacion = useRef(0);
+  const lienzo = useRef<HTMLCanvasElement>(null), impulso = useRef(0);
+  const llegadaPendiente = useRef<ResultadoCarrera | null>(null);
+  const modelos = navesRivales(rivales ?? [], navePorId(perfil?.equipped?.ship).id);
+  const modelosRef = useRef(modelos); modelosRef.current=modelos;
+  const perfilRef = useRef(perfil); perfilRef.current=perfil;
   const bot = import.meta.env.DEV && new URLSearchParams(location.search).has("bot");
   useEffect(()=>{recordarJuego(JUEGOS_ORBITA.find(j=>j.id==="carrera")!);},[]);
 
@@ -53,25 +59,29 @@ export default function CarreraPage() {
 
   function animar(el: Element | null | undefined, cuadros: Keyframe[], tiempo = 350) {
     if (!el || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // Varios adelantamientos juntos comparten un destello, sin apilarlo.
+    for(const previa of el.getAnimations()) if(efectos.current.has(previa)) {
+      previa.cancel();efectos.current.delete(previa);
+    }
     const a = el.animate(cuadros,{duration:tiempo,easing:"ease-out"});
     efectos.current.add(a); a.onfinish = ()=>efectos.current.delete(a);
   }
   function procesar(eventos: EventoCarrera[]) {
     for (const e of eventos) {
       if (e.tipo === "acierto") {
-        const chispa = naveAlumno.current?.querySelector(".car-chispa");
-        if (chispa) { (chispa as HTMLImageElement).src = `/assets/orbita/carrera/chispa-${e.indice % 3 + 1}.webp`; animar(chispa,[{opacity:1,transform:"translateX(0) scale(1)"},{opacity:0,transform:"translateY(55px) scale(.2)"}]); }
+        impulso.current=Math.min(1,impulso.current+.42);
       }
       if (e.tipo === "error") {
         animar(naveAlumno.current?.querySelector(".car-casco"),[{translate:"0 0"},{translate:"-5px 0"},{translate:"0 0"}]);
         if (sonidoRef.current) blip(100,65,.018);
       }
       if (e.tipo === "pasa") {
-        animar(naves.current.get(e.fantasmaId)?.querySelector(".car-casco"),[{opacity:.4},{opacity:.15},{opacity:.4}]);
-        animar(naveAlumno.current?.querySelector(".car-destello"),[{opacity:0},{opacity:1},{opacity:0}]);
+        animar(naves.current.get(e.fantasmaId)?.querySelector(".car-casco"),[{opacity:.55},{opacity:.28},{opacity:.55}]);
+        animar(naveAlumno.current?.querySelector(".car-destello"),[{opacity:0,transform:"scale(.4)"},{opacity:.85,transform:"translateY(-5px) scale(1)"},{opacity:0,transform:"translateY(-16px) scale(.6)"}],420);
       }
       if (e.tipo === "fin") {
-        setResultado(e.resultado);
+        // Se guarda al cruzar; la presentación espera la celebración breve.
+        llegadaPendiente.current=e.resultado;
         const turno = generacion.current;
         setGuardado(sincronizaArcade(user?.role) ? "Guardando tu carrera…" : "Carrera de prueba guardada en esta compu.");
         void registrarPartida(e.resultado,user?.role,"carrera").then(res=>{
@@ -87,26 +97,34 @@ export default function CarreraPage() {
   useEffect(() => {
     if (!rivales) return;
     generacion.current++;
+    impulso.current=0; llegadaPendiente.current=null;
     const m = new MotorCarrera({texto:texto.texto,textId:texto.id,fantasmas:rivales});
     motor.current = m;
     let raf = 0, anterior = performance.now(), ultimoHud = 0, ultimaLuz = -1, esperaBot = 0;
+    let avance=0, vueloMs=0, finalMs=0, finalMostrado=false;
+    const avances=rivales.map(()=>0), movimiento=matchMedia("(prefers-reduced-motion: reduce)");
+    const dibujo=lienzo.current ? crearEfectosCarrera(lienzo.current) : null;
     let ancho = escena.current?.clientWidth ?? 1366, alto = escena.current?.clientHeight ?? 768;
     let camara = camaraCarrera(ancho,alto);
     const ajustarCamara = () => {
       camara=camaraCarrera(ancho,alto);
+      dibujo?.ajustar(ancho,alto);
       if(recta.current){recta.current.style.width=camara.imagen.ancho+"px";recta.current.style.height=camara.imagen.alto+"px";recta.current.style.left=camara.imagen.x+"px";recta.current.style.top=camara.imagen.y+"px";}
       if(meta.current){meta.current.style.width=camara.arco+"px";meta.current.style.left=ancho/2+"px";meta.current.style.top=camara.techoMeta+"px";}
     };
     const observar = new ResizeObserver(([r])=>{if(r){ancho=r.contentRect.width;alto=r.contentRect.height;ajustarCamara();}});
     if (escena.current) observar.observe(escena.current);
     ajustarCamara();
-    const posicionar = (el: HTMLElement | null | undefined, progreso: number, carril: number) => {
-      if (!el) return;
+    const posicionar = (el: HTMLElement | null | undefined, progreso: number, carril: number, color: string): VueloCarrera => {
       const p=camara.corredor(progreso,carril);
+      if (!el) return {...p,color,alumno:carril===2};
       el.style.transform = `translate3d(${p.x}px,${p.y}px,0) scale(${p.escala})`;
       el.style.zIndex=String(10+Math.round((1-progreso)*100));
       el.style.setProperty("--car-rumbo",`${p.giro}deg`);
       el.style.setProperty("--car-alias-opacidad",String(Math.max(0,1-progreso*1.5)));
+      el.style.setProperty("--car-flota",`${movimiento.matches ? 0 : Math.sin(vueloMs/650+carril)*1.5}px`);
+      el.style.setProperty("--car-potencia",String(carril===2 ? impulso.current : .45));
+      return {...p,color,alumno:carril===2};
     };
     const cuadro = (ahora: number) => {
       const dt = Math.min(80,Math.max(0,ahora-anterior)); anterior = ahora;
@@ -116,12 +134,29 @@ export default function CarreraPage() {
         esperaBot += dt;
         if (esperaBot >= 180) { esperaBot = 0; procesarRef.current(m.tecla(m.texto[m.indice]!)); }
       }
-      posicionar(naveAlumno.current,m.progreso,2);
-      m.fantasmas.forEach((f,i)=>posicionar(naves.current.get(f.id),f.progreso,[0,1,3,4][i]!));
+      const dtVisual=m.pausa && !m.resultado ? 0 : dt;
+      vueloMs+=dtVisual;
+      impulso.current*=Math.exp(-dtVisual/420);
+      avance=suavizarCarrera(avance,m.progreso,dtVisual,movimiento.matches);
+      const equipo=perfilRef.current?.equipped;
+      const cruce=movimiento.matches ? 0 : Math.min(.08,Math.max(0,finalMs-180)/10000);
+      const vuelos=[posicionar(naveAlumno.current,avance+cruce,2,colorEstela(equipo?.trail) ?? navePorId(equipo?.ship).colorMotor ?? "#55dfff")];
+      m.fantasmas.forEach((f,i)=>{
+        avances[i]=suavizarCarrera(avances[i]!,f.progreso,dtVisual,movimiento.matches);
+        const rival=rivales[i]!;
+        vuelos.push(posicionar(naves.current.get(f.id),avances[i]!,[0,1,3,4][i]!,colorEstela(rival.id === "propio" ? equipo?.trail : rival.trail) ?? navePorId(modelosRef.current[i]).colorMotor ?? "#55dfff"));
+      });
+      if(llegadaPendiente.current) {
+        finalMs+=dtVisual;
+        if(finalMs >= (movimiento.matches ? 100 : 1050) && !finalMostrado) {
+          finalMostrado=true;setResultado(llegadaPendiente.current);
+        }
+      }
+      dibujo?.dibujar(camara,vuelos,dtVisual,impulso.current,m.largada && !m.resultado,Math.max(0,finalMs-150),movimiento.matches);
       const luz = Math.min(3,Math.floor(m.cuentaMs/800));
       if (luz !== ultimaLuz) { ultimaLuz=luz; if(sonidoRef.current)blip(220+luz*180,330+luz*180,.03); }
       if (ahora-ultimoHud >= 100) {ultimoHud=ahora;refrescar(n=>n+1);}
-      if (!m.resultado && !document.hidden) raf=requestAnimationFrame(cuadro);
+      if (!finalMostrado && !document.hidden) raf=requestAnimationFrame(cuadro);
     };
     const visibilidad = () => {
       cancelAnimationFrame(raf);
@@ -132,7 +167,7 @@ export default function CarreraPage() {
     if(document.hidden)m.pausar();else raf=requestAnimationFrame(cuadro);
     document.addEventListener("visibilitychange",visibilidad);
     entrada.current?.focus({preventScroll:true});
-    return ()=>{ generacion.current++;cancelAnimationFrame(raf);observar.disconnect();document.removeEventListener("visibilitychange",visibilidad);efectos.current.forEach(a=>a.cancel());efectos.current.clear(); };
+    return ()=>{ generacion.current++;cancelAnimationFrame(raf);dibujo?.limpiar();observar.disconnect();document.removeEventListener("visibilitychange",visibilidad);efectos.current.forEach(a=>a.cancel());efectos.current.clear(); };
   },[texto,rivales,bot]);
 
   useEffect(() => {
@@ -178,11 +213,13 @@ export default function CarreraPage() {
 
   const m=motor.current, pausada=!!m?.pausa || !!resultado;
   let letra=0;
-  const casco=(r:Rival | null)=>{
+  const casco=(r:Rival | null, indice=-1)=>{
     const equipo=r?.id === "propio" || !r ? perfil?.equipped : r;
-    return <><span className="car-sombra-nave"/><span className="car-reflejo-motor" style={{"--car-reflejo":colorEstela(equipo?.trail) ?? "#55dfff"} as CSSProperties}/><div className="car-casco"><NaveOrbita nave={navePorId(equipo?.ship)} pausada={pausada} colorMotor={colorEstela(equipo?.trail)} efectoEstela={efectoCosmetico(equipo?.trail)} /></div><MascotaOrbita id={equipo?.pet} pausada={pausada} contexto={r ? "tienda" : "partida"} destinoMensaje={r ? undefined : voz} /></>;
+    const nave=navePorId(r ? modelos[indice] : equipo?.ship), carril=r ? [0,1,3,4][indice]! : 2;
+    const pose={"--nave-neutra":carril===2 ? 1 : 0,"--nave-derecha":carril<2 ? 1 : 0,"--nave-izquierda":carril>2 ? 1 : 0} as CSSProperties;
+    return <><span className="car-sombra-nave"/><span className="car-reflejo-motor" style={{"--car-reflejo":colorEstela(equipo?.trail) ?? nave.colorMotor ?? "#55dfff"} as CSSProperties}/><div className="car-casco" style={pose}><NaveOrbita nave={nave} pausada={pausada} colorMotor={colorEstela(equipo?.trail)} efectoEstela={efectoCosmetico(equipo?.trail)} /></div><MascotaOrbita id={equipo?.pet} pausada={pausada} contexto={r ? "tienda" : "partida"} destinoMensaje={r ? undefined : voz} /></>;
   };
-  return <main className="car-pagina" data-resultado={!!resultado} aria-label="Carrera de cohetes">
+  return <main className="car-pagina" data-resultado={!!resultado} data-pausada={pausada} data-oculta={document.hidden} aria-label="Carrera de cohetes">
     <div className="orb-fondo car-cielo" style={{"--orb-nebulosa":"url(/assets/orbita/fondo/nebulosa.webp)","--orb-horizonte":"url(/assets/orbita/fondo/horizonte.webp)","--orb-tinte":"rgb(112, 96, 230)"} as CSSProperties} aria-hidden="true">
       <img className="orb-estrellas" src="/assets/orbita/fondo/estrellas.webp" alt=""/><div className="orb-tinte"/><img className="orb-horizonte" src="/assets/orbita/fondo/horizonte.webp" alt=""/>
     </div>
@@ -196,10 +233,11 @@ export default function CarreraPage() {
       <div className="car-pie-lectura"><p className="car-ayuda orb-dato" aria-live="polite">{m?.rojas.length ? "Borrá las letras rojas con Backspace para seguir." : !m?.largada ? "Leé el texto y preparate para salir." : "Seguí el texto. Cada letra te acerca a la meta."}</p><span className="car-avance">{Math.round((m?.progreso ?? 0)*100)} %</span></div><div className="car-progreso" aria-hidden="true"><i style={{transform:`scaleX(${m?.progreso ?? 0})`}}/></div>
     </section>
     <div className="car-escena" ref={escena} aria-hidden="true">
-      <img ref={recta} className="car-recta" src="/assets/orbita/carrera/recta-banquinas.webp" alt=""/>
+      <img ref={recta} className="car-recta" src="/assets/orbita/carrera/recta-lunar.webp" alt=""/>
+      <canvas ref={lienzo} className="car-efectos"/>
       <div ref={meta} className="car-meta"><img src="/assets/orbita/carrera/meta-ancha.webp" alt=""/></div>
-      {(rivales ?? []).map(r=><div className="car-corredor car-corredor--fantasma" key={r.id} ref={el=>{if(el)naves.current.set(r.id,el);else naves.current.delete(r.id);}}><span className="car-alias orb-dato">{r.alias}</span>{casco(r)}</div>)}
-      <div className="car-corredor car-corredor--alumno" ref={naveAlumno}><span className="car-alias car-alias--vos orb-dato">VOS</span>{casco(null)}<img className="car-chispa" src="/assets/orbita/carrera/chispa-1.webp" alt=""/><img className="car-destello" src="/assets/orbita/hub/destello.webp" alt=""/></div>
+      {(rivales ?? []).map((r,i)=><div className="car-corredor car-corredor--fantasma" key={r.id} ref={el=>{if(el)naves.current.set(r.id,el);else naves.current.delete(r.id);}}><span className="car-alias orb-dato">{r.alias}</span>{casco(r,i)}</div>)}
+      <div className="car-corredor car-corredor--alumno" ref={naveAlumno}><span className="car-alias car-alias--vos orb-dato">VOS</span>{casco(null)}<img className="car-destello" src="/assets/orbita/hub/destello.webp" alt=""/></div>
     </div>
 
     {!resultado && <LargadaCarrera cuentaMs={m?.cuentaMs ?? 0} tiempoMs={m?.tiempoMs ?? 0} preparada={!!rivales} pausada={pausada}/> }
