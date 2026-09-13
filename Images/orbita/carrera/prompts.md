@@ -190,3 +190,27 @@ alpha con sharp autorizado y exporta `recta-banquinas.webp`: 1536×1024,
 anclajes con las naves. Ambos pies de `meta-ancha.webp` quedan fuera de
 la calzada y dentro de las banquinas: el examen de Carrera verifica esos
 límites y el espacio del casco de los rivales exteriores.
+
+## Circuito de cristal y cerámica lunar (12/09/2026)
+
+Rediseño pedido por Ezequiel, con libertad para el arte y las animaciones.
+Fuente `recta-lunar-source.png`, herramienta integrada de imágenes,
+generación `exec-bbf66bfe-52fc-4886-898f-fc475305de1d`.
+Referencias: `recta-banquinas-guia.png` y `recta-banquinas-source.png`.
+
+Prompt final:
+
+> Rediseñar por completo los materiales de esta pista de TYPELY, ilustración 3D de videojuego infantil de alta calidad. IMAGEN 1 es guía GEOMÉTRICA OBLIGATORIA: conservar exactamente cinco carriles, las seis líneas, los dos hombros/banquinas y la silueta, punto lejano al 12.7% de altura. IMAGEN 2 es solamente la versión anterior: NO repetir su mosaico caótico de triángulos ni su violeta eléctrico excesivo. NUEVO ESTILO: circuito de cristal tallado y cerámica lunar, elegante y lúdico; cinco bandas azules y pervinca de cristal translúcido profundo y pulido, paneles grandes pero proporcionados, lisos con leves curvaturas en las esquinas, juntas transversales espaciadas muy finas, reflejos largos suaves controlados. Separadores de carriles como finos perfiles de cristal menta lechosa con filete nacarado, volumen y pequeño bisel real. Pequeñas flechas e incrustaciones de luz alineadas al centro de cada carril. Banquinas a ambos lados como superficies de piedra lavanda azulada oscura pulida con baldosas grandes sobrias y un delicado filete dorado en su borde exterior; lugar de apoyo plano para un arco que el juego añadirá. Borde exterior del puente ligeramente grueso y biselado, sin escalones. Iluminación cyan y perla, acentos violetas más suaves. Alta nitidez, nada de bokeh, toda la pista enfocada; sin líneas rayadas ruidosas, sin confeti, sin parches facetados. Calidad Pixar juguete de cristal, no vector, no diseño Tron. Conservar rigurosamente la geometría y ancho de la primera guía y dejar las banquinas completamente transitables y vacías. NEGRO PURO #000000 fuera de la silueta para recuperar alpha, sin cielo, sin arco, sin naves, sin carteles ni texto. 3072×2048 solicitado; no agrandar una imagen pequeña, generar detalle nuevo.
+
+La salida nativa es 1536×1024. `recta-lunar.webp` conserva esa resolución
+(182 KB), con alpha recuperado por sharp autorizado: 26,5 % vacío y
+alpha medio 0,000 en el 10 % superior. No se agranda ni se deforma.
+Se midieron los separadores de esta salida para ajustar `pistaCarrera.ts`:
+ancho aproximado 230 px en y=180; los pies del arco quedan en las banquinas.
+El original, la guía y las versiones anteriores permanecen intactos.
+
+Las naves reutilizan las vistas dibujadas del hangar: derecha para los
+dos andariveles izquierdos, izquierda para los dos derechos y neutra
+para el alumno. El casco tiene una inclinación leve hacia el suelo.
+Los modelos prestados a rivales sin nave especial solo afectan esta vista;
+se conserva la nave equipada de cada rival y del fantasma propio.

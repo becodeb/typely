@@ -108,6 +108,7 @@ const PIEZAS = [
   { grupo: "carrera", base: "recta", tope: 2560, alfa: true, mate: "negro", arribaLimpio: .03, arribaFraccion: .35 },
   { grupo: "carrera", base: "recta-frontal", tope: 2560, alfa: true, mate: "negro", arribaLimpio: .03, arribaFraccion: .35 },
   { grupo: "carrera", base: "recta-banquinas", tope: 3072, alfa: true, mate: "negro", arribaLimpio: .03, arribaFraccion: .10 },
+  { grupo: "carrera", base: "recta-lunar", tope: 1536, alfa: true, mate: "negro", arribaLimpio: .03, arribaFraccion: .10 },
   // El pórtico conserva el lienzo 3:2 para anclar ambos pies a la pista.
   { grupo: "carrera", base: "meta-ancha", tope: 1536, alfa: true, mate: "negro" },
   ...["meta", "medalla-oro", "medalla-plata", "medalla-bronce"].map(base => ({ grupo: "carrera", base, tope: 1024, alfa: true, mate: "negro", recortar: true, encuadrar: true })),
