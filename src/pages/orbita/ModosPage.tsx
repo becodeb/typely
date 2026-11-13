@@ -107,14 +107,15 @@ export function ModosPage() {
               setMensaje("Tu docente pausó el modo Órbita por ahora. ¡Seguí con la aventura!")
             }
           />
+          {/* El tercer orbe despertó. El cartel que tenía decía "todavía
+              está creciendo…" — resultó profético: adentro había un
+              jardín de cristales todo este tiempo. */}
           <Orbe
-            mundo="dormido"
-            titulo="???"
-            subtitulo=""
+            mundo="automatizacion"
+            titulo="Vivero"
+            subtitulo="Programá tu nave"
             flota="orb-flota-c"
-            dormido
-            motivoDormido="Muy pronto"
-            onDormido={() => setMensaje("Acá va a aparecer un modo nuevo. Todavía está creciendo…")}
+            onEntrar={() => navigate("/automatizacion")}
           />
         </div>
 

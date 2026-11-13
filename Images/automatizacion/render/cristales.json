@@ -1,0 +1,22 @@
+{
+  "fuente": "Images/automatizacion/cristales/hoja-verde.png",
+  "tamano": 512,
+  "anclaX": 0.5,
+  "anclaY": 0.75,
+  "variantes": [
+    "punta",
+    "racimo",
+    "prisma",
+    "estrella"
+  ],
+  "etapas": [
+    "brote",
+    "creciendo",
+    "maduro"
+  ],
+  "alturaEtapa": {
+    "brote": 0.33,
+    "creciendo": 0.62,
+    "maduro": 1
+  }
+}

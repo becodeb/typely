@@ -23,8 +23,9 @@ export function Orbe({
   onDormido,
   flota = "orb-flota-a",
 }: {
-  /** Nombre del archivo de mundo: "aventura" | "orbita" | "dormido". */
-  mundo: "aventura" | "orbita" | "dormido";
+  /** Nombre del archivo de mundo. Cada modo nuevo suma UNA imagen, no un
+   *  set: el cristal y el brillo son compartidos. */
+  mundo: "aventura" | "orbita" | "automatizacion" | "dormido";
   titulo: string;
   subtitulo: string;
   dormido?: boolean;

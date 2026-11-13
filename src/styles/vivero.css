@@ -1,0 +1,211 @@
+/* Legibilidad y descubrimientos. Mantiene la geometría del lienzo y el arte. */
+.auto-titulo { font-family: var(--font-display); font-size: 26px; line-height: 1; margin: 0; color: #17355f; }
+.auto-pantalla .auto-titulo small { display: block; font-size: 13px; margin-top: 5px; }
+.auto-pantalla .auto-nombre-recurso { font-size: 12px; }
+.auto-pantalla .auto-herramientas { grid-column: 1 / -1; grid-row: 2; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.auto-pantalla .auto-herramientas > span { font-weight: 800; margin-right: 8px; color: #17355f; }
+.auto-pantalla .auto-control { min-width: 44px; min-height: 44px; padding: 8px 13px; border: 1px solid #ffffffb8; border-radius: 12px; background: #f5faffeb; color: #24446d; font: 600 12px var(--font-body, sans-serif); cursor: pointer; box-shadow: 0 3px 9px #36568612; }
+.auto-pantalla .auto-control:hover:not(:disabled) { background: #fff; }
+.auto-pantalla .auto-control:active:not(:disabled) { transform: translateY(1px); }
+.auto-pantalla .auto-control:disabled { opacity: .5; cursor: default; }
+.auto-pantalla :is(button, .auto-pantalla select, .auto-pantalla input):focus-visible { outline: 3px solid #17355f; outline-offset: 3px; }
+.auto-pantalla .auto-objetivo { width: 100%; padding: 13px 18px; border-radius: 18px; color: #24446d; }
+.auto-pantalla .auto-objetivo > small { font-size: 11px; font-weight: 700; color: #466384; }
+.auto-pantalla .auto-objetivo h2 { font: 800 22px/1.1 var(--font-display); margin: 3px 0 6px; }
+.auto-pantalla .auto-objetivo p { font-size: 12px; line-height: 1.5; margin: 0; }
+.auto-pantalla .auto-inspector { text-align: center; color: #17355f; width: 100%; background: #f3f9ffda; border-radius: 15px; padding: 9px 14px; }
+.auto-pantalla .auto-inspector strong { font: 800 17px/1.2 var(--font-display); }
+.auto-pantalla .auto-inspector small { display: block; font-size: 10px; margin: 3px 0; }
+.auto-pantalla .auto-inspector p { font-size: 12px; line-height: 1.4; min-height: 34px; margin: 5px 0 0; }
+.auto-pantalla .auto-ejecucion { display: flex; gap: 7px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.auto-pantalla .auto-ejecucion .auto-empezar { min-height: 46px; padding: 10px 19px; font-size: 17px; }
+.auto-pantalla .auto-metricas { color: #24446d; font-size: 11px; text-align: center; font-variant-numeric: tabular-nums; }
+.auto-pantalla .auto-mejora { flex: 0 0 320px; min-height: 70px; padding: 9px 13px; }
+.auto-pantalla .auto-mejora__texto { display: grid; gap: 3px; text-align: left; font-size: 14px; line-height: 1.2; }
+.auto-pantalla .auto-mejora__texto small { font: 500 11px/1.4 var(--font-body, sans-serif); }
+.auto-pantalla .auto-descubrir { flex: 0 0 130px; }
+.auto-pantalla .auto-etiqueta-bloque { font: 700 11px/1.15 var(--font-body, sans-serif); text-align: center; max-width: 100%; }
+.auto-pantalla .auto-caja .auto-bloque { flex-direction: column; gap: 3px; min-height: 72px; padding: 13px 5px 8px; }
+.auto-pantalla .auto-caja--doble .auto-bloque { min-height: 72px; width: 96px; }
+.auto-pantalla .auto-etiqueta-control { font: 700 12px var(--font-body, sans-serif); white-space: nowrap; }
+.auto-pantalla .auto-etiqueta-sensor { font: 600 11px var(--font-body, sans-serif); }
+.auto-pantalla .auto-sensor:has(.auto-etiqueta-sensor) { width: auto; max-width: 190px; gap: 5px; padding: 6px 9px; min-height: 44px; }
+.auto-pantalla .auto-repetir__lomo { min-height: 52px; }
+.auto-pantalla .auto-crecimiento { position: absolute; transform: translate(-50%, -5%); z-index: 1100; pointer-events: none; text-align: center; min-width: 38px; }
+.auto-pantalla .auto-crecimiento__texto { display: inline-block; padding: 2px 6px; border-radius: 7px; font: 800 10px/1.3 var(--font-body, sans-serif); background: #eff7ffff; color: #24446d; box-shadow: 0 2px 5px #24446d22; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.auto-pantalla .auto-crecimiento--listo .auto-crecimiento__texto { background: #ddfff2; color: #116547; }
+.auto-pantalla .auto-crecimiento__riel { display: block; height: 4px; margin: 3px 10%; border-radius: 4px; background: #254a6950; overflow: hidden; }
+.auto-pantalla .auto-crecimiento__riel > span { display: block; height: 100%; background: #2ccaa5; transform-origin: left; transition: transform .4s linear; }
+.auto-pantalla .auto-ancla--nave .auto-cuerpo { opacity: 1; }
+.auto-pantalla .auto-ancla--volando .auto-cuerpo { opacity: 1; }
+.auto-pantalla .auto-guia { position: fixed; inset: 0; margin: auto; width: 92%; max-width: 1100px; max-height: 85dvh; padding: 24px; overflow: auto; background: #f3f8fff5; color: #24446d; }
+.auto-pantalla .auto-guia::backdrop { background: #16325650; backdrop-filter: blur(4px); }
+.auto-pantalla .auto-guia > header { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
+.auto-pantalla .auto-guia h2, .auto-pantalla .auto-guia h3, .auto-pantalla .auto-guia h4 { font-family: var(--font-display); font-weight: 800; }
+.auto-pantalla .auto-guia h2 { font-size: 25px; }
+.auto-pantalla .auto-guia h3 { margin-top: 20px; font-size: 20px; }
+.auto-pantalla .auto-guia p { font-size: 13px; line-height: 1.7; max-width: 85ch; }
+.auto-pantalla .auto-guia__minerales { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
+.auto-pantalla .auto-guia__minerales img { height: 70px; width: 70px; object-fit: contain; }
+@media (max-width: 1100px) {
+.auto-pantalla .auto-nombre-recurso { display: none; }
+.auto-pantalla .auto-caja--doble { grid-template-columns: 1fr; }
+.auto-pantalla .auto-objetivo h2 { font-size: 19px; }
+.auto-pantalla .auto-campo { grid-template-rows: auto minmax(100px, 1fr) auto auto auto; }
+}
+@media (max-width: 767px) {
+.auto-pantalla { height: auto; min-height: 100dvh; overflow: auto; grid-template-columns: 1fr; grid-template-rows: auto auto 560px 650px auto; padding: 10px; }
+.auto-pantalla .auto-cabecera { flex-wrap: wrap; gap: 12px; }
+.auto-pantalla .auto-saldos { gap: 12px; flex-wrap: wrap; }
+.auto-pantalla .auto-saldos .auto-dato { font-size: 22px; }
+.auto-pantalla .auto-taller { grid-column: 1; grid-row: 4; }
+.auto-pantalla .auto-campo { grid-column: 1; grid-row: 3; }
+.auto-pantalla .auto-mejoras { grid-row: 5; }
+.auto-pantalla .auto-guia { position: fixed; inset: 12px; }
+.auto-pantalla .auto-guia__minerales { grid-template-columns: 1fr 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+.auto-pantalla .auto-crecimiento__riel > span { transition: none; }
+}
+
+/* Stable stage: messages, metrics and controls never resize the island. */
+.auto-campo { grid-template-rows: 104px minmax(100px, 1fr) 110px 52px 36px; }
+.auto-pantalla .auto-objetivo { height: 104px; overflow: auto; }
+.auto-pantalla .auto-inspector { height: 110px; overflow: auto; }
+.auto-pantalla .auto-metricas { height: 36px; overflow: auto; line-height: 18px; }
+.auto-pantalla .auto-ejecucion { flex-wrap: nowrap; width: 100%; }
+.auto-pantalla .auto-ejecucion .auto-empezar { width: 148px; flex: 0 0 148px; }
+.auto-pantalla .auto-caja .auto-bloque { min-height: 94px; padding: 12px 8px 23px; }
+.auto-pantalla .auto-etiqueta-bloque { font-size: 13px; line-height: 1.25; overflow-wrap: anywhere; }
+.auto-pantalla .auto-bloque > img { width: 32px; height: 32px; object-fit: contain; flex: none; }
+.auto-pantalla .auto-mejora > img { width: 48px; height: 48px; object-fit: contain; flex: none; }
+.auto-pantalla .auto-sensor__dibujo > img { width: 100%; height: 100%; object-fit: contain; }
+.auto-pantalla .auto-repetir__lomo > img { width: 30px; height: 30px; object-fit: contain; }
+.auto-pantalla .auto-inicio { gap: 7px; font: 800 15px var(--font-display); }
+.auto-pantalla .auto-lienzo__capa--suave { transition: transform 300ms ease; }
+.auto-pantalla .auto-guia-pulso { animation: vivero-guia 1.6s ease-in-out infinite; }
+@keyframes vivero-guia { 50% { filter: brightness(1.15) drop-shadow(0 0 8px #facc15); } }
+.auto-pantalla .auto-isla { animation: vivero-tierra .65s ease both; }
+@keyframes vivero-tierra { from { opacity: .4; transform: scale(.94); } to { opacity: 1; transform: scale(1); } }
+.auto-pantalla .auto-arbol { display: grid; gap: 10px; }
+.auto-pantalla .auto-arbol .auto-mejora { width: 100%; min-height: 88px; }
+.auto-pantalla .auto-arbol__paso { display: flex; align-items: center; gap: 12px; }
+.auto-pantalla .auto-arbol__paso > span { flex: 0 0 32px; font: 800 22px var(--font-display); }
+.auto-pantalla .auto-arbol__paso + .auto-arbol__paso { border-top: 1px solid #ceddea; padding-top: 10px; }
+.auto-pantalla .auto-guia__pasos { display: flex; gap: 20px; flex-wrap: wrap; }
+.auto-pantalla .auto-guia__pasos img { width: 64px; height: 64px; object-fit: contain; }
+@media (max-height: 800px) and (min-width: 769px) {
+.auto-pantalla .auto-campo { grid-template-rows: 82px minmax(80px, 1fr) 90px 46px 36px; gap: 5px; }
+.auto-pantalla .auto-objetivo { height: 82px; padding: 8px 14px; }
+.auto-pantalla .auto-inspector { height: 90px; padding: 5px 10px; }
+.auto-pantalla .auto-ejecucion .auto-control { padding: 6px 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+.auto-pantalla .auto-guia-pulso, .auto-pantalla .auto-isla { animation: none; }
+.auto-pantalla .auto-lienzo__capa--suave { transition: none; }
+}
+
+/* Una única carcasa para todas las piezas: el encastre siempre cae en las
+   mismas coordenadas. La silueta facetada vive en un PNG transparente; el
+   color semántico se aplica debajo por `multiply`, así mantenemos una sola
+   textura y cinco tonos sin duplicar archivos. */
+.auto-pantalla .auto-bloque--color-1 { --auto-color: #35b9ff; }
+.auto-pantalla .auto-bloque--color-2 { --auto-color: #ffc43d; }
+.auto-pantalla .auto-bloque--color-3 { --auto-color: #ff5fa3; }
+.auto-pantalla .auto-bloque--color-4 { --auto-color: #19d8c1; }
+.auto-pantalla .auto-bloque--color-5 { --auto-color: #9a70ff; }
+
+.auto-pantalla .auto-bloque {
+  background-color: var(--auto-color);
+  background-image: url("/assets/automatizacion/bloques/bloque-shell-facetado.png");
+  background-position: center;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-blend-mode: multiply;
+  clip-path: none;
+  -webkit-mask-image: url("/assets/automatizacion/bloques/bloque-shell-facetado.png");
+  mask-image: url("/assets/automatizacion/bloques/bloque-shell-facetado.png");
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  filter:
+    saturate(1.22) brightness(1.08)
+    drop-shadow(0 4px 0 color-mix(in srgb, var(--auto-color) 62%, #000))
+    drop-shadow(0 9px 12px rgba(54, 86, 134, 0.25));
+}
+.auto-pantalla .auto-bloque::after { display: none; }
+
+.auto-pantalla .auto-repetir--color-1 { --auto-tono: #35b9ff; }
+.auto-pantalla .auto-repetir--color-2 { --auto-tono: #ffc43d; }
+.auto-pantalla .auto-repetir--color-3 { --auto-tono: #ff5fa3; }
+.auto-pantalla .auto-repetir--color-4 { --auto-tono: #19d8c1; }
+.auto-pantalla .auto-repetir--color-5 { --auto-tono: #9a70ff; }
+
+/* El arranque es la primera pieza de la misma familia: misma anchura,
+   misma pestaña inferior y el mismo eje X que la muesca de cualquier bloque.
+   Solo pierde la muesca superior porque no hay nada que encastrar arriba. */
+.auto-pantalla .auto-inicio {
+  width: 172px;
+  height: 60px;
+  border-radius: 0;
+  background-color: var(--auto-tono);
+  background-image: url("/assets/automatizacion/bloques/inicio-shell-facetado.png");
+  background-position: center;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-blend-mode: normal;
+  box-shadow: none;
+  clip-path: none;
+  -webkit-mask-image: url("/assets/automatizacion/bloques/inicio-shell-facetado.png");
+  mask-image: url("/assets/automatizacion/bloques/inicio-shell-facetado.png");
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  filter:
+    saturate(1.12) brightness(1.08)
+    drop-shadow(0 4px 0 color-mix(in srgb, var(--auto-tono) 62%, #000))
+    drop-shadow(0 9px 12px rgba(54, 86, 134, 0.28));
+}
+.auto-pantalla .auto-inicio::after { display: none; }
+.auto-pantalla .auto-inicio > :is(svg, span) { position: relative; z-index: 1; }
+
+/* La etiqueta nunca compite con el símbolo: el dibujo tiene una caja estable
+   y el texto puede ocupar dos líneas sin tocar la muesca. */
+.auto-pantalla .auto-bloque > :is(svg, img) {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  object-fit: contain;
+}
+.auto-pantalla .auto-bloque .auto-etiqueta-bloque {
+  max-width: 100%;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.auto-pantalla .auto-objetivo h2 { margin: 3px 0 4px; font: 800 20px/1.1 var(--font-display); }
+.auto-pantalla .auto-objetivo p { margin: 0; font: 500 12px/1.4 var(--font-body); }
+.auto-pantalla .auto-inspector p { margin: 4px 0 0; font: 500 12px/1.4 var(--font-body); min-height: 0; }
+.auto-pantalla .auto-empezar { height: 46px; min-height: 46px; }
+.auto-pantalla .auto-mejoras { min-height: 94px; max-height: 94px; }
+.auto-pantalla .auto-mejora { min-width: 320px; flex: 0 1 560px; }
+.auto-pantalla .auto-arbol .auto-mejora { min-width: 0; flex: none; }
+.auto-pantalla .auto-sprite { background: none; box-shadow: none; border: 0; clip-path: none; object-fit: contain; }
+.auto-pantalla .auto-guia__pasos article { flex: 1 1 180px; }
+.auto-pantalla .auto-guia details { margin-top: 18px; }
+.auto-pantalla .auto-guia summary { cursor: pointer; min-height: 44px; font-weight: 700; }
+
+.auto-pantalla .auto-celebracion { display:flex; align-items:center; gap:14px; height:100%; }
+.auto-pantalla .auto-celebracion > img { width:64px; height:64px; object-fit:contain; }
+.auto-pantalla .auto-celebracion > div { flex:1; }
+.auto-pantalla .auto-rayo-cosecha { position:absolute; left:50%; bottom:10%; width:175%; height:230%; object-fit:contain; translate:-50% 0; pointer-events:none; animation:vivero-rayo .65s ease-out forwards; }
+.auto-pantalla .auto-nada { border:0; aspect-ratio:1; }
+.auto-pantalla .auto-nada > img { display:block; width:100%; height:100%; object-fit:contain; animation:vivero-anillo .65s ease-out forwards; }
+@keyframes vivero-rayo { from { opacity:0; scale:.65; } 30% { opacity:.9; } to { opacity:0; scale:1.15; } }
+@keyframes vivero-anillo { from { opacity:0; scale:.55; } 30% { opacity:1; } to { opacity:0; scale:1.35; } }

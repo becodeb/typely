@@ -36,6 +36,7 @@ const TormentaPage = lazy(() => import("./pages/orbita/TormentaPage"));
 const CarreraPage = lazy(() => import("./pages/orbita/CarreraPage"));
 const RankingPage = lazy(() => import("./pages/orbita/RankingPage"));
 const HangarPage = lazy(() => import("./pages/orbita/HangarPage"));
+const AutomatizacionPage = lazy(() => import("./pages/automatizacion/AutomatizacionPage"));
 
 function PageFallback() {
   return (
@@ -223,6 +224,20 @@ export function App() {
               </Suspense>
             }
           />
+          {/* Modo Automatización. Va detrás de `SoloEnComputadora` por la
+              misma razón que los niveles: el taller de bloques necesita
+              arrastre y precisión que un teléfono no da (CLAUDE.md §6.2). */}
+          <Route
+            path="/automatizacion"
+            element={
+              <SoloEnComputadora>
+                <Suspense fallback={<PageFallback />}>
+                  <AutomatizacionPage />
+                </Suspense>
+              </SoloEnComputadora>
+            }
+          />
+
           <Route path="/orbita/hangar" element={<Navigate to="/orbita/tienda" replace />} />
         </Route>
 
