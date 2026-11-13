@@ -22,7 +22,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { hasError
         className="min-h-dvh grid place-items-center p-6"
         style={{ background: "linear-gradient(180deg, #cfeeff 0%, #e8f6ff 60%, #f3f9ff 100%)" }}
       >
-        <section className="glass-card-smooth rounded-3xl p-10 w-[min(28rem,92vw)] text-center flex flex-col items-center gap-4">
+        <section className="glass-card-smooth tarjeta-marca rounded-3xl p-10 w-[min(28rem,92vw)] text-center flex flex-col items-center gap-4">
           <img src="/favicon-256.png" alt="" className="w-20 h-20" decoding="async" />
           <h1 className="font-display text-2xl font-black text-text">¡Ups! Algo salió mal</h1>
           <p className="text-muted font-semibold text-sm">

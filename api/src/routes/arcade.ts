@@ -10,10 +10,13 @@
  *    no se le enseña qué chequeo lo atrapó.
  *
  *  - LOS CRISTALES LOS ACUÑA EL SERVIDOR. El cliente informa lo que mostró
- *    (palabras + extra de cosecha + bono de rango) y acá se recomputa el
- *    tope teórico; se acredita el menor de los dos. El HUD nunca puede
- *    prometer más de lo que el servidor va a pagar… salvo trampa, y en ese
- *    caso paga cero.
+ *    (palabras TIPEADAS + bono de rango) y acá se recomputa el tope
+ *    teórico; se acredita el menor de los dos. El HUD nunca puede prometer
+ *    más de lo que el servidor va a pagar… salvo trampa, y en ese caso paga
+ *    cero. Desde las mejoras permanentes (migración 0004) una partida trae
+ *    además su nivel y su build: la bala extra y el golpe crítico destruyen
+ *    palabras que nadie tipeó, y sin saberlo el escéptico las marcaría como
+ *    imposibles.
  *
  *  - ALIAS, NUNCA NOMBRE REAL, hacia afuera. El top global cruza escuelas y
  *    son menores. El nombre real solo aparece para un actor cuyo alcance ya
@@ -31,8 +34,10 @@ import { db, schema, sql as pg } from "../db/index.js";
 import { and, eq, sql } from "drizzle-orm";
 import { requireActor, requireRole } from "../authContext.js";
 import { audit } from "../audit.js";
+import { cristalesInfinitosLocales } from "../localDevelopment.js";
+import { validarCarrera, cristalesDeCarrera } from "../carrera.js";
 
-const GAME_IDS = ["tormenta"] as const;
+const GAME_IDS = ["tormenta", "carrera"] as const;
 
 /* ------------------------------------------------------------------ */
 /* Rangos y cristales — ESPEJO de src/utils/orbita/motor.ts.           */
@@ -48,9 +53,33 @@ const BONO_RANGO: Record<string, number> = {
 };
 const RANGOS_VALIDOS = Object.keys(BONO_RANGO);
 
+/* Las trece mejoras — ESPEJO de `MejoraId` en src/utils/orbita/motor.ts. */
+const MEJORAS_IDS = [
+  "bala", "segunda", "vida", "regeneracion", "escudo", "critico",
+  "viento", "foco", "onda", "congelar", "iman", "racha", "teclas",
+] as const;
+
 /* Catálogo del hangar — ESPEJO de src/data/orbitaCosmeticos.ts. El precio
    que vale es ESTE: el cliente muestra el suyo, el servidor cobra el suyo. */
-const CATALOGO: Record<string, { tipo: "estela" | "rayo"; precio: number }> = {
+const CATALOGO: Record<string, { tipo: "estela" | "rayo" | "impacto" | "nave" | "mascota"; precio: number }> = {
+  "mascota-botito": { tipo: "mascota", precio: 400 },
+  "mascota-lunita": { tipo: "mascota", precio: 600 },
+  "mascota-gatito-cometa": { tipo: "mascota", precio: 1000 },
+  "mascota-medusa-burbuja": { tipo: "mascota", precio: 1400 },
+  "mascota-pulpito-dj": { tipo: "mascota", precio: 2000 },
+  "mascota-dino-patinador": { tipo: "mascota", precio: 2600 },
+  "mascota-capibara-astronauta": { tipo: "mascota", precio: 3400 },
+  "mascota-dragon-gelatina": { tipo: "mascota", precio: 4200 },
+  "estela-burbujas": { tipo: "estela", precio: 850 },
+  "estela-pixeles": { tipo: "estela", precio: 1600 },
+  "estela-arcoiris": { tipo: "estela", precio: 1800 },
+  "rayo-relampago": { tipo: "rayo", precio: 900 },
+  "rayo-caramelo": { tipo: "rayo", precio: 1600 },
+  "rayo-burbujas": { tipo: "rayo", precio: 1800 },
+  "impacto-rosa": { tipo: "impacto", precio: 300 },
+  "impacto-burbujas": { tipo: "impacto", precio: 850 },
+  "impacto-confeti": { tipo: "impacto", precio: 1500 },
+  "impacto-palomitas": { tipo: "impacto", precio: 1800 },
   "estela-menta": { tipo: "estela", precio: 120 },
   "estela-violeta": { tipo: "estela", precio: 180 },
   "estela-rosa": { tipo: "estela", precio: 260 },
@@ -58,6 +87,21 @@ const CATALOGO: Record<string, { tipo: "estela" | "rayo"; precio: number }> = {
   "rayo-violeta": { tipo: "rayo", precio: 100 },
   "rayo-rosa": { tipo: "rayo", precio: 200 },
   "rayo-dorado": { tipo: "rayo", precio: 350 },
+  "estela-estrellas": { tipo: "estela", precio: 650 },
+  "estela-aurora": { tipo: "estela", precio: 1400 },
+  "rayo-pulso": { tipo: "rayo", precio: 700 },
+  "rayo-espiral": { tipo: "rayo", precio: 1500 },
+  "impacto-anillos": { tipo: "impacto", precio: 600 },
+  "impacto-cristales": { tipo: "impacto", precio: 1200 },
+  "nave-aurora": { tipo: "nave", precio: 2400 },
+  "nave-prisma": { tipo: "nave", precio: 3600 },
+  "nave-fenix": { tipo: "nave", precio: 4800 },
+  "nave-eclipse": { tipo: "nave", precio: 6000 },
+  "nave-zapatilla-cohete": { tipo: "nave", precio: 7200 },
+  "nave-tiburon-galactico": { tipo: "nave", precio: 8400 },
+  "nave-dragon-caramelo": { tipo: "nave", precio: 9600 },
+  "nave-ovni-gelatina": { tipo: "nave", precio: 10800 },
+  "nave-ajolote-espacial": { tipo: "nave", precio: 12000 },
 };
 
 /* ------------------------------------------------------------------ */
@@ -114,7 +158,9 @@ function aliasInvalido(alias: string, username: string, fullName: string): strin
 /* Coherencia de una partida                                           */
 /* ------------------------------------------------------------------ */
 const runItemSchema = z.object({
-  gameId: z.enum(GAME_IDS),
+  gameId: z.enum(GAME_IDS).default("tormenta"),
+  textId: z.string().max(80).optional(),
+  puesto: z.number().int().optional(),
   startedAt: z.string().datetime(),
   endedAt: z.string().datetime(),
   durationMs: z.number().int().min(0),
@@ -128,8 +174,21 @@ const runItemSchema = z.object({
   charsTyped: z.number().int().min(0),
   errors: z.number().int().min(0),
   crystalsClaimed: z.number().int().min(0),
+  /* Mejoras permanentes por nivel (2026-09-05, migración 0004). Las tres
+     son OPCIONALES a propósito: una cola guardada en el navegador antes de
+     este deploy llega sin ellas y tiene que seguir entrando. */
+  wordsTyped: z.number().int().min(0).optional(),
+  level: z.number().int().min(0).max(40).default(0),
+  upgrades: z
+    .array(z.object({ id: z.enum(MEJORAS_IDS), level: z.number().int().min(1).max(9) }))
+    .max(40)
+    .default([]),
 });
 type RunItem = z.infer<typeof runItemSchema>;
+
+function nivelDe(it: RunItem, id: (typeof MEJORAS_IDS)[number]): number {
+  return it.upgrades.find((u) => u.id === id)?.level ?? 0;
+}
 
 const runSchema = z.union([
   runItemSchema.transform((item) => ({ items: [item] })),
@@ -139,21 +198,40 @@ const runSchema = z.union([
 /** ¿La telemetría cierra? Los topes son holgados a propósito: acá no se
  *  arbitra el récord mundial, se filtra al que abrió la consola. */
 function validarCoherencia(it: RunItem): boolean {
+  if (it.gameId === "carrera") return validarCarrera(it);
   if (!RANGOS_VALIDOS.includes(it.rankId)) return false;
-  if (it.durationMs < 15_000 || it.durationMs > 320_000) return false;
+  /* La partida termina al perder las vidas, sin duración máxima. */
+  if (it.durationMs < 15_000) return false;
   if (it.wpmPeak > 250 || it.wpmAvg > 200) return false;
   const segundos = it.durationMs / 1000;
   if (it.charsTyped > segundos * 25) return false; // 25 pulsaciones/s sostenidas: no
-  if (it.wordsDestroyed > it.charsTyped) return false;
+  /* Lo TIPEADO necesita teclas; lo destruido incluye lo tipeado. */
+  const tipeadas = it.wordsTyped ?? it.wordsDestroyed;
+  if (tipeadas > it.charsTyped) return false;
+  if (tipeadas > it.wordsDestroyed) return false;
+  /* Lo que cayó sin tipearse solo puede venir de la bala extra (cada
+     palabra tipeada arrastra hasta tantas como balas extra tenga) o del
+     golpe crítico (una más). Sin esas mejoras, destruido == tipeado. */
+  const arrastre = nivelDe(it, "bala") + (nivelDe(it, "critico") > 0 ? 1 : 0);
+  if (it.wordsDestroyed > tipeadas * (1 + arrastre)) return false;
+  /* Cada nivel es una carta elegida: el nivel no puede superar la suma de
+     los niveles de la build (más uno, si la partida terminó con las cartas
+     todavía en pantalla). */
+  const nivelesBuild = it.upgrades.reduce((a, u) => a + u.level, 0);
+  if (it.level > nivelesBuild + 1) return false;
   /* Tope teórico de puntos por palabra: la más larga (22), banda 10, amenaza
-     100, racha máxima — redondeado hacia arriba con aire. */
-  if (it.score > it.wordsDestroyed * 3200 + 100) return false;
+     100, racha máxima y Teclas difíciles ×2,5 — 7.644, redondeado con aire. */
+  if (it.score > it.wordsDestroyed * 8000 + 100) return false;
   return true;
 }
 
 function cristalesMaximos(it: RunItem): number {
-  /* palabras + extra de cosecha (nunca más que todas) + bono de rango. */
-  return it.wordsDestroyed * 2 + (BONO_RANGO[it.rankId] ?? 0);
+  if (it.gameId === "carrera") return cristalesDeCarrera(it);
+  const bono = BONO_RANGO[it.rankId] ?? 0;
+  /* Formato anterior a las mejoras (sin wordsTyped): palabras + extra de
+     cosecha, como pagaba entonces. Con mejoras, solo lo tipeado + el bono. */
+  if (it.wordsTyped === undefined) return it.wordsDestroyed * 2 + bono;
+  return it.wordsTyped + bono;
 }
 
 /* ------------------------------------------------------------------ */
@@ -184,7 +262,7 @@ function perfilPublico(p: typeof schema.arcadeProfile.$inferSelect) {
     bestThreat: p.bestThreat,
     bestRank: p.bestRank,
     owned,
-    equipped: { trail: p.equippedTrail, beam: p.equippedBeam },
+    equipped: { trail: p.equippedTrail, beam: p.equippedBeam, impact: p.equippedImpact, ship: p.equippedShip, pet: p.equippedPet },
   };
 }
 
@@ -251,6 +329,7 @@ export async function arcadeRoutes(app: FastifyInstance) {
       await db.insert(schema.arcadeRuns).values({
         userId: actor.id,
         gameId: it.gameId,
+        textId: it.textId,
         startedAt: new Date(it.startedAt),
         endedAt: new Date(it.endedAt),
         durationMs: it.durationMs,
@@ -266,11 +345,22 @@ export async function arcadeRoutes(app: FastifyInstance) {
         crystalsEarned: cristales,
         weekKey: claveSemana(new Date(it.endedAt)),
         ranked: ok,
+        wordsTyped: it.wordsTyped ?? it.wordsDestroyed,
+        level: it.level,
+        upgrades: JSON.stringify(it.upgrades),
       });
       if (ok) {
         algunaRankeada = true;
         cristalesGanados += cristales;
-        if (it.score > mejorPuntaje) {
+        await db.insert(schema.arcadeBests).values({
+          userId: actor.id, gameId: it.gameId, bestScore: it.score,
+          bestWpm: it.wpmAvg, bestAt: new Date(it.endedAt),
+        }).onConflictDoUpdate({
+          target: [schema.arcadeBests.userId, schema.arcadeBests.gameId],
+          set: { bestScore: it.score, bestWpm: it.wpmAvg, bestAt: new Date(it.endedAt) },
+          setWhere: sql`${schema.arcadeBests.bestScore} < ${it.score}`,
+        });
+        if (it.gameId === "tormenta" && it.score > mejorPuntaje) {
           mejorPuntaje = it.score;
           mejorAmenaza = it.peakThreat;
           mejorRango = it.rankId;
@@ -339,10 +429,38 @@ export async function arcadeRoutes(app: FastifyInstance) {
     const perfil = await asegurarPerfil(actor.id);
     const semana = claveSemana(new Date());
     const semanal = await posicionEn(actor.id, "tormenta", semana, {});
+    const records = await db.select().from(schema.arcadeBests).where(eq(schema.arcadeBests.userId, actor.id));
+    const bests = Object.fromEntries(records.map(r => [r.gameId, { score: r.bestScore, wpm: r.bestWpm }]));
     return reply.send({
-      profile: perfilPublico(perfil),
+      profile: { ...perfilPublico(perfil), bests, crystalsInfinite: cristalesInfinitosLocales(req) },
+      bests,
       week: { key: semana, best: semanal?.score ?? null, pos: semanal?.pos ?? null },
     });
+  });
+
+  /* Fantasmas: una sola lectura al entrar. Solo alias y cosméticos, nunca
+     nombre real; el grado usa el mismo alcance que el ranking existente. */
+  app.get("/api/arcade/ghosts", async (req, reply) => {
+    const actor = requireRole(req, "alumno");
+    if ((req.query as {game?: string}).game !== "carrera") return reply.code(400).send({error:"Juego inválido."});
+    const [yo] = await pg<{grade:string | null}[]>`SELECT g.grade FROM users u LEFT JOIN groups g ON g.id=u.group_id WHERE u.id=${actor.id}`;
+    if (!yo?.grade) return reply.send({mine:null,grade:[],median:25});
+    const [mine] = await db.select({wpm:schema.arcadeBests.bestWpm,score:schema.arcadeBests.bestScore})
+      .from(schema.arcadeBests).where(and(eq(schema.arcadeBests.userId,actor.id),eq(schema.arcadeBests.gameId,"carrera")));
+    const mejores = await pg<{user_id:string;alias:string | null;wpm:number;score:number;ship:string|null;trail:string|null;pet:string|null}[]>`
+      SELECT DISTINCT ON (r.user_id) r.user_id, p.alias, r.wpm_avg AS wpm, r.score,
+        p.equipped_ship AS ship, p.equipped_trail AS trail, p.equipped_pet AS pet
+      FROM arcade_runs r JOIN users u ON u.id=r.user_id JOIN groups g ON g.id=u.group_id
+      LEFT JOIN arcade_profile p ON p.user_id=r.user_id
+      WHERE r.ranked AND r.game_id='carrera' AND r.week_key=${claveSemana(new Date())}
+        AND u.deleted_at IS NULL AND g.grade=${yo.grade}
+      ORDER BY r.user_id, r.score DESC, r.ended_at ASC`;
+    const velocidades = mejores.map(r=>Number(r.wpm)).sort((a,b)=>a-b);
+    const mitad = Math.floor(velocidades.length / 2);
+    const median = velocidades.length ? (velocidades.length % 2 ? velocidades[mitad]! : (velocidades[mitad-1]! + velocidades[mitad]!) / 2) : 25;
+    const grade = mejores.filter(r=>r.user_id !== actor.id).sort((a,b)=>b.score-a.score).slice(0,3)
+      .map(r=>({alias:r.alias ?? "Piloto sin nombre",wpm:Number(r.wpm),ship:r.ship,trail:r.trail,pet:r.pet}));
+    return reply.send({mine:mine ?? null,grade,median});
   });
 
   /* ----- GET /api/arcade/leaderboard?game=&scope=&period= -----
@@ -481,13 +599,15 @@ export async function arcadeRoutes(app: FastifyInstance) {
 
     const item = CATALOGO[parsed.data.id];
     if (!item) return reply.code(404).send({ error: "Ese artículo no existe." });
+    const infinitos = cristalesInfinitosLocales(req);
+    const precioCobrado = infinitos ? 0 : item.precio;
 
     const perfil = await asegurarPerfil(actor.id);
     const publico = perfilPublico(perfil);
     if (publico.owned.includes(parsed.data.id)) {
       return reply.code(409).send({ error: "Ya lo tenés." });
     }
-    if (perfil.crystalsBalance < item.precio) {
+    if (perfil.crystalsBalance < precioCobrado) {
       return reply.code(409).send({ error: "No te alcanzan los cristales todavía." });
     }
 
@@ -497,23 +617,25 @@ export async function arcadeRoutes(app: FastifyInstance) {
     const actualizadas = await db
       .update(schema.arcadeProfile)
       .set({
-        crystalsBalance: sql`${schema.arcadeProfile.crystalsBalance} - ${item.precio}`,
+        crystalsBalance: sql`${schema.arcadeProfile.crystalsBalance} - ${precioCobrado}`,
         ownedCosmetics: owned,
         updatedAt: new Date(),
       })
       .where(
         and(
           eq(schema.arcadeProfile.userId, actor.id),
-          sql`${schema.arcadeProfile.crystalsBalance} >= ${item.precio}`,
+          sql`${schema.arcadeProfile.crystalsBalance} >= ${precioCobrado}`,
+          // Una segunda compra no puede sobrescribir una colección más nueva.
+          eq(schema.arcadeProfile.ownedCosmetics, perfil.ownedCosmetics),
         ),
       )
       .returning({ balance: schema.arcadeProfile.crystalsBalance });
     const actualizada = actualizadas[0];
     if (!actualizada) {
-      return reply.code(409).send({ error: "No te alcanzan los cristales todavía." });
+      return reply.code(409).send({ error: "Tu saldo o colección cambió. Actualizá la tienda y volvé a intentar." });
     }
 
-    await audit({ actor, action: "arcade_buy", entityType: "user", entityId: actor.id, meta: { id: parsed.data.id, precio: item.precio } });
+    await audit({ actor, action: "arcade_buy", entityType: "user", entityId: actor.id, meta: { id: parsed.data.id, precio: precioCobrado, ...(infinitos ? { desarrolloLocal: true } : {}) } });
     return reply.send({ ok: true, balance: actualizada.balance });
   });
 
@@ -521,7 +643,7 @@ export async function arcadeRoutes(app: FastifyInstance) {
   app.post("/api/arcade/equip", async (req, reply) => {
     const actor = requireRole(req, "alumno");
     const parsed = z
-      .object({ slot: z.enum(["trail", "beam"]), id: z.string().nullable() })
+      .object({ slot: z.enum(["trail", "beam", "impact", "ship", "pet"]), id: z.string().nullable() })
       .safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "Datos inválidos." });
 
@@ -530,7 +652,7 @@ export async function arcadeRoutes(app: FastifyInstance) {
     const { slot, id } = parsed.data;
     if (id !== null) {
       const item = CATALOGO[id];
-      const tipoEsperado = slot === "trail" ? "estela" : "rayo";
+      const tipoEsperado = { trail: "estela", beam: "rayo", impact: "impacto", ship: "nave", pet: "mascota" }[slot];
       if (!item || item.tipo !== tipoEsperado) {
         return reply.code(400).send({ error: "Ese artículo no va en ese lugar." });
       }
@@ -542,9 +664,7 @@ export async function arcadeRoutes(app: FastifyInstance) {
     await db
       .update(schema.arcadeProfile)
       .set(
-        slot === "trail"
-          ? { equippedTrail: id, updatedAt: new Date() }
-          : { equippedBeam: id, updatedAt: new Date() },
+        { [{ trail: "equippedTrail", beam: "equippedBeam", impact: "equippedImpact", ship: "equippedShip", pet: "equippedPet" }[slot]]: id, updatedAt: new Date() },
       )
       .where(eq(schema.arcadeProfile.userId, actor.id));
     return reply.send({ ok: true });

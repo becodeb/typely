@@ -156,7 +156,7 @@ export function SkinUnlockCelebration({
       </div>
 
       <div
-        className="glass-card modal-card relative w-full max-w-lg max-h-[92dvh] overflow-y-auto px-6 py-8 text-center animate-card-pop"
+        className="glass-card modal-card tarjeta-marca relative w-full max-w-lg max-h-[92dvh] overflow-y-auto px-6 py-8 text-center animate-card-pop"
         style={{ animationDelay: "60ms" }}
       >
         {/* Overline + título con el gradiente de marca en loop. */}

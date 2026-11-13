@@ -126,44 +126,117 @@ Cuatro roles: `superadmin` (la plataforma), `admin` (UNA sede), `docente`
   `0 24px 60px rgba(54,86,134,0.2)`.
 - Animations are soft and purposeful; honour `prefers-reduced-motion: reduce`.
 
-### Login card — reference spec
+### Login card — "caramelo y gemas" (shipped 2026-09-05)
 
-Target proportions for the login card, kept from the original design reference.
-Where a number here disagrees with what `LoginPage.tsx` actually ships, **the
-shipped value wins** — notably the card is fixed at `w-[min(32rem,92vw)]`, and
-the fonts are the shipped pair (see "Typography" above); do not introduce
-Quicksand, which the original reference also suggested.
+The card is made of the **same material as the logo**, so the brand and the
+form stop being two things. It has its own classes, `.login-*` in
+`global.css`, like `.gp-*`, `.nv-*` and `.orb-*` — it does **not** use
+`glass-surface` / `glass-card-smooth`, which half the app shares. The
+`GlassInput` and `AnimatedButton` components in `src/components/auth/` are
+login-only and carry these classes. Where a number here disagrees with what
+`LoginPage.tsx` ships, **the shipped value wins**; the card stays at
+`w-[min(32rem,92vw)]` with fixed (non-vmin) type, and the fonts are the shipped
+pair — do not introduce Quicksand.
 
-- **Card:** radius 34–44px, background `rgba(255,255,255,0.58)`, backdrop blur
-  22–30px, 1px border `rgba(255,255,255,0.85)`, outer shadow
-  `0 30px 90px rgba(80,70,180,0.28)`, soft turquoise/purple/pink glow on the top
-  and right edges. Never a flat blue/white rectangle.
-- **Vertical order:** wordmark → title → subtitle → "Tu rol" divider → 2×2 role
-  selector → user input → password input → primary button → demo button → safety
-  note.
-- **Wordmark** dominates the top of the card at 48–58px. Never a small square
-  icon as the brand.
-- **Type:** title 40–48px weight 800–900 `#18325f`; subtitle 17–20px `#52658f`;
-  labels 14–16px weight 700 `#596994`.
-- **Role selector:** 2×2 pills, gap 14–16px, height 62–68px, radius 18–22px.
-  Inactive `rgba(255,255,255,0.72)`; active
-  `linear-gradient(135deg, rgba(255,255,255,0.9), rgba(220,245,255,0.65))` with a
-  2px `#5ff3d4`/`#9b7cff` border and `0 0 22px rgba(118,92,255,0.25)` glow.
-- **Inputs:** height 58–64px, radius 18–22px, `rgba(255,255,255,0.72)`, border
-  `rgba(130,140,190,0.22)`, focus border `#73f3dc` with
-  `0 0 0 4px rgba(115,243,220,0.25)`. Left icon; eye toggle on password.
-- **Primary button:** height 62–68px, radius 22px,
-  `linear-gradient(90deg, #54e8c6, #25c8df, #536bff)`, shadow
-  `0 14px 30px rgba(35,190,210,0.35)`, sparkle left + arrow right, hover
-  `translateY(-2px) brightness(1.03)`, active `scale(0.98)`.
-- **Demo button:** height 56–62px, `rgba(255,255,255,0.78)`, text `#405083` or
-  `#5e4edb`, rocket icon, soft border.
+- **Card:** `.login-shell` (512px) → `.login-rim` (4px **gold** fillet,
+  radius 44, its tones sampled from the corner ornament — shadow `#e48a12`,
+  mid `#f9d22b`, light `#ffdc3c` — so card and corners read as one piece;
+  it was iridescent before the ornaments arrived) → `.login-card` (radius 40,
+  white glass `0.78→0.66` with faint mint/lilac/pink tints, blur 28px, shadow
+  `0 30px 90px rgba(80,70,180,0.28)`). Never a flat blue/white rectangle.
+- **Wordmark:** the real 3D logo (`assets.logoWordmark`, preloaded in
+  `index.html`) at `min(360px, 72%)`, straddling the top edge (`top: -84px`)
+  and anchored to the shell, outside the clipping card. Never a small square
+  icon, never text with a gradient as the brand.
+- **Corner ornaments:** generated art, not CSS. `login-esquina.webp` is a
+  jeweled gold rail with gems and cloud puffs drawn for the **top-left**
+  corner; the other three are the same image rotated 90/180/270. **Where
+  each one sits lives in `src/data/loginEsquinas.ts`**, one row per corner:
+  `x`/`y` offset from its own corner, `ancho`, and an extra `giro`, all in
+  **% of the card's width** (also vertically — `.login-shell` is a
+  `container-type: inline-size` and the values render as `cqw`), so the
+  piece keeps its proportion at every height and under the fit-to-viewport
+  zoom. Never pixels. Place them with the **visual editor**: set
+  `localStorage.typely_dev_editor = "1"` once, open `/login?editor=1`, drag
+  a corner (arrows nudge, `S` = width, `Z` = spin, Shift ×10, Alt fine,
+  "Espejar a las 4" copies one corner to all), and `Ctrl/Cmd + S` writes
+  the file through `scripts/vite-plugin-login-esquinas.ts` — the same
+  dev-only endpoint pattern as the level editor (§6.1). The wordmark stacks
+  above the ornaments (`z-index: 2`) so the logo reads as resting on the
+  crest. Source `Images/brand/login/esquina-source.png` (with
+  `guia-esquina.png`, the placement guide used to generate it); regenerate
+  the web copy with `node scripts/import-login-esquina.mjs`. Flat SVG gems
+  were tried first and rejected: solid fills with white outlines do not
+  match the logo's material. Two tiny SVG diamonds still flank the
+  "ENTRÁ A TU CUENTA" divider.
+- **Pattern:** an SVG `<pattern>` of four-point sparkles at 45% opacity fills
+  the card behind everything (`.login-destellos`). It replaced three spinning
+  ✦ text glyphs.
+- **Vertical order:** wordmark → "¡Bienvenido!" (Baloo 2, 42px, `#18325f`) →
+  subtitle (17px, `#52658f`) → divider → user input → password input → primary
+  button → demo button → safety note. There is **no role selector** (§4: one
+  form for all four roles).
+- **Inputs (`.login-campo`):** 60px, radius 20, white `0.82`, border
+  `rgba(130,140,190,0.24)`; the icon sits in a 36px gradient bubble (mint for
+  the user, violet for the password); focus border `#73f3dc` with
+  `0 0 0 4px rgba(115,243,220,0.25)`. Eye toggle on the password.
+- **Primary (`.login-boton--primario`):** 64px, radius 22,
+  `linear-gradient(90deg, #54e8c6, #25c8df, #536bff)`, a candy gloss on the
+  top half (`::before`), shadow `0 14px 30px rgba(35,190,210,0.35)`, sparkle
+  left + arrow right, hover `translateY(-2px) brightness(1.03)`, active
+  `scale(0.98)`.
+- **Demo (`.login-boton--demo`):** 58px, white `0.84`, text `#5e4edb`, 2px
+  lilac border, rocket icon.
+- **It never scrolls, on any screen.** Three layers, in order: short windows
+  (`max-height: 700px`) pull the wordmark in and shrink the controls a notch;
+  narrow windows (`max-width: 1180px`) shrink the mascots so they stop
+  hiding behind the card, and phones (`max-width: 480px`) tighten the side
+  padding and the title; and as the last resort `useAjusteAlViewport`
+  (`src/hooks/`) measures the shell at scale 1 and applies a CSS `zoom` ≤ 1
+  so the whole card, wordmark overhang and margins included, fits the
+  viewport in both axes. It uses `zoom`, not `transform`, because zoom is
+  layout (centring stays exact) and a transformed ancestor can kill the
+  card's backdrop blur in Chrome. Verified 2026-09-05 at 1920×1080,
+  1366×912, 1366×768, 1366×560, 1280×600, 1024×768, 375×812, 375×667 and
+  812×375 with no scroll. Nothing changes the card's width.
 - **Mascots** flank the card from outside it, never cropped, never stretched,
   never on a white box. See "Login mascots" below for the shipped positioning.
 
-When you change this screen, screenshot it and compare against the reference
-before calling it done; fix spacing, proportions, blur, radius and shadows and
-repeat. One pass is rarely enough.
+### Every white container on a student screen is a brand card (structural rule)
+
+**There is no plain white card in the student's game. Anywhere.** Every
+white container — page cards, modals, HUD pills, popovers, toasts, the
+star counter, the skin bar, Órbita's glass, in every mode and every
+screen the `alumno` role can reach — wears the light version of the login
+card: the same tinted white glass (mint → lilac → pink) and a 3px
+iridescent fillet (2px on pills, so touch heights survive) drawn as the
+`border-box` layer of the background. **No sparkle pattern** — repeated on
+every card it overloaded the screen, so it stays on the login only — and no
+gold and no corner ornaments, which are the login's alone.
+
+**It is automatic, not opt-in.** The rule at the very END of `global.css`
+("REGLA ESTRUCTURAL") applies it to `glass`, `glass-strong`, `glass-card`,
+`glass-card-smooth`, `glass-surface`, `orb-vidrio`, `orb-pildora`,
+`orb-aviso`, `modal-card` and `skin-bar-panel`; `.tarjeta-marca` is the
+explicit synonym. It sits at the end on purpose so it wins the cascade over
+every glass rule above it — do not move it, and do not add a `bg-white/…`
+utility on top of a glass class (the rule wins anyway and the state is
+lost). **A new student card is built with one of those classes and is born
+a brand card.** A bare `bg-white/70 rounded-2xl` box on a student screen is
+a bug. `/gestion` uses none of these classes and is untouched.
+
+Deliberate exceptions, and only these: the mission (`.gp-mision`) shares
+the tinted fill but keeps its **lit gradient border, which stays exclusive**
+(§6.5); Órbita's upgrade cards (`.orb-carta`) carry rarity in their frame;
+keys, ice plates, inputs and buttons are not cards; the Órbita pill's
+active state (`.orb-pildora--activa`) keeps its mint fill. `.vidrio-liso`
+exists as an explicit escape for a future case that truly needs flat glass
+— using it is a decision to justify in a comment, not a default.
+
+The design was chosen on a three-direction canvas ("Tarjeta de login TYPELY",
+2026-09-05) against a keycap-styled card and a split indigo "portal" card. When
+you change this screen, screenshot it at 1366×768 and 375×812 and compare
+before calling it done. One pass is rarely enough.
 
 ### Keyboard (GameplayPage)
 - Five rows (`num`, `top`, `home`, `bot`, `mod`). Keys are frosted crystal
@@ -829,9 +902,10 @@ touchpad, windows, tabs, shortcuts, text editing, UI literacy). `SkillLevelView`
 
 ### 8.1 Modo Órbita (arcade)
 
-El segundo eje del producto: minijuegos infinitos y rejugables, medidos por
-supervivencia y velocidad — no por completación. El primero es **Tormenta de
-palabras** (`/orbita/tormenta`). La especificación de diseño completa vive en
+El segundo eje del producto es una sección de minijuegos rejugables, medidos
+por supervivencia y velocidad. Incluye **Tormenta de palabras**
+(`/orbita/tormenta`) y **Carrera de cohetes** (`/orbita/carrera`).
+La especificación de diseño de Tormenta vive en
 el artefacto "Tormenta de palabras"; acá va lo que hace falta para tocar el
 código sin romper sus reglas.
 
@@ -839,14 +913,157 @@ código sin romper sus reglas.
 selector de ORBES DE CRISTAL — Aventura (las islas), Órbita, y un orbe dormido
 para modos futuros. Las rutas: `/orbita` (hub), `/orbita/tormenta` (el juego,
 con `SoloEnComputadora` igual que los niveles), `/orbita/ranking`,
-`/orbita/hangar`. Todo lazy.
+`/orbita/tienda` (la antigua `/orbita/hangar` redirige). Todo lazy.
+
+**Carrusel de minijuegos (etapa 2, aprobado).** `/orbita` monta
+`CarruselJuegos.tsx` con los cinco puestos de `orbitaJuegos.ts`: Tormenta,
+Carrera y tres juegos futuros. Por pedido expreso de Ezequiel del 07/09,
+las galaxias se reemplazaron por objetos simples: nube con palabras,
+cohetes con bandera, huevo, cristal y cofre. Autorizó elegir y generar el
+arte sin otra aprobación individual. Las fuentes y los prompts quedan en
+`Images/orbita/destinos/`, y los WebP en `public/assets/orbita/destinos/`.
+CSS 3D, destino entero sin acotar, giros
+de 700/1000/1200 ms según los gestos encadenados, teclado, flechas de vidrio,
+deslizar y clic lateral. La nave equipada y su mascota acompañan el giro;
+el cielo recibe el impulso contrario y vuelve al centro al descansar.
+El sonido comparte interruptor y clave con Tormenta. Movimiento reducido
+funde en 200 ms, sin rotación, inclinación, parallax ni respiración.
+Se conserva la selección en `typely_orbita_galaxia_v1`. La estación con
+la nave posada pasó a `Puerto.tsx`, fondo de la tienda.
+
+La distribución vertical se ajustó con autorización de Ezequiel para que
+arte, nombres y nave no se tapen a 1366×768 y 1366×912. En la revisión del
+07/09 pidió reemplazar explícitamente el efecto de láminas vistas de canto:
+se conservan el recorrido del anillo, su radio y la perspectiva, pero cada
+ilustración compensa el giro y solo inclina 13° por puesto (máximo 26°).
+Las laterales se ven al 66 % y las del fondo al 43 %, más elevadas, para
+mostrar distancia sin perder la cara del objeto. Los nombres miran al
+lector. Flota suavemente solo el objeto central; cuatro rastros luminosos
+acompañan el viaje. Se retiraron el aura y el polvo orbital para simplificar
+la escena. La nave acompaña con desplazamiento y estelas desde los motores
+reales de cada pose, del color equipado. Solo se animan transform y opacity;
+con movimiento reducido se apagan estos adornos y se conserva el fundido.
+Celular: explorar solamente.
+El hito del carrusel se mostró antes de avanzar. Ezequiel habilitó la Carrera
+y aprobó sus sesenta párrafos el 08/09/2026. El brief original está en
+`Images/orbita/GALAXIAS-BRIEF.html`; las revisiones autorizadas se documentan acá.
+
+**Carrera de cohetes.** `CarreraPage.tsx` es lazy, con `SoloEnComputadora`.
+`MotorCarrera` (`src/utils/orbita/carrera.ts`) es puro: cada carácter correcto
+avanza una fracción del recorrido; hasta cinco errores coral bloquean el
+avance hasta borrarlos. El sexto se ignora. Backspace también retrocede una
+correcta, sin otra penalidad. La entrada usa `beforeinput`, composición y
+normalización NFC para conservar mayúsculas, tildes y ñ. No admite pegar.
+El texto completo aparece arriba, en hasta tres líneas; tres luces con pasos
+de 800 ms dan la largada. A los 20 s sin tecla se congelan nave, reloj y
+fantasmas; cualquier tecla retoma. Pestaña oculta también pausa.
+La carrera termina al completar el texto, sin vidas ni corte por tiempo.
+
+**Excepción explícita a las bandas:** todos corren los mismos sesenta
+párrafos escritos a mano y aprobados, sin depender del progreso de Aventura.
+`src/data/carreraTextos.ts` contiene IDs estables, 90–140 caracteres, dos o
+tres oraciones y solo letras, espacios, puntos, comas y signos de pregunta.
+Otra vez sortea un texto distinto del anterior. El examen valida todo el corpus.
+
+Hasta cuatro fantasmas avanzan a PPM constante: el récord propio y los tres
+mejores del grado de la semana ISO, con alias y cosméticos, sin nombres reales.
+`GET /api/arcade/ghosts?game=carrera` se consulta una vez al entrar; sin red,
+en demo o sin grado queda un rival a la mediana del grado, o 25 PPM.
+El puesto cuenta los fantasmas que llegaron estrictamente antes del alumno.
+Puntaje = `round(ppmNeto × (precision/100)² × 10)`; cristales =
+`round(caracteres/5)` más 12/8/5/2/2 por puesto. El resultado muestra tiempo,
+PPM, precisión, puesto, puntaje y cristales; los tres primeros reciben medalla.
+La pista, meta, luces, medallas y chispas son arte generado; las naves,
+mascotas, estelas y el sonido se reutilizan. Movimiento reducido apaga
+cursor pulsante, chispas y destellos decorativos.
+
+**Revisión visual de Carrera (08/09/2026):** a pedido de Ezequiel se reemplazó
+la vista lateral por una cámara detrás de las naves. `pistaCarrera.ts` define
+la proyección común de los cinco carriles, sus corredores y la llegada.
+La recta frontal se generó directamente para esta cámara: `recta-frontal.webp`
+se muestra con escala uniforme y traslación, sin estirar su textura. Se
+retiraron la homografía de la imagen lateral y la segunda copia del suelo,
+que parecía una escalera flotante. El arco conserva su posición frontal y
+su abertura alineada al final de los carriles, sin tarimas debajo.
+Las naves conservan su orientación frontal y reducen
+su escala al alejarse; los alias se atenúan a distancia. No se alteraron los
+PNG. Texto alineado a la izquierda, consigna y progreso en un mismo bloque,
+tiempo y ritmo agrupados en la barra, luces de largada junto a la consigna.
+El alto de la pista depende del espacio que deja el párrafo, incluso si
+ocupa tres líneas. El resultado refuerza la separación del fondo y la
+jerarquía entre medalla, puesto, puntaje y métricas.
+
+**Duraciones revisadas con autorización:** se mantienen el largo de los
+textos y las velocidades reales. En veinte párrafos por perfil, las medianas
+del examen son 200/100/56/35/22/16 s para 8/15/25/40/60/85 PPM.
+El máximo observado para 8 PPM es 229 s. Se comprueban 45–75 s para 25 PPM,
+25–45 s para 40 PPM y hasta 360 s en todos los perfiles. La API admite
+Carrera de 5–360 s para ranking (el juego puede completarse fuera de esa
+ventana); valida textId, largo exacto, PPM, precisión, fórmula del puntaje,
+puesto, nivel cero y ausencia de mejoras. Tormenta conserva sus límites.
+
+**Datos y ranking por juego:** migración `0007_arcade_carrera.sql`, tabla
+`arcade_bests` por alumno/juego y `arcade_runs.text_id`. Los récords previos
+de Tormenta se copian en la migración; los campos históricos del perfil
+siguen siendo de Tormenta. `/me` agrega `bests`, el ranking tiene pestañas
+y el hub muestra el récord de cada juego. El récord local migra el formato
+anterior a un mapa por juego. Las partidas usan la cola existente y se
+reintentan al volver al hub; el demo nunca manda datos a la API.
+
+Verificación de Carrera (08/09/2026): build y TypeScript de API; examen de
+Carrera y ambos exámenes de Tormenta; integración local de migración,
+validación, cristales, récords, fantasmas y ranking. En Chrome se verificaron
+entrada, errores, composición, pausas, resultado, otra carrera y envío
+pendiente al recuperar la red, a 1366×768, 1366×912 y 1440×900 sin scroll.
+Movimiento reducido verificado; la ruta sigue siendo solo de exploración
+en celular a 375×812. Frontend y API reconstruidos en Docker, API saludable
+y proxy HTTP 200 en el puerto local 3007; el 3005 estaba ocupado.
+
+Verificación del hito 1 (08/09/2026): build, TypeScript de API y ambos
+exámenes de Tormenta aprobados; navegación y ausencia de scroll verificadas
+en Chrome a 1366×768, 1366×912, 1440×900 y 375×812. La medición del compilado
+local con los nuevos objetos dio mediana 16,7 ms, p95 16,8 ms y tres cuadros
+por encima de 20 ms (máximo 66,6 ms, 419 muestras). La cara visible también
+se verificó durante giros encadenados e inversión en vuelo.
+**La aceptación de rendimiento sigue abierta:**
+no equivale a verificar 60 fps sin picos en la Chromebook del aula.
+
+**Bonus Tormenta de signos.** `tormentaSignos.ts` controla una única oleada
+por partida, sin mirar el progreso de Aventura ni exigir precisión. Se
+habilita con seis intervalos dentro de palabras que promedien como máximo
+un segundo; se ofrece desde los 30 s, con 2–6 s aleatorios de espera.
+Primero deja de generar palabras y espera a que la pantalla se vacíe.
+La frase `tormenta de signos`, incluidos sus espacios, viaja sola hacia la nave como cualquier palabra (28 s de recorrido, con
+retroceso al acertar). Usa los mismos disparos, seguimiento y prefijo escrito.
+Completarla inicia signos individuales: uno al principio y hasta
+dos o tres según el ritmo de respuesta. La presión crece sin techo desde
+los 30 s, hasta ser casi imposible alrededor de los 40 s; no hay cierre por
+temporizador. El primer impacto cierra el bonus sin gastar vidas ni escudos.
+Cada signo da tres veces los puntos base de una palabra de cinco letras
+(90 con los ajustes actuales). El cierre desvanece el tinte durante
+3 s y retoma la partida. Entrada, oleada y cierre congelan el reloj normal,
+la adaptación, las rachas y los tiempos de mejoras. Las cartas obtenidas
+por esos puntos se ofrecen al volver. El bonus no aumenta los cristales.
+`EscenaSignos.tsx` solo tiñe suavemente el fondo después de completar la
+frase; no hay núcleo, carteles ni contador adicional. Los signos usan una
+tipografía monoespaciada sin brillo ni subrayado para distinguir sus trazos;
+el guion bajo queda excluido del bonus.
+Verificación: `node scripts/verificar-tormenta-signos.mjs` y
+`node scripts/simular-tormenta.mjs` (distingue tiempo normal y bonus).
 
 **El motor es puro y la promesa se verifica por simulación.**
 `src/utils/orbita/motor.ts` no toca DOM: un controlador de lazo cerrado mide
 PPM×precisión^1.7 en ventana de 10 s, estima el techo del jugador (R̂, solo
 sube) y exige `R̂ × (1 + margen(t))` con un margen que va de **−15 % al
-arrancar a +35 % a los 120 s** — la partida dura ~2:00 ± 0:30 PARA CUALQUIERA
-por construcción. Los primeros 4-10 s son un **vuelo de prueba**: llueven
+arrancar a +35 % a los 120 s** y sigue creciendo (exponente 2) — la partida
+BASE dura ~2:00 PARA CUALQUIERA por construcción; las mejoras permanentes
+(más abajo) la estiran. No existe corte por tiempo: solo termina al perder
+el último corazón, respetando Segunda oportunidad — y el TECHO BLANDO (ver
+mejoras) garantiza que eso pase sí o sí, alrededor de los cinco minutos
+hasta para un tipeador perfecto. La API tampoco excluye partidas por ser
+largas. `node scripts/verificar-tormenta-sin-limite.mjs`
+verifica 30 minutos con vidas y el cierre al perder la última.
+Los primeros 4-10 s son un **vuelo de prueba**: llueven
 palabras cada vez más rápido (tres en pantalla, sin asomo de banda, intervalo
 ≤ 2,5 s) y nada lastima. El vuelo corta cuando el tope de tres queda lleno
 1,5 s seguidos, cuando una palabra casi impacta, cuando el chico lleva 2,5 s
@@ -860,19 +1077,63 @@ del vuelo reciben 40 % más de viaje. En la partida, si el chico vacía la
 pantalla y espera más del 15 % del intervalo entre palabras, R̂ **empuja**
 (25 %/s; 30 %/s en el vuelo): la adaptación es por lo que hacés, no por
 reloj. Tres frenos a ese empuje, y los tres fueron trinquetes reales: no
-cuenta mientras un *lento*, un *pulso* o un *rayo* vacían la pantalla; nunca
+cuenta mientras una *bala*, un *crítico* o una *onda* vacían la pantalla; nunca
 lleva R̂ más allá de 1,35 × la demanda; y la cadencia se mide contra el largo
 REAL de la última palabra, no contra el largo medio de la banda (un "@" de la
 banda de símbolos dejaba la pantalla vacía todo su intervalo y R̂ pasaba de
 50 a 102 en cinco segundos). Dos exámenes, y hay que correr los dos después
 de tocar cualquier valor de `AJUSTES`: `node scripts/simular-tormenta.mjs`
-(seis tipeadores sintéticos de 8 a 85 PPM; los seis tienen que caer en
-90–150 s de mediana) y `node scripts/jugar-tormenta.mjs` (diez jugadores
-guionados — el que arranca mal y termina brillante, el que se distrae, el
-que no toca nada — con métricas de sensación: huecos, ahogo, en qué segundo
-se pierde cada corazón, amenaza en el tiempo, poderes verificados,
-invariantes). Los dos aceptan `--ajuste clave=valor` para probar una perilla
+(seis tipeadores sintéticos de 8 a 85 PPM que eligen cartas al azar; los
+seis tienen que caer en 90–180 s de mediana, sin imponer duración máxima)
+y `node scripts/jugar-tormenta.mjs` (trece jugadores guionados — el que
+arranca mal y termina brillante, el que se distrae, el que no toca nada, y
+tres builds fijas: defensiva, ofensiva y cazador de balas — con métricas de
+sensación: huecos, ahogo, en qué segundo se pierde cada corazón, amenaza en
+el tiempo, niveles y build, invariantes del sorteo). Los dos aceptan `--ajuste clave=valor` para probar una perilla
 sin editar el motor. No dar por buena una calibración que no pase los dos.
+
+**Mejoras permanentes por nivel** (2026-09-05, diseño en el artefacto
+"Mejoras de Tormenta"; reemplazaron a los siete poderes que caían al azar).
+El puntaje cruza umbrales geométricos (`nivelUmbral0: 250` × `nivelRazon:
+1.5`ⁿ, el primero a los ~20 s); en cada uno el motor se PAUSA (`eligiendo`),
+sortea tres cartas por rareza (común 65 · rara 28 · épica 7) y espera
+`elegir()`, que rechaza lo que no ofreció. Se elige con las teclas 1-2-3 o
+tocando, sin cuenta regresiva ni "volver a tirar". Trece mejoras
+(`MEJORAS` en el motor, `MejoraId`), cada una con su tabla por nivel en
+`AJUSTES`: bala extra (el rayo se bifurca y cae también la más urgente —
+mitad de puntos, sin racha), segunda oportunidad, +1 vida (tope blando 5),
+regeneración (30/20/12 s), escudo latente (20/12/8 s sin daño), golpe
+crítico (15/30/45 % con palabra limpia), viento a favor (8/15/20 % más
+lento), foco (la más urgente marcada y apuntada sola), onda de choque (al
+subir de nivel y cada 12/8 palabras), congelar al errar (0,5/0,8/1,2 s con
+cooldown FIJO de 12 s: si mejorara el cooldown, errar a propósito sería
+estrategia), imán, racha blindada (perdones que se renuevan por nivel) y
+teclas difíciles (×1,5/2/2,5 por mayúsculas, tildes y símbolos). Topes
+duros salen del sorteo; los blandos (bala, vida) quedan con peso chico —
+con suerte pueden tocar igual. Se fue el impuesto por poder
+(`margenPorAuxilio`): las mejoras VALEN, y no hay corte por duración — la
+partida termina solo al perder el último corazón. Lo que sí hay es un
+**techo blando** (decisión de Ezequiel, 2026-09-07): la amenaza está
+topeada en 100 y las perillas tienen pisos (vida 2,8 s, intervalo 0,55 s),
+así que un tipeador perfecto con Viento e Imán las saturaba y no perdía
+nunca (846 s en el banco). Pasados `techoBlandoDesde: 210` s de partida
+real, esos pisos bajan un escalón cada `techoBlandoCada: 45` s (hacia
+`techoBlandoVidaMin: 0.7` s y `techoBlandoIntervaloMin: 0.2` s): las
+palabras llegan más rápido de lo que nadie puede tipearlas y hasta la
+máquina perfecta cae, alrededor de los cinco minutos. Los perfiles
+humanos terminan antes de que muerda, así que para ellos "una buena build
+estira" sigue siendo verdad. El HUD lo anuncia como SOBRECARGA ×N
+(`motor.sobrecargaNivel`). Los
+cristales se acuñan sobre lo TIPEADO (`palabrasTipeadas`), nunca sobre lo
+que cayó por bala o crítico; el servidor recibe nivel y build (migración
+`0004`, columnas `words_typed`, `level`, `upgrades`) y `validarCoherencia`
+sabe cuántas palabras puede arrastrar cada bala. Las gemas de las mejoras
+son las mismas gemas redondas de los poderes (cuatro reusadas: lento →
+viento, mira → foco, escudo, pulso → onda; reparación → +1 vida) más ocho
+nuevas (`ORBITA.md` §7.6); la rareza va en el marco de la carta (CSS),
+nunca en la gema. Al subir de nivel hay que ELEGIR también en los exámenes:
+los jugadores guionados leen `motor.eligiendo` después de cada tick y de
+cada tecla, porque el nivel sube dentro de `tecla()`.
 
 **Reglas que no se negocian:**
 
@@ -890,22 +1151,36 @@ sin editar el motor. No dar por buena una calibración que no pase los dos.
   la que no cierra se guarda con `ranked=false` — no compite ni acuña. Los
   cristales los recomputa el servidor, nunca se acredita lo que diga el
   cliente sin tope.
-- **El corpus sale del currículum** (`src/data/orbitaCorpus.ts`: once bandas
-  desde los `targets[]` reales, en orden pedagógico) y el techo del alumno es
-  su banda desbloqueada +1 de asomo — nunca símbolos que jamás vio.
+- **Tormenta es el mismo juego para todos** (decisión de Ezequiel,
+  08/09/2026): el corpus NO depende de la isla en la que va el chico. Son
+  tres bandas fijas (`src/data/orbitaCorpus.ts`: letras sueltas, sílabas y
+  palabras de 2-4, palabras de 5-6 como asomo), sacadas de los `targets[]`
+  reales de cualquier isla y filtradas a pura letra minúscula sin tilde —
+  ni dígitos, ni signos, ni espacios. El motor sube de banda con la amenaza
+  solo hasta `AJUSTES.bandaTope` (1); lo que escala con la habilidad es la
+  presión (cadencia, velocidad, simultáneas), no el vocabulario. Los signos
+  aparecen ÚNICAMENTE en la oleada "tormenta de signos". La página ya no
+  consulta estrellas ni mundos abiertos, y `MotorTormenta` no recibe banda.
+  Recalibración que lo acompañó, con los dos exámenes pasando: la banda
+  sube a amenaza 10 (`bandaCadaAmenaza`; con 8 el lector de 8 PPM caía a
+  sílabas en su borde y duraba 82 s) y el tope de simultáneas es 10, una
+  más cada 12 de amenaza (`simultaneasMax`, `simultaneasCadaAmenaza`; con
+  8 y cada 20, calibrados para palabras largas, el experto de 85 PPM
+  limpiaba las cortas más rápido de lo que el tope dejaba entregar y
+  duraba 190 s). Medianas: 108/150/152/143/154/173 s para 8→85 PPM.
 - **El demo juega y no manda nada**: sin cuenta no hay ranking ni cristales.
 - **El docente puede pausar el modo por grupo** (`groups.arcade_enabled`,
   toggle en la pantalla de islas del grupo). El orbe se ve dormido, nunca
   desaparece ni queda como botón muerto.
 - La partida **se pausa sola con la pestaña oculta** (rAF + recorte de dt en
-  el motor): una interrupción de aula no regala impactos. Cuatro ganchos
+  el motor): una interrupción de aula no regala impactos. Tres ganchos
   existen SOLO en dev y no aparecen en producción: `?bot=N` corre el bucle
   por intervalo a N× (para verificar desde una pestaña oculta, donde no hay
   rAF, antes de que el cliente de Vite recargue), `window.__tormentaTecla`
-  tipea por el mismo camino que el teclado, `window.__tormentaVivas` da la
-  lista viva del MOTOR (el DOM entre dos pintadas de React miente), y
-  `?banda=8` fuerza la banda máxima de corpus (0-10) para probar símbolos o
-  correos sin pasarse cinco islas. Ojo con `?bot=4`: una partida sin teclas
+  tipea por el mismo camino que el teclado y `window.__tormentaVivas` da la
+  lista viva del MOTOR (el DOM entre dos pintadas de React miente). El
+  `?banda=N` que forzaba la banda del corpus se fue con las bandas por isla
+  (08/09/2026). Ojo con `?bot=4`: una partida sin teclas
   termina en 22 s de juego, o sea 5 s de pared — el bot hay que inyectarlo
   antes de que termine la cuenta regresiva.
 
@@ -913,8 +1188,73 @@ sin editar el motor. No dar por buena una calibración que no pase los dos.
 (`typely_orbita_*`), cola con reintento a `POST /api/arcade/run`, cache de
 perfil. Ranking semanal por `week_key` ISO calculada con huso argentino.
 Tablas `arcade_profile` / `arcade_runs` (migración `0003_arcade.sql`); el
-catálogo del hangar está duplicado a propósito cliente/servidor y manda el
+catálogo de la tienda está duplicado a propósito cliente/servidor y manda el
 del servidor.
+
+**Tienda:** cinco secciones (Estelas, Rayos, Naves, Impactos, Mascotas), con probador
+local que no modifica el equipo de la cuenta. Comprar y equipar son acciones
+separadas. Se mantienen los ids y precios de los colores anteriores; se suman
+efectos animados y las naves aprobadas Aurora (2400), Prisma (3600),
+Fénix (4800) y Eclipse (6000). Fénix y Eclipse tienen propulsión original
+ámbar y fucsia, respectivamente; una estela equipada conserva su propio color.
+La colección divertida suma Zapatilla cohete (7200), Tiburón galáctico (8400),
+Dragón de caramelo (9600), Ovni gelatina (10800) y Ajolote espacial (12000).
+Rarezas de naves en `orbitaCosmeticos.ts`: Común (original, Aurora, Prisma),
+Rara (Fénix, Eclipse), Épica (Zapatilla, Tiburón, Dragón) y Legendaria
+(Gelatina, Ajolote). Las tarjetas y el probador muestran la etiqueta; el
+catálogo usa tintes menta, lila, dorado y rosa sobre el vidrio de marca.
+Todas las secciones usan esas cuatro rarezas: colores y originales Comunes;
+estrellas, pulso y anillos Raros; aurora, espiral y cristales Épicos.
+La colección de efectos suma estelas Burbujas (850, Rara), Píxeles (1600,
+Épica) y Arcoíris (1800, Legendaria); rayos Relámpago (900, Rara), Caramelo
+(1600, Épica) y Pompas (1800, Legendaria); impactos Rosa (300, Común),
+Burbujas (850, Rara), Confeti (1500, Épica) y Pochoclos (1800, Legendaria).
+Son efectos CSS/SVG en `EfectosCosmeticos.tsx`, compartidos por catálogo,
+probador y partida. Las miniaturas quedan quietas para no animar todo el
+catálogo a la vez; las partículas tienen cantidad fija y respetan pausa
+y movimiento reducido. La rareza es obligatoria en cada cosmético.
+Cada nave de la colección divertida tiene tres perspectivas generadas (neutra, izquierda y derecha),
+con anclajes propios para el cristal y los dos propulsores.
+`NaveOrbita`, `RayoCosmetico` e `ImpactoCosmetico` se comparten entre partida y
+vista previa. El registro `orbitaNaves.ts` mide anclajes por pose; nunca se
+mezclan las siluetas con transparencia. PNG originales en
+`Images/orbita/naves/<id-de-nave>`, derivados WebP en `public/assets/orbita/naves/`.
+Importación: `node scripts/import-orbita-naves.mjs aurora` (o el id de carpeta);
+`recorte.json` conserva los blancos de Prisma y elimina el fondo encerrado
+entre las alas y conexiones de Eclipse. La migración `0005` añade
+`equipped_impact` y `equipped_ship`, nulos para el aspecto original.
+La compra condiciona saldo y colección en la misma actualización para evitar
+dobles compras o pérdida de objetos simultáneos. Prueba local de contratos:
+`cd api` y `node --env-file=.env --import tsx src/scripts/verificar-tienda.ts`.
+
+**Mascotas:** ocho diseños aprobados con rarezas y precios: Botito (400) y
+Lunita (600), Comunes; Gatito cometa (1000) y Medusa burbuja (1400), Raras;
+Pulpito DJ (2000) y Dino patinador (2600), Épicas; Capibara astronauta (3400)
+y Dragón de gelatina (4200), Legendarias. Slot `pet`, columna `equipped_pet`
+(migración 0006); null permite volar sin acompañante. `MascotaOrbita` se
+comparte entre inicio, probador y partida. `orbitaPersonalidades.ts` define
+gestos y frases propias (8/12/16/20 por mascota según rareza). Anima los WebP
+con transformaciones CSS y hasta seis partículas; no carga GIF ni video.
+Saluda, alienta y observa rachas/corazones del HUD para festejar o acompañar
+un tropiezo, sin acceso al motor, daño, objetivos ni puntaje. El mensaje usa
+texto lavanda sin fondo, borde ni globo: en el inicio aparece temporalmente
+bajo el título (sin subtítulo fijo ni nombre de nave), en la tienda ocupa una línea fuera del probador, y en partida
+queda al costado del acompañante. Los destinos externos se conectan por ref
+y portal; no superponen la ilustración ni cambian su altura al hablar. Un solo mensaje
+dura 6,5 s; hay al menos 11 s entre reacciones y 26 s entre mensajes de ánimo
+en partida. Respeta pausa, pestaña oculta y movimiento reducido. PNG y prompts en
+`Images/orbita/mascotas/<id>/`, WebP transparentes de 512px en
+`public/assets/orbita/mascotas/<id>/`. Importador:
+`node scripts/import-orbita-mascotas.mjs <id>`. No modifica los PNG.
+
+**Cristales infinitos en local:** `ORBITA_CRISTALES_INFINITOS=true` en
+`api/.env` hace que las compras cuesten cero sin modificar el saldo guardado.
+Solo se activa con base local, socket y origen localhost/loopback y fuera de
+`NODE_ENV=production`. El perfil informa `crystalsInfinite` y la UI muestra ∞.
+`VITE_ORBITA_CRISTALES_INFINITOS=true` en `.env.local` habilita lo mismo para
+la demo, solo en Vite dev y localhost: compras/equipo en una clave separada,
+sin llamadas a la API. Reiniciar API/Vite al cambiar las variables. Ambas
+opciones vienen desactivadas en la plantilla.
 
 **Estética: el mismo cuento de las islas, de noche, visto desde arriba.**
 Índigo (`#141b4d`) en vez de negro; el tinte de la amenaza va de pervinca a
@@ -924,12 +1264,18 @@ fuera de la escena del juego es el **vidrio de marca** (`.orb-vidrio`,
 `.orb-pildora`, `.orb-boton-primario`, `.orb-boton-vidrio`, `.orb-campo`):
 blanco esmerilado con blur, resplandor turquesa/violeta/rosa y texto azul de
 tinta, el mismo de la tarjeta de login. Dentro de la escena el HUD sigue
-siendo texto suelto con halo, nunca tarjetas. Lo que se ve grande (insignia
-del resultado y del podio, gema del poder que llega a la nave, cristal del
+siendo texto suelto con halo, nunca tarjetas. Las palabras que vuelan nacen a
+19 px y llegan a 64 px sobre la nave (`posicionDe`, escala 0,6 → 2,0 sobre
+2rem), con estela hacia atrás, "pop" al nacer, tambaleo que crece con la
+cercanía y latido coral pasado el 72 % del viaje; las mayúsculas van doradas
+y un 30 % más grandes; y el texto va SIEMPRE derecho — es un juego de tipeo,
+nada rota salvo las letras de una palabra que ya murió. Lo que se ve grande (insignia
+del resultado y del podio, gemas de las cartas y de la build, cristal del
 saldo) son objetos 3D generados en `public/assets/orbita/{insignias,gemas}/`
 que `InsigniaRango tamano="grande"` y `Gema` cargan con respaldo SVG; el
-horizonte de las islas (`fondo/horizonte.webp`) y la estación del hub
-(`hub/estacion.webp`) se ocultan solos hasta que existan. Las fichas y los
+horizonte de las islas (`fondo/horizonte.webp`) se oculta si falta. El inicio
+de Órbita usa una escena de vuelo (`EscenaVuelo`) con la nave, sus motores,
+la estela equipada y su mascota; ya no usa `hub/estacion.webp`. Las fichas y los
 prompts de esas piezas están en `Images/orbita/ORBITA.md` §7; el importador
 las mide (`node scripts/import-orbita-art.mjs`) y `preview-orbita-fondo.mjs`
 apila el horizonte con palabras encima para aprobarlo. Ojo Chrome:
@@ -1050,8 +1396,9 @@ edge.
   center % coords in `src/data/levelPositions.ts`. Compact floating HUD
   (`.island-hud`) + popover beside the selected node. **Dev-only** position editor
   (`?editor=1`, gated by `import.meta.env.DEV`, stripped from prod).
-- **Login card**: glass card with halo, shimmering "TYPELY" wordmark, role-aware
-  form. Card width `min(32rem, …)`.
+- **Login card**: the "caramelo y gemas" card of §5 — iridescent fillet, the
+  3D wordmark straddling the top, corner gems, sparkle pattern, one form for
+  every role. Card width `min(32rem, …)`.
 
 ## 13. Deployment
 
@@ -1120,6 +1467,11 @@ migración fallida corta el arranque a propósito.
   frames; no white boxes behind transparent assets.
 - Keep student UI immersive and minimal — never make it look like an admin
   dashboard. Gameplay must be real and keyboard-driven, never placeholder.
+- **No plain white card on any student screen.** Every white container is
+  the brand card (tinted glass + iridescent fillet, no sparkles), applied
+  automatically by the rule at the end of `global.css` to the glass
+  classes. New cards use those classes; a bare `bg-white/…` box is a bug
+  (§5, "Every white container…").
 - **On a level screen, do not box what is already boxed**, and do not stack
   panels over the island — the art is the scene, not a backdrop (§6.5).
 - **The lit gradient border belongs to the mission alone.** Give it to another

@@ -1,0 +1,9 @@
+{
+  "nombre": "Lunita",
+  "rareza": "comun",
+  "precioPropuesto": 600,
+  "aprobada": true,
+  "herramienta": "image_gen (integrada)",
+  "prompt": "Use case: stylized-concept. Asset type: one transparent-background companion pet sprite for TYPELY Órbita, a premium cozy space typing game for children. Polished soft 3D collectible toy render, pearly ceramic, candy gloss, beautifully modeled rounded volume and expressive large eyes, crisp clean silhouette readable at 60px, soft studio highlights upper left. ONE single cute floating character, entire body and accessories inside centered square framing with 15% clear margin, facing slightly upward and three-quarter toward viewer, suitable hovering to the side of a spaceship. No spaceship, no weapons, no text or labels, no ground, no base, no cast ground shadow, no surrounding scene. Genuine transparent alpha background, no checkerboard pattern, no opaque background. Do not draw an icon, emoji or flat illustration. A simple cute plump crescent moon character made of pale lavender pearly marshmallow, sleepy happy violet eyes and subtle peach blush, short dangling tiny feet, small mint nightcap with a single ivory pompom. Modest simple common-tier design. Rounded thick crescent volume, no stars or objects floating separately.",
+  "precio": 600
+}

@@ -6,7 +6,7 @@
  *
  * Decisiones de dibujo que importan:
  *
- *  - Las ≤8 palabras vivas se mueven con estilos IMPERATIVOS desde el
+ *  - Las ≤10 palabras vivas se mueven con estilos IMPERATIVOS desde el
  *    rAF (transform sobre refs), nunca con setState por frame: React
  *    monta y desmonta palabras (eventos discretos), el frame solo las
  *    empuja. En una Chromebook de aula esa diferencia es jugable/no.
@@ -26,16 +26,19 @@
 import { ArrowLeft, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { CharacterSkin } from "../../components/common/CharacterSkin";
+import { NaveOrbita, type NaveOrbitaHandle } from "../../components/orbita/NaveOrbita";
 import {
-  COLOR_DE_POWERUP,
+  COLOR_DE_MEJORA,
   Gema,
   IconoOrbita,
   InsigniaRango,
 } from "../../components/orbita/OrbitaIconos";
-import { bandaMaxDesbloqueada } from "../../data/orbitaCorpus";
-import { colorEstela, colorRayo } from "../../data/orbitaCosmeticos";
-import { getWorldStarRequirements, WORLD_PEDAGOGY_ORDER } from "../../data/worlds";
+import { colorEstela, colorRayo, efectoCosmetico, cosmeticoPorId } from "../../data/orbitaCosmeticos";
+import { DURACION_IMPACTO_MS, DURACION_RAYO_MS, ImpactoCosmetico, RayoCosmetico } from "../../components/orbita/EfectosCosmeticos";
+import { MascotaOrbita } from "../../components/orbita/MascotaOrbita";
+import { EscenaSignos } from "../../components/orbita/EscenaSignos";
+import type { EstadoSignos } from "../../utils/orbita/tormentaSignos";
+import { navePorId } from "../../data/orbitaNaves";
 import { useAuth } from "../../hooks/useAuth";
 import type { ArcadeRunResponse } from "../../utils/api";
 import {
@@ -47,11 +50,12 @@ import {
 import {
   MotorTormenta,
   RANGOS,
+  type CartaMejora,
   type EventoMotor,
-  type PowerupId,
+  type MejoraId,
   type ResultadoPartida,
 } from "../../utils/orbita/motor";
-import { getTotalStars } from "../../utils/progress";
+import { blip, SONIDO_KEY } from "../../utils/orbita/sonido";
 
 /* ------------------------------------------------------------------ */
 /* Geometría de la escena                                              */
@@ -63,12 +67,45 @@ const FUGA_Y = 24;
 const NAVE_Y = 84;
 const ABANICO_X = 34;
 
+/* La palabra nace chica en el punto de fuga y llega GRANDE a la nave: con
+   la base de 2rem, la escala 0,6 → 2,0 da 19 px al nacer y 64 px al
+   impactar. Antes era 14 → 35 y un chico recién la leía encima de la nave.
+   El abanico se cierra menos al final (0,72 en vez de 0,82) porque dos
+   palabras de 64 px que converjan al mismo centro se pisan. */
 function posicionDe(carril: number, progreso: number) {
   return {
-    x: 50 + carril * ABANICO_X * (1 - progreso * 0.82),
+    x: 50 + carril * ABANICO_X * (1 - progreso * 0.72),
     y: FUGA_Y + (NAVE_Y - 6 - FUGA_Y) * progreso,
-    escala: 0.55 + progreso * 0.8,
+    escala: 0.6 + progreso * 1.4,
   };
+}
+
+/* Una palabra muerta, desarmándose letra por letra. Vive 900 ms. */
+interface Cadaver {
+  id: number;
+  x: number;
+  y: number;
+  escala: number;
+  color: string;
+  impacto: boolean;
+  letras: { ch: string; dx: number; dy: number; rot: number; d: number; mayus: boolean }[];
+}
+
+/* Rumbo de cada letra al morir. Destruida por el jugador: estalla en todas
+   direcciones. Impactó en la nave: cae hacia abajo, más lejos. */
+function letrasQueVuelan(texto: string, impacto: boolean): Cadaver["letras"] {
+  return [...texto].map((ch, i) => {
+    const ang = impacto ? Math.PI / 2 + (Math.random() - 0.5) * 1.2 : Math.random() * Math.PI * 2;
+    const dist = impacto ? 40 + Math.random() * 70 : 30 + Math.random() * 60;
+    return {
+      ch,
+      dx: Math.round(Math.cos(ang) * dist),
+      dy: Math.round(Math.sin(ang) * dist),
+      rot: Math.round((Math.random() - 0.5) * 160),
+      d: i * 18,
+      mayus: /[A-ZÁÉÍÓÚÜÑ]/.test(ch),
+    };
+  });
 }
 
 /* Pervinca calmo → violeta → coral. El termómetro ambiental de la amenaza.
@@ -112,37 +149,11 @@ function tinteDeAmenaza(amenaza: number): string {
 /* ------------------------------------------------------------------ */
 /* Sonido — dos blips de WebAudio, apagados por defecto                 */
 /* ------------------------------------------------------------------ */
-const SONIDO_KEY = "typely_orbita_sonido";
-
-function blip(freq: number, hasta: number, ganancia = 0.05) {
-  const Ctor =
-    window.AudioContext ||
-    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!Ctor) return;
-  const ctx = new Ctor();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = "sine";
-  osc.frequency.setValueAtTime(freq, ctx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(hasta, ctx.currentTime + 0.12);
-  gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(ganancia, ctx.currentTime + 0.01);
-  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.16);
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start();
-  osc.stop(ctx.currentTime + 0.18);
-  window.setTimeout(() => void ctx.close(), 260);
-}
-
 /* ------------------------------------------------------------------ */
 
 interface PalabraRender {
   id: number;
   texto: string;
-  /** Trae un poder escondido: se dibuja con la estela especial. Cuál es,
-   *  no se sabe hasta que llega a la nave. */
-  poder: boolean;
 }
 /** El poder volando desde donde murió la palabra hasta la nave. */
 interface Viaje {
@@ -153,9 +164,11 @@ interface Viaje {
   dy: number;
   ms: number;
 }
+/* La mejora recién elegida se revela un instante sobre la nave — la carta
+   "vuela" a la nave antes de quedar en la fila del HUD. */
 interface Revelado {
   id: number;
-  powerup: PowerupId;
+  powerup: MejoraId;
 }
 interface Chispa {
   id: number;
@@ -180,7 +193,7 @@ type FasePantalla = "cuenta" | "jugando" | "resultado";
 
 /* Lo que falta escribir se dibuja como HTML para poder PINTAR las
    mayúsculas: cada letra que necesita Shift va en <em>, que el CSS pinta
-   dorada. Se escapa antes — la banda de símbolos trae < > &. */
+   dorada. Se escapa antes — la oleada de signos trae & y comillas. */
 function escaparHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -188,40 +201,47 @@ function marcarMayusculas(s: string): string {
   return escaparHtml(s).replace(/[A-ZÁÉÍÓÚÜÑ]/g, (c) => `<em>${c}</em>`);
 }
 
-const NOMBRE_POWERUP: Record<PowerupId, string> = {
-  reparacion: "¡Reparación!",
-  escudo: "¡Escudo!",
-  pulso: "¡Pulso!",
-  lento: "¡Tiempo lento!",
-  rayo: "¡Rayo dividido!",
-  cosecha: "¡Doble cosecha!",
-  mira: "¡Mira!",
+/* Las mejoras, como las lee un chico: nombre corto y qué cambia en UNA
+   frase, para el nivel al que pasarías. */
+const NOMBRE_MEJORA: Record<MejoraId, string> = {
+  bala: "Bala extra",
+  segunda: "Segunda oportunidad",
+  vida: "+1 vida",
+  regeneracion: "Regeneración",
+  escudo: "Escudo latente",
+  critico: "Golpe crítico",
+  viento: "Viento a favor",
+  foco: "Foco",
+  onda: "Onda de choque",
+  congelar: "Congelar al errar",
+  iman: "Imán",
+  racha: "Racha blindada",
+  teclas: "Teclas difíciles",
+};
+const DESCRIPCION_MEJORA: Record<MejoraId, (nivel: number) => string> = {
+  bala: (n) => `Al destruir una palabra caen también ${n === 1 ? "la más urgente" : `las ${n} más urgentes`}.`,
+  segunda: () => "Una vez: al perder el último corazón, seguís con uno.",
+  vida: () => "Un corazón más, ahora y en el máximo.",
+  regeneracion: (n) => `Si te falta un corazón, vuelve cada ${[30, 20, 12][n - 1] ?? 12} segundos.`,
+  escudo: (n) => `Tras ${[20, 12, 8][n - 1] ?? 8} segundos sin daño se te forma un escudo.`,
+  critico: (n) => `Una palabra sin errores tiene ${[15, 30, 45][n - 1] ?? 45} % de tirar otra.`,
+  viento: (n) => `Las palabras viajan un ${[8, 15, 20][n - 1] ?? 20} % más lento.`,
+  foco: (n) => (n === 1 ? "La más urgente siempre marcada y apuntada sola." : "También se marca la segunda."),
+  onda: (n) =>
+    n === 1 ? "Al subir de nivel, todo retrocede." : `Además, todo retrocede cada ${n === 2 ? 12 : 8} palabras.`,
+  congelar: (n) => `Un error congela todo ${[0.5, 0.8, 1.2][n - 1] ?? 1.2} s (cada 12 s).`,
+  iman: (n) => `Al destruir, las cercanas retroceden ${[5, 10, 15][n - 1] ?? 15} %.`,
+  racha: (n) => `${n} error${n > 1 ? "es" : ""} por nivel sin perder la racha.`,
+  teclas: (n) => `Puntos ×${[1.5, 2, 2.5][n - 1] ?? 2.5} por mayúsculas, tildes y símbolos.`,
 };
 
 export function TormentaPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  /* Banda máxima desbloqueada por el modo historia: el corpus del arcade
-     es "lo aprendido y un poco más allá", nunca símbolos jamás vistos. */
-  /* Atajo de desarrollo: ?banda=8 fuerza la banda máxima (0-10) para
-     probar símbolos, correos o mensajes sin pasarse cinco islas antes.
-     Solo en dev: en producción la condición es constante false. */
-  const bandaForzada = useMemo(() => {
-    if (!import.meta.env.DEV) return null;
-    const q = new URLSearchParams(window.location.search);
-    if (!q.has("banda")) return null;
-    const n = Number(q.get("banda"));
-    return Number.isFinite(n) ? Math.max(0, Math.min(10, Math.round(n))) : null;
-  }, []);
-
-  const bandaMax = useMemo(() => {
-    if (bandaForzada !== null) return bandaForzada;
-    const total = getTotalStars();
-    const requisitos = getWorldStarRequirements();
-    const abiertos = new Set(WORLD_PEDAGOGY_ORDER.filter((id) => total >= (requisitos[id] ?? 0)));
-    return bandaMaxDesbloqueada(abiertos);
-  }, [bandaForzada]);
+  /* El corpus es el mismo para todos (decisión de Ezequiel, 08/09/2026):
+     Tormenta ya no mira la isla en la que va el chico ni sus estrellas.
+     Ver `AJUSTES.bandaTope` en el motor y la cabecera de orbitaCorpus.ts. */
 
   const perfil = useMemo(() => perfilLocal(), []);
   const estela = colorEstela(perfil?.equipped.trail);
@@ -233,14 +253,53 @@ export function TormentaPage() {
   const [corazones, setCorazones] = useState(3);
   const [escudo, setEscudo] = useState(0);
   const [puntaje, setPuntaje] = useState(0);
-  const [hud, setHud] = useState({ ppm: 0, racha: 0, amenaza: 2, cristales: 0, prueba: false });
+  const [hud, setHud] = useState<{
+    ppm: number;
+    racha: number;
+    amenaza: number;
+    cristales: number;
+    prueba: boolean;
+    nivel: number;
+    /** Puntaje / umbral del próximo nivel, 0..1. */
+    progresoNivel: number;
+    mejoras: { id: MejoraId; nivel: number }[];
+    /** Segundos hasta que Congelar vuelva a estar listo (0 = listo). */
+    congelarRestante: number;
+    /** Escalones de techo blando (0 = partida normal). */
+    sobrecarga: number;
+  }>({
+    ppm: 0,
+    racha: 0,
+    amenaza: 2,
+    cristales: 0,
+    prueba: false,
+    nivel: 0,
+    progresoNivel: 0,
+    mejoras: [],
+    congelarRestante: 0,
+    sobrecarga: 0,
+  });
   const [chispas, setChispas] = useState<Chispa[]>([]);
   const [rayos, setRayos] = useState<Rayo[]>([]);
   const [avisos, setAvisos] = useState<Aviso[]>([]);
-  const [viajes, setViajes] = useState<Viaje[]>([]);
+  const [cadaveres, setCadaveres] = useState<Cadaver[]>([]);
+  /* Las tres cartas ofrecidas al subir de nivel (el motor está en pausa
+     mientras existan). El ref las espeja para el atajo de teclado 1-2-3. */
+  const [cartas, setCartas] = useState<CartaMejora[] | null>(null);
+  const cartasRef = useRef<CartaMejora[] | null>(null);
+  /* Palabras que llegaron a la nave en plena invulnerabilidad y rebotaron:
+     salen despedidas hacia arriba y se desvanecen. */
+  const [rebotes, setRebotes] = useState<
+    { id: number; x: number; y: number; escala: number; texto: string }[]
+  >([]);
+  const naveRef = useRef<HTMLDivElement | null>(null);
+  const naveSpriteRef = useRef<NaveOrbitaHandle>(null);
+  const temporizadoresEfectos = useRef(new Set<number>());
+  const [nivelActual, setNivelActual] = useState(0);
   const [revelado, setRevelado] = useState<Revelado | null>(null);
   const [erroneaId, setErroneaId] = useState<number | null>(null);
   const [resultado, setResultado] = useState<ResultadoPartida | null>(null);
+  const [signos, setSignos] = useState<EstadoSignos | null>(null);
   const [respuestaServidor, setRespuestaServidor] = useState<ArcadeRunResponse | null>(null);
   const [sonido, setSonido] = useState(() => localStorage.getItem(SONIDO_KEY) === "1");
 
@@ -255,32 +314,56 @@ export function TormentaPage() {
   sonidoRef.current = sonido;
   const efectoIds = useRef(1);
 
+  useEffect(() => {
+    const pendientes = temporizadoresEfectos.current;
+    return () => { pendientes.forEach(id => window.clearTimeout(id)); pendientes.clear(); };
+  }, []);
+
   /* ---------------------------------------------------------------- */
   /* Cuenta regresiva → motor nuevo                                    */
   /* ---------------------------------------------------------------- */
   useEffect(() => {
     if (fase !== "cuenta") return;
     if (cuenta === 0) {
-      motorRef.current = new MotorTormenta({ bandaMax });
+      motorRef.current = new MotorTormenta();
       setFase("jugando");
       return;
     }
     const t = window.setTimeout(() => setCuenta((c) => c - 1), 900);
     return () => window.clearTimeout(t);
-  }, [fase, cuenta, bandaMax]);
+  }, [fase, cuenta]);
 
   function otraVez() {
+    setSignos(null);
     motorRef.current = null;
     palabraEls.current.clear();
     setPalabras([]);
     setCorazones(3);
     setEscudo(0);
     setPuntaje(0);
-    setHud({ ppm: 0, racha: 0, amenaza: 2, cristales: 0, prueba: false });
+    setHud({
+      ppm: 0,
+      racha: 0,
+      amenaza: 2,
+      cristales: 0,
+      prueba: false,
+      nivel: 0,
+      progresoNivel: 0,
+      mejoras: [],
+      congelarRestante: 0,
+      sobrecarga: 0,
+    });
     setChispas([]);
     setRayos([]);
+    temporizadoresEfectos.current.forEach(id => window.clearTimeout(id));
+    temporizadoresEfectos.current.clear();
+    naveSpriteRef.current?.reiniciar();
+    setCadaveres([]);
+    setCartas(null);
+    cartasRef.current = null;
+    setNivelActual(0);
+    setRebotes([]);
     setAvisos([]);
-    setViajes([]);
     setRevelado(null);
     ultimaPos.current.clear();
     setResultado(null);
@@ -298,15 +381,93 @@ export function TormentaPage() {
       const motor = motorRef.current;
       if (!motor) return;
 
+      const dispararA = (id: number, intenso: boolean) => {
+        const palabra = palabraEls.current.get(id);
+        const escena = escenaRef.current;
+        const nave = naveSpriteRef.current;
+        if (!palabra || !escena || !nave) return;
+        const r = palabra.getBoundingClientRect();
+        const e = escena.getBoundingClientRect();
+        const destino = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+        nave.atacar(destino, () => {
+        nave.disparar(intenso);
+        const origen = nave.origenDisparo();
+        if (!origen) return;
+        const idRayo = efectoIds.current++;
+        setRayos(prev => [...prev.slice(-11), {
+          id: idRayo,
+          x: (origen.x - e.left) / e.width * 100,
+          y: (origen.y - e.top) / e.height * 100,
+          largo: Math.hypot(destino.x - origen.x, destino.y - origen.y),
+          angulo: Math.atan2(destino.y - origen.y, destino.x - origen.x) * 180 / Math.PI,
+        }]);
+        const timer = window.setTimeout(() => {
+          setRayos(prev => prev.filter(rayo => rayo.id !== idRayo));
+          temporizadoresEfectos.current.delete(timer);
+        }, DURACION_RAYO_MS);
+        temporizadoresEfectos.current.add(timer);
+        });
+      };
+
+      /* Deja un cadáver donde estaba la palabra: mismo lugar, misma
+         escala, mismo texto, y las letras salen volando. Hay que llamarlo
+         ANTES de borrar el elemento del mapa, que es de donde sale todo. */
+      /* Un aviso corto sobre la nave, como los de antes: se apila hasta
+         tres y se va solo. */
+      const avisar = (texto: string, color: string) => {
+        const idAviso = efectoIds.current++;
+        setAvisos((prev) => [...prev.slice(-2), { id: idAviso, texto, color }]);
+        window.setTimeout(() => setAvisos((prev) => prev.filter((a) => a.id !== idAviso)), 1500);
+      };
+
+      const enterrar = (id: number, color: string, impacto: boolean) => {
+        const el = palabraEls.current.get(id);
+        const escena = escenaRef.current;
+        if (!el || !escena) return;
+        const r = el.getBoundingClientRect();
+        const e = escena.getBoundingClientRect();
+        const x = ((r.left + r.width / 2 - e.left) / e.width) * 100;
+        const y = ((r.top + r.height / 2 - e.top) / e.height) * 100;
+        const escala = Number(/scale\(([\d.]+)\)/.exec(el.style.transform)?.[1] ?? 1);
+        const idCad = efectoIds.current++;
+        setCadaveres((prev) => [
+          ...prev,
+          { id: idCad, x, y, escala, color, impacto, letras: letrasQueVuelan(el.textContent ?? "", impacto) },
+        ]);
+        window.setTimeout(() => setCadaveres((prev) => prev.filter((c) => c.id !== idCad)), 900);
+      };
+
       for (const ev of eventos) {
         switch (ev.tipo) {
+          case "signos":
+            setSignos(ev.estado);
+            if (ev.estado.fase === "cierre") {
+              naveSpriteRef.current?.reiniciar();
+              setRayos([]);
+              if (sonidoRef.current) blip(880, 440, .18);
+            } else if (ev.estado.fase === "activa" && sonidoRef.current) blip(220, 1100, .2);
+            break;
+          case "retira":
+            palabraEls.current.delete(ev.id);
+            setPalabras(prev => prev.filter(p => p.id !== ev.id));
+            break;
+          case "acierto":
+            // La última letra recibe el disparo fuerte de «destruida».
+            if (!eventos.some(e => e.tipo === "destruida" && e.id === ev.id)) dispararA(ev.id, false);
+            break;
           case "nace":
             setPalabras((prev) => [
               ...prev,
-              { id: ev.palabra.id, texto: ev.palabra.texto, poder: ev.palabra.poder !== null },
+              { id: ev.palabra.id, texto: ev.palabra.texto },
             ]);
             break;
           case "destruida": {
+            dispararA(ev.id, true);
+            /* Lo que cayó por bala se desarma en dorado, por crítico en
+               violeta: se ve de qué murió sin leer nada. */
+            const colorVia =
+              ev.via === "bala" ? "#ffd552" : ev.via === "critico" ? "#9b7cff" : "#5be8ba";
+            enterrar(ev.id, colorVia, false);
             const el = palabraEls.current.get(ev.id);
             const escena = escenaRef.current;
             if (el && escena) {
@@ -316,28 +477,15 @@ export function TormentaPage() {
               const y = ((r.top + r.height / 2 - e.top) / e.height) * 100;
               ultimaPos.current.set(ev.id, { x, y });
               const idBoom = efectoIds.current++;
-              setChispas((prev) => [...prev, { id: idBoom, x, y, color: rayoColor }]);
-              window.setTimeout(
-                () => setChispas((prev) => prev.filter((c) => c.id !== idBoom)),
-                460,
-              );
-              /* El rayo sale de la nave hacia la palabra. */
-              const nx = 50;
-              const ny = NAVE_Y - 4;
-              const dx = ((x - nx) / 100) * e.width;
-              const dy = ((y - ny) / 100) * e.height;
-              const idRayo = efectoIds.current++;
-              setRayos((prev) => [
-                ...prev,
-                {
-                  id: idRayo,
-                  x: nx,
-                  y: ny,
-                  largo: Math.hypot(dx, dy),
-                  angulo: (Math.atan2(dy, dx) * 180) / Math.PI,
-                },
+              setChispas((prev) => [
+                ...prev.slice(-15),
+                { id: idBoom, x, y, color: ev.via === "tipeo" ? rayoColor : colorVia },
               ]);
-              window.setTimeout(() => setRayos((prev) => prev.filter((l) => l.id !== idRayo)), 200);
+              const timer = window.setTimeout(() => {
+                setChispas(prev => prev.filter(c => c.id !== idBoom));
+                temporizadoresEfectos.current.delete(timer);
+              }, DURACION_IMPACTO_MS);
+              temporizadoresEfectos.current.add(timer);
             }
             palabraEls.current.delete(ev.id);
             setPalabras((prev) => prev.filter((p) => p.id !== ev.id));
@@ -345,55 +493,61 @@ export function TormentaPage() {
             if (sonidoRef.current) blip(620, 980);
             break;
           }
-          case "poderViaja": {
-            /* Un orbe de luz vuela desde donde murió la palabra hasta la
-               nave. Todavía no se sabe qué trae: la sorpresa se revela al
-               llegar. */
-            const desde = ultimaPos.current.get(ev.id) ?? { x: 50, y: 50 };
-            ultimaPos.current.delete(ev.id);
-            const e = escenaRef.current?.getBoundingClientRect();
-            const ancho = e?.width ?? 1000;
-            const alto = e?.height ?? 600;
-            const idViaje = efectoIds.current++;
-            const ms = Math.round(ev.segundos * 1000);
-            setViajes((prev) => [
-              ...prev,
-              {
-                id: idViaje,
-                x: desde.x,
-                y: desde.y,
-                dx: ((50 - desde.x) / 100) * ancho,
-                dy: ((NAVE_Y - 4 - desde.y) / 100) * alto,
-                ms,
-              },
-            ]);
-            window.setTimeout(
-              () => setViajes((prev) => prev.filter((v) => v.id !== idViaje)),
-              ms + 60,
-            );
+          case "subeNivel": {
+            /* El motor ya está en pausa: las cartas quedan hasta elegir. */
+            ultimaPos.current.clear();
+            cartasRef.current = ev.cartas;
+            setCartas(ev.cartas);
+            setNivelActual(ev.nivel);
+            if (sonidoRef.current) blip(740, 1180, 0.06);
             break;
           }
-          case "poderAplicado": {
+          case "mejoraElegida": {
+            cartasRef.current = null;
+            setCartas(null);
+            /* La gema elegida se revela sobre la nave y después vive en la
+               fila de la build del HUD. */
             const idRev = efectoIds.current++;
-            setRevelado({ id: idRev, powerup: ev.powerup });
+            setRevelado({ id: idRev, powerup: ev.id });
             window.setTimeout(
               () => setRevelado((prev) => (prev?.id === idRev ? null : prev)),
               1000,
             );
-            const idAviso = efectoIds.current++;
-            setAvisos((prev) => [
-              ...prev.slice(-2),
-              { id: idAviso, texto: NOMBRE_POWERUP[ev.powerup], color: COLOR_DE_POWERUP[ev.powerup] },
-            ]);
-            window.setTimeout(
-              () => setAvisos((prev) => prev.filter((a) => a.id !== idAviso)),
-              1500,
-            );
+            avisar(`${NOMBRE_MEJORA[ev.id]}${ev.nivel > 1 ? ` · nivel ${ev.nivel}` : ""}`, COLOR_DE_MEJORA[ev.id]);
             setCorazones(motor.corazones);
             setEscudo(motor.escudo);
-            if (sonidoRef.current) blip(740, 1180, 0.06);
+            if (sonidoRef.current) blip(620, 980);
             break;
           }
+          case "regenera":
+            setCorazones(ev.corazones);
+            avisar("¡Corazón recuperado!", "#ff9fca");
+            break;
+          case "escudoFormado":
+            setEscudo(ev.escudo);
+            avisar("¡Escudo!", "#54e8c6");
+            break;
+          case "segundaOportunidad":
+            setCorazones(motor.corazones);
+            avisar("¡Segunda oportunidad!", "#ffd552");
+            if (sonidoRef.current) blip(740, 1180, 0.06);
+            break;
+          case "onda": {
+            /* Un anillo que sale de la nave y empuja todo: la escena lo
+               lleva como clase un instante. */
+            const escena = escenaRef.current;
+            if (escena) {
+              escena.classList.remove("orb-escena--onda");
+              void escena.offsetWidth;
+              escena.classList.add("orb-escena--onda");
+              window.setTimeout(() => escena.classList.remove("orb-escena--onda"), 900);
+            }
+            avisar("¡Onda de choque!", "#25c8df");
+            break;
+          }
+          case "congela":
+            avisar("¡Congelado!", "#cfeeff");
+            break;
           case "roce": {
             /* Vuelo de prueba: la palabra llegó pero no lastima. Se disuelve
                en gris, sin sonido de golpe — la medición terminó, nada más. */
@@ -421,7 +575,46 @@ export function TormentaPage() {
             setPalabras((prev) => prev.filter((p) => p.id !== ev.id));
             break;
           }
+          case "rebote": {
+            /* Llegó en plena invulnerabilidad: no lastima, REBOTA. La
+               palabra sale despedida hacia arriba entera y se desvanece, y
+               la nave destella blanco — el mismo gesto que un escudo que
+               absorbe. Antes se desarmaba en gris y se leía como "la letra
+               desapareció", no como "rebotó porque acabás de recibir un
+               golpe". */
+            const el = palabraEls.current.get(ev.id);
+            const escena = escenaRef.current;
+            if (el && escena) {
+              const r = el.getBoundingClientRect();
+              const e = escena.getBoundingClientRect();
+              const idReb = efectoIds.current++;
+              setRebotes((prev) => [
+                ...prev,
+                {
+                  id: idReb,
+                  x: ((r.left + r.width / 2 - e.left) / e.width) * 100,
+                  y: ((r.top + r.height / 2 - e.top) / e.height) * 100,
+                  escala: Number(/scale\(([\d.]+)\)/.exec(el.style.transform)?.[1] ?? 1),
+                  texto: el.textContent ?? "",
+                },
+              ]);
+              window.setTimeout(() => setRebotes((prev) => prev.filter((x) => x.id !== idReb)), 700);
+            }
+            const nave = naveRef.current;
+            if (nave) {
+              nave.classList.remove("orb-nave--flash");
+              void nave.offsetWidth;
+              nave.classList.add("orb-nave--flash");
+              window.setTimeout(() => nave.classList.remove("orb-nave--flash"), 340);
+            }
+            palabraEls.current.delete(ev.id);
+            setPalabras((prev) => prev.filter((p) => p.id !== ev.id));
+            if (sonidoRef.current) blip(520, 760, 0.04);
+            break;
+          }
           case "impacto":
+            naveSpriteRef.current?.impacto();
+            enterrar(ev.id, "#ff8fa8", true);
             palabraEls.current.delete(ev.id);
             setPalabras((prev) => prev.filter((p) => p.id !== ev.id));
             setCorazones(motor.corazones);
@@ -491,10 +684,25 @@ export function TormentaPage() {
 
       /* Palabras: transform imperativo, prefijo escrito, estados. */
       const enganche = motor.engancheId;
+      /* Foco: la más urgente siempre marcada. */
       const masUrgente =
-        motor.t < motor.efectos.miraHasta
+        motor.nivelDe("foco") > 0
           ? [...motor.vivas].sort((a, b) => b.progreso - a.progreso)[0]?.id ?? null
           : null;
+      /* El rectángulo de la escena se lee UNA vez, antes de escribir
+         estilos: leerlo dentro del bucle forzaría un layout por palabra. */
+      const escenaRect = escenaRef.current?.getBoundingClientRect();
+      // Solo seguimos una palabra que el jugador ya empezó; la aparición
+      // de amenazas o el marcado automático de Foco no orientan la nave.
+      const palabraEnCurso = motor.vivas.find(p => p.id === enganche && p.escrito > 0 && p.texto.length > 1);
+      const seguimientoNave = palabraEnCurso ? posicionDe(palabraEnCurso.carril, palabraEnCurso.progreso) : null;
+      if (!motor.eligiendo) naveSpriteRef.current?.apuntar(
+        seguimientoNave && escenaRect
+          ? { x: escenaRect.left + escenaRect.width * seguimientoNave.x / 100, y: escenaRect.top + escenaRect.height * seguimientoNave.y / 100 }
+          : null,
+        dt,
+      );
+      let hayPeligro = false;
       for (const p of motor.vivas) {
         const el = palabraEls.current.get(p.id);
         if (!el) continue;
@@ -502,33 +710,66 @@ export function TormentaPage() {
         el.style.left = `${pos.x}%`;
         el.style.top = `${pos.y}%`;
         el.style.transform = `translate(-50%, -50%) scale(${pos.escala.toFixed(3)})`;
-        const hecho = el.querySelector("b");
-        const resto = el.querySelector("span");
+        /* Cercanía al cuadrado: las lejanas vienen quietas y el tambaleo
+           arranca en el último tramo, cuando ya es una amenaza. */
+        el.style.setProperty("--orb-cerca", (p.progreso * p.progreso).toFixed(3));
+        if (escenaRect) {
+          /* La estela apunta CONTRA LA VELOCIDAD, no hacia el punto de fuga
+             como lugar: las palabras nacen ya desplegadas a lo ancho a la
+             altura de la fuga, así que "hacia la fuga" al nacer sería una
+             cola horizontal. La velocidad sale de derivar posicionDe():
+             en x se cierra hacia el centro, en y baja de FUGA_Y a la nave.
+             El elemento "mira" hacia abajo (+y); rotarlo θ lo deja
+             apuntando a (−sin θ, cos θ), que tiene que ser ese versor. */
+          const bx = (escenaRect.width * (p.carril * ABANICO_X * 0.72)) / 100;
+          const by = (escenaRect.height * -(NAVE_Y - 6 - FUGA_Y)) / 100;
+          const ang = (Math.atan2(-bx, by) * 180) / Math.PI;
+          el.style.setProperty("--orb-cola-ang", `${ang.toFixed(1)}deg`);
+        }
+        const hecho = el.querySelector(".orb-palabra__hecho");
+        const resto = el.querySelector(".orb-palabra__resto");
         if (hecho && resto) {
           /* Se compara contra el DOM real, no contra una marca propia: si
              React vuelve a escribir el span (re-render por otra prop), la
              marca mentiría y quedaría el prefijo con el resto entero —
-             "¿C¿Cómo estás?". Son ≤8 palabras: comparar es gratis. */
-          const prefijo = p.texto.slice(0, p.escrito);
+             "¿C¿Cómo estás?". Son ≤8 palabras: comparar es gratis.
+             El prefijo también marca mayúsculas: si no, la M grande de
+             "Mundo" se achicaría en el instante de tipearla. */
+          const hechoHtml = marcarMayusculas(p.texto.slice(0, p.escrito));
           const restoHtml = marcarMayusculas(p.texto.slice(p.escrito));
-          if (hecho.textContent !== prefijo) hecho.textContent = prefijo;
+          if (hecho.innerHTML !== hechoHtml) hecho.innerHTML = hechoHtml;
           if (resto.innerHTML !== restoHtml) resto.innerHTML = restoHtml;
         }
+        const peligro = p.progreso > 0.72;
+        if (peligro) hayPeligro = true;
         el.classList.toggle("orb-palabra--enganchada", p.id === enganche);
-        el.classList.toggle("orb-palabra--peligro", p.progreso > 0.72);
+        el.classList.toggle("orb-palabra--peligro", peligro);
         el.classList.toggle("orb-palabra--mira", p.id === masUrgente);
       }
+      escenaRef.current?.classList.toggle("orb-escena--peligro", hayPeligro);
+      /* Congelar al errar: escarcha sobre la escena mientras nada avanza. */
+      escenaRef.current?.classList.toggle("orb-escena--congelada", motor.congelado);
+      /* Invulnerable tras un golpe: la nave parpadea, como en cualquier juego
+         con este mecanismo — lo que llegue mientras tanto rebota. */
+      naveRef.current?.classList.toggle("orb-nave--invulnerable", motor.invulnerable);
 
       /* HUD y tinte, a ~3 Hz — no hace falta más y ahorra renders. */
       acumuladorHud += dt;
       if (acumuladorHud > 350) {
         acumuladorHud = 0;
+        if (motor.signos.enCurso) setSignos(motor.signos.estado);
+        const { puntaje: pts, umbral } = motor.progresoNivel;
         setHud({
           ppm: Math.round(motor.ppmInstantaneo),
           racha: motor.racha,
           amenaza: Math.round(motor.amenaza),
           cristales: motor.cristalesVivos,
           prueba: motor.fase === "calibracion",
+          nivel: motor.nivel,
+          progresoNivel: umbral > 0 ? Math.min(1, pts / umbral) : 0,
+          mejoras: motor.mejorasLista,
+          congelarRestante: motor.congelarRestante,
+          sobrecarga: motor.sobrecargaNivel,
         });
         const fondo = fondoRef.current;
         if (fondo) {
@@ -593,6 +834,17 @@ export function TormentaPage() {
       procesarEventos(motor.tecla(ch));
     },
     [fase, procesarEventos],
+  );
+
+  /** Elegir una carta: por tecla 1-2-3 o tocándola. El motor rechaza lo
+   *  que no ofreció, así que acá no hace falta validar. */
+  const elegirMejora = useCallback(
+    (id: MejoraId) => {
+      const motor = motorRef.current;
+      if (!motor) return;
+      procesarEventos(motor.elegir(id));
+    },
+    [procesarEventos],
   );
 
   /* Compañero del ?bot=1: en desarrollo la entrada queda expuesta para que
@@ -673,6 +925,15 @@ export function TormentaPage() {
   useEffect(() => {
     function onKeyDown(ev: KeyboardEvent) {
       if (fase !== "jugando") return;
+      /* Con cartas en pantalla, 1-2-3 eligen y nada más se procesa. */
+      if (cartasRef.current) {
+        if (/^[123]$/.test(ev.key)) {
+          ev.preventDefault();
+          const carta = cartasRef.current[Number(ev.key) - 1];
+          if (carta) elegirMejora(carta.id);
+        }
+        return;
+      }
       if (ev.key === "Escape") {
         ev.preventDefault();
         const motor = motorRef.current;
@@ -696,7 +957,7 @@ export function TormentaPage() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [fase, procesarCaracter, procesarEventos]);
+  }, [fase, procesarCaracter, procesarEventos, elegirMejora]);
 
   /* ---------------------------------------------------------------- */
 
@@ -705,7 +966,7 @@ export function TormentaPage() {
   const sincroniza = sincronizaArcade(user?.role);
 
   return (
-    <main className="relative h-dvh overflow-hidden select-none" aria-label="Tormenta de palabras">
+    <main className="relative h-dvh overflow-hidden select-none" aria-label="Tormenta de palabras" data-signos={signos?.fase}>
       {/* Fondo por capas — el tinte lo maneja el rAF con la amenaza. */}
       <div
         ref={fondoRef}
@@ -737,6 +998,7 @@ export function TormentaPage() {
         <img className="orb-polvo" src="/assets/orbita/fondo/polvo.webp" alt="" />
       </div>
 
+      <EscenaSignos estado={signos} />
       {/* Input oculto: el mismo truco de GameplayPage para teclas muertas. */}
       <input
         ref={captureInputRef}
@@ -762,7 +1024,7 @@ export function TormentaPage() {
                    pisar en cada re-render y el resto de la palabra
                    parpadearía entero hasta el frame siguiente. Se llena
                    acá, al montar, para que no haya un frame en blanco. */
-                const resto = el.querySelector("span");
+                const resto = el.querySelector(".orb-palabra__resto");
                 if (resto && !resto.innerHTML) resto.innerHTML = marcarMayusculas(p.texto);
               } else {
                 palabraEls.current.delete(p.id);
@@ -770,52 +1032,83 @@ export function TormentaPage() {
             }}
             className={[
               "orb-palabra",
-              p.poder ? "orb-palabra--poder" : "",
               erroneaId === p.id ? "orb-palabra--error" : "",
             ]
               .filter(Boolean)
               .join(" ")}
-            style={{ fontSize: "1.6rem" }}
+            style={{ fontSize: "2rem" }}
           >
-            <b />
-            <span />
+            <i className="orb-palabra__cola" aria-hidden="true" />
+            <span className="orb-palabra__cuerpo">
+              <b className="orb-palabra__hecho" />
+              <span className="orb-palabra__resto" />
+            </span>
           </span>
         ))}
 
-        {/* El poder volando a la nave — un orbe de luz, todavía anónimo. */}
-        {viajes.map((v) => (
+        {/* Las que llegaron en plena invulnerabilidad: rebotan enteras. */}
+        {rebotes.map((r) => (
           <span
-            key={v.id}
-            className="orb-viaje"
+            key={r.id}
+            className="orb-rebote"
+            aria-hidden="true"
+            style={
+              { left: `${r.x}%`, top: `${r.y}%`, fontSize: "2rem", "--orb-esc": r.escala } as React.CSSProperties
+            }
+          >
+            {r.texto}
+          </span>
+        ))}
+
+        {/* Las que acaban de morir, desarmándose letra por letra. */}
+        {cadaveres.map((c) => (
+          <span
+            key={c.id}
+            className="orb-cadaver"
+            aria-hidden="true"
             style={
               {
-                left: `${v.x}%`,
-                top: `${v.y}%`,
-                "--orb-dx": `${v.dx.toFixed(0)}px`,
-                "--orb-dy": `${v.dy.toFixed(0)}px`,
-                "--orb-viaje-ms": `${v.ms}ms`,
+                left: `${c.x}%`,
+                top: `${c.y}%`,
+                fontSize: "2rem",
+                "--orb-esc": c.escala,
+                "--orb-cad-color": c.color,
               } as React.CSSProperties
             }
-          />
+          >
+            {c.letras.map((l, i) => (
+              <i
+                key={i}
+                className={l.mayus ? "orb-cadaver__mayus" : undefined}
+                style={
+                  {
+                    "--orb-dx": `${l.dx}px`,
+                    "--orb-dy": `${l.dy}px`,
+                    "--orb-rot": `${l.rot}deg`,
+                    "--orb-d": `${l.d}ms`,
+                  } as React.CSSProperties
+                }
+              >
+                {l.ch === " " ? " " : l.ch}
+              </i>
+            ))}
+          </span>
         ))}
+
 
         {/* Fogonazo + cuatro chispas de cuatro puntas (los <i> son las chispas). */}
         {chispas.map((c) => (
-          <span
+          <ImpactoCosmetico
             key={c.id}
-            className="orb-explosion"
+            efecto={efectoCosmetico(perfil?.equipped.impact)}
+            color={cosmeticoPorId(perfil?.equipped.impact)?.color ?? c.color}
             style={{ left: `${c.x}%`, top: `${c.y}%`, "--orb-boom-color": c.color } as React.CSSProperties}
-          >
-            <i />
-            <i />
-            <i />
-            <i />
-          </span>
+          />
         ))}
         {rayos.map((l) => (
-          <span
+          <RayoCosmetico
             key={l.id}
-            className="orb-rayo"
+            efecto={efectoCosmetico(perfil?.equipped.beam)} color={rayoColor}
             style={
               {
                 left: `${l.x}%`,
@@ -828,8 +1121,8 @@ export function TormentaPage() {
           />
         ))}
 
-        {/* La nave del chico — la que se ganó con estrellas. */}
-        <div className="orb-nave">
+        {/* Nave exclusiva de Órbita, independiente de las estrellas. */}
+        <div ref={naveRef} className="orb-nave">
           {estela && (
             <span
               className="orb-estela"
@@ -839,13 +1132,17 @@ export function TormentaPage() {
           {escudo > 0 && (
             <span className={`orb-escudo-aro ${escudo > 1 ? "orb-escudo-aro--doble" : ""}`} />
           )}
-          <CharacterSkin kind="ship" alt="Tu nave" />
+          <NaveOrbita ref={naveSpriteRef} pausada={fase !== "jugando" || Boolean(cartas)}
+            nave={navePorId(perfil?.equipped.ship)} efectoEstela={efectoCosmetico(perfil?.equipped.trail)}
+            colorMotor={estela} colorDisparo={rayoColor} />
+          <MascotaOrbita id={perfil?.equipped.pet} contexto="partida" racha={hud.racha} corazones={corazones}
+            pausada={fase !== "jugando" || Boolean(cartas)} />
           {/* Recién acá se sabe qué era: la gema explota sobre la nave. */}
           {revelado && (
             <span
               key={revelado.id}
               className="orb-revelado"
-              style={{ color: COLOR_DE_POWERUP[revelado.powerup] }}
+              style={{ color: COLOR_DE_MEJORA[revelado.powerup] }}
             >
               <Gema nombre={revelado.powerup} className="w-full h-full" />
             </span>
@@ -909,7 +1206,42 @@ export function TormentaPage() {
               racha ×{Math.min(4, 1 + 0.5 * Math.floor(hud.racha / 3)).toFixed(1).replace(".0", "")}
             </div>
           )}
+          {/* Cuánto falta para la próxima carta: una barrita bajo el puntaje. */}
+          {!hud.prueba && (
+            <div className="orb-nivel" aria-label={`Nivel ${hud.nivel}`}>
+              <span className="orb-dato orb-nivel__rotulo">nivel {hud.nivel}</span>
+              <span className="orb-nivel__riel">
+                <i style={{ width: `${Math.round(hud.progresoNivel * 100)}%` }} />
+              </span>
+            </div>
+          )}
         </div>
+
+        {/* La build: las gemas que llevás, con su nivel. Congelar muestra
+            además su cooldown como un anillo que se va llenando. */}
+        {hud.mejoras.length > 0 && (
+          <div className="left-4 bottom-4 orb-build" aria-label="Tus mejoras">
+            {hud.mejoras.map((m) => {
+              const enCooldown = m.id === "congelar" && hud.congelarRestante > 0;
+              const fraccion = enCooldown ? 1 - hud.congelarRestante / 12 : 1;
+              return (
+                <span
+                  key={m.id}
+                  className={`orb-build__gema ${enCooldown ? "orb-build__gema--cooldown" : ""}`}
+                  style={{ "--orb-cd": `${Math.round(fraccion * 360)}deg` } as React.CSSProperties}
+                  title={`${NOMBRE_MEJORA[m.id]} · nivel ${m.nivel}`}
+                >
+                  <Gema nombre={m.id} className="w-9 h-9" />
+                  <span className="orb-build__puntos" aria-hidden="true">
+                    {Array.from({ length: m.nivel }, (_, i) => (
+                      <i key={i} />
+                    ))}
+                  </span>
+                </span>
+              );
+            })}
+          </div>
+        )}
 
         <div className="right-8 top-3 text-right grid gap-0.5 justify-items-end">
           <div className="orb-dato font-bold text-xl flex items-center gap-1.5">
@@ -959,9 +1291,14 @@ export function TormentaPage() {
         >
           amenaza {hud.amenaza}
         </div>
-        {bandaForzada !== null && (
-          <div className="orb-dato left-4 bottom-3 text-[11px] font-bold tracking-widest uppercase opacity-70">
-            dev · banda forzada {bandaForzada}
+        {/* Techo blando: pasados los 3:30 la amenaza no sube de 100, pero las
+            palabras llegan cada vez más rápido. Se dice, y late. */}
+        {hud.sobrecarga > 0 && (
+          <div
+            className="orb-dato orb-sobrecarga right-7 bottom-[6%] text-xs font-bold tracking-widest uppercase"
+            style={{ writingMode: "vertical-rl" }}
+          >
+            sobrecarga ×{(1 + hud.sobrecarga).toFixed(1)}
           </div>
         )}
         {/* El vuelo de prueba se anuncia: el chico tiene que saber que los
@@ -974,6 +1311,43 @@ export function TormentaPage() {
       </div>
 
       {corazones === 1 && fase === "jugando" && <div className="orb-vineta" aria-hidden="true" />}
+
+      {/* Subiste de nivel: el juego está en pausa hasta que elijas. */}
+      {cartas && fase === "jugando" && (
+        <div className="orb-eleccion" role="dialog" aria-modal="true" aria-label="Elegí una mejora">
+          <div className="orb-vidrio orb-eleccion__tarjeta">
+            <p className="orb-eleccion__nivel">¡Nivel {nivelActual}!</p>
+            <h2 className="orb-eleccion__titulo">Elegí una mejora</h2>
+            <p className="orb-suave orb-eleccion__ayuda">Teclas 1, 2 y 3 — o tocá la carta</p>
+            <div className="orb-cartas">
+              {cartas.map((c, i) => {
+                const proximo = c.nivelActual + 1;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={`orb-carta orb-carta--${c.rareza}`}
+                    onClick={() => elegirMejora(c.id)}
+                  >
+                    <span className="orb-carta__tecla">{i + 1}</span>
+                    <Gema nombre={c.id} className="orb-carta__gema" />
+                    <span className="orb-carta__rareza">
+                      {c.rareza === "comun" ? "común" : c.rareza === "rara" ? "rara" : "épica"}
+                    </span>
+                    <b className="orb-carta__nombre">{NOMBRE_MEJORA[c.id]}</b>
+                    <span className="orb-carta__efecto">{DESCRIPCION_MEJORA[c.id](proximo)}</span>
+                    <span className="orb-carta__puntos" aria-label={`nivel ${proximo}`}>
+                      {[1, 2, 3].map((n) => (
+                        <i key={n} className={n <= c.nivelActual ? "on" : n === proximo ? "prox" : ""} />
+                      ))}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Cuenta regresiva */}
       {fase === "cuenta" && (
@@ -1004,7 +1378,7 @@ export function TormentaPage() {
           style={{ background: "rgba(20, 27, 77, 0.55)" }}
         >
           <section
-            className="orb-vidrio w-[min(30rem,94vw)] max-h-[88vh] overflow-y-auto p-6 text-center grid gap-4"
+            className="orb-vidrio tarjeta-marca w-[min(30rem,94vw)] max-h-[88vh] overflow-y-auto p-6 text-center grid gap-4"
             aria-label="Resultado de la partida"
           >
             {!(record && record.puntaje > resultado.puntaje) && (
@@ -1080,6 +1454,23 @@ export function TormentaPage() {
               )}
             </div>
 
+            {/* La build con la que terminaste. */}
+            {resultado.mejoras.length > 0 && (
+              <div className="orb-build orb-build--resultado" aria-label={`Nivel ${resultado.nivel}, tu build`}>
+                <span className="orb-build__nivel">nivel {resultado.nivel}</span>
+                {resultado.mejoras.map((m) => (
+                  <span key={m.id} className="orb-build__gema" title={`${NOMBRE_MEJORA[m.id]} · nivel ${m.nivel}`}>
+                    <Gema nombre={m.id} className="w-9 h-9" />
+                    <span className="orb-build__puntos" aria-hidden="true">
+                      {Array.from({ length: m.nivel }, (_, i) => (
+                        <i key={i} />
+                      ))}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            )}
+
             {record && record.puntaje > resultado.puntaje ? (
               <p className="orb-suave m-0 text-sm font-semibold">
                 Tu récord sigue en {record.puntaje.toLocaleString("es-AR")}. ¡Cerca!
@@ -1123,8 +1514,8 @@ export function TormentaPage() {
                 <RotateCcw size={19} /> Otra vez
               </button>
               <div className="grid grid-cols-2 gap-2">
-                <Link to="/orbita/hangar" className="orb-boton-vidrio text-sm">
-                  Hangar
+                <Link to="/orbita/tienda" className="orb-boton-vidrio text-sm">
+                  Tienda
                 </Link>
                 <Link to="/orbita" className="orb-boton-vidrio text-sm">
                   Volver a Órbita

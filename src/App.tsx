@@ -33,6 +33,7 @@ const GameplayPage = lazy(() =>
 const ModosPage = lazy(() => import("./pages/orbita/ModosPage"));
 const OrbitaHubPage = lazy(() => import("./pages/orbita/OrbitaHubPage"));
 const TormentaPage = lazy(() => import("./pages/orbita/TormentaPage"));
+const CarreraPage = lazy(() => import("./pages/orbita/CarreraPage"));
 const RankingPage = lazy(() => import("./pages/orbita/RankingPage"));
 const HangarPage = lazy(() => import("./pages/orbita/HangarPage"));
 const AutomatizacionPage = lazy(() => import("./pages/automatizacion/AutomatizacionPage"));
@@ -204,6 +205,10 @@ export function App() {
             }
           />
           <Route
+            path="/orbita/carrera"
+            element={<SoloEnComputadora><Suspense fallback={<PageFallback />}><CarreraPage /></Suspense></SoloEnComputadora>}
+          />
+          <Route
             path="/orbita/ranking"
             element={
               <Suspense fallback={<PageFallback />}>
@@ -212,7 +217,7 @@ export function App() {
             }
           />
           <Route
-            path="/orbita/hangar"
+            path="/orbita/tienda"
             element={
               <Suspense fallback={<PageFallback />}>
                 <HangarPage />
@@ -232,6 +237,8 @@ export function App() {
               </SoloEnComputadora>
             }
           />
+
+          <Route path="/orbita/hangar" element={<Navigate to="/orbita/tienda" replace />} />
         </Route>
 
         {/* Gestión — superadmin y admin. Las dos comparten pantallas: el

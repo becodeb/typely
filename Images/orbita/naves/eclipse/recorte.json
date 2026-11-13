@@ -1,0 +1,5 @@
+{
+  "saturacionMaxima": 5,
+  "huecoMinimoPx": 1500,
+  "motivo": "Quitar también los huecos de fondo encerrados entre el casco, las alas crecientes y sus conexiones; conservar pequeños reflejos del metal."
+}

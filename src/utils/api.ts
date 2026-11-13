@@ -221,7 +221,9 @@ export interface AuditEntry {
 /** Una partida terminada, lista para enviar. Espeja `runItemSchema` de
  *  `api/src/routes/arcade.ts`. */
 export interface ArcadeRunPayload {
-  gameId: "tormenta";
+  gameId: "tormenta" | "carrera";
+  textId?: string;
+  puesto?: number;
   startedAt: string;
   endedAt: string;
   durationMs: number;
@@ -235,6 +237,11 @@ export interface ArcadeRunPayload {
   charsTyped: number;
   errors: number;
   crystalsClaimed: number;
+  /** Mejoras permanentes (migración 0004). Opcionales en el servidor para
+   *  que una cola vieja siga entrando; el cliente nuevo las manda siempre. */
+  wordsTyped: number;
+  level: number;
+  upgrades: { id: string; level: number }[];
 }
 
 export interface ArcadePosicion {
@@ -258,13 +265,21 @@ export interface ArcadeRunResponse {
 }
 
 export interface ArcadePerfil {
+  bests?: Partial<Record<"tormenta" | "carrera", { score: number; wpm: number }>>;
   alias: string | null;
   crystals: number;
+  crystalsInfinite?: boolean;
   bestScore: number;
   bestThreat: number;
   bestRank: string | null;
   owned: string[];
-  equipped: { trail: string | null; beam: string | null };
+  equipped: { trail: string | null; beam: string | null; impact?: string | null; ship?: string | null; pet?: string | null };
+}
+
+export interface ArcadeGhosts {
+  mine: { wpm: number; score: number } | null;
+  grade: { alias: string; wpm: number; ship: string | null; trail: string | null; pet: string | null }[];
+  median: number;
 }
 
 export interface ArcadeBoardRow {
@@ -458,8 +473,10 @@ export const api = {
     call<{ profile: ArcadePerfil; week: { key: string; best: number | null; pos: number | null } }>(
       "/arcade/me",
     ),
-  arcadeLeaderboard: (q: { scope?: "global" | "sede" | "grade"; period?: "week" | "all" } = {}) => {
+  arcadeGhosts: (game: "carrera") => call<ArcadeGhosts>(`/arcade/ghosts?game=${game}`, { retry: false, signal: AbortSignal.timeout(3500) }),
+  arcadeLeaderboard: (q: { game?: "tormenta" | "carrera"; scope?: "global" | "sede" | "grade"; period?: "week" | "all" } = {}) => {
     const p = new URLSearchParams();
+    if (q.game) p.set("game", q.game);
     if (q.scope) p.set("scope", q.scope);
     if (q.period) p.set("period", q.period);
     const qs = p.toString();
@@ -471,7 +488,7 @@ export const api = {
     call<{ ok: true; alias: string }>("/arcade/alias", { method: "POST", json: { alias } }),
   buyArcadeItem: (id: string) =>
     call<{ ok: true; balance: number }>("/arcade/buy", { method: "POST", json: { id } }),
-  equipArcadeItem: (slot: "trail" | "beam", id: string | null) =>
+  equipArcadeItem: (slot: "trail" | "beam" | "impact" | "ship" | "pet", id: string | null) =>
     call<{ ok: true }>("/arcade/equip", { method: "POST", json: { slot, id } }),
 
   health: () => call<{ ok: boolean; service: string; ts: string }>("/health", { retry: false }),

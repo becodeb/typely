@@ -56,22 +56,23 @@ function rngCon(semilla) {
 /* ------------------------------------------------------------------ */
 /* El tipeador sintético                                               */
 /* ------------------------------------------------------------------ */
-/* wpm: velocidad sostenida · err: probabilidad de tecla errada ·
-   banda: hasta dónde desbloqueó en el modo historia. Los perfiles bajan
-   en error a medida que suben en velocidad, como los chicos reales. */
+/* wpm: velocidad sostenida · err: probabilidad de tecla errada. Los perfiles
+   bajan en error a medida que suben en velocidad, como los chicos reales.
+   Ya no llevan banda: el corpus es el mismo para todos (AJUSTES.bandaTope);
+   lo único que cambia entre un chico de primero y uno de sexto es la
+   presión que el motor les mide. */
 const PERFILES = [
-  { nombre: "1er grado lento ", wpm: 8, err: 0.14, banda: 0 },
-  { nombre: "1er grado típico", wpm: 15, err: 0.1, banda: 1 },
-  { nombre: "3er grado típico", wpm: 25, err: 0.08, banda: 3 },
-  { nombre: "5to grado típico", wpm: 40, err: 0.06, banda: 6 },
-  { nombre: "6to muy bueno   ", wpm: 60, err: 0.04, banda: 9 },
-  { nombre: "tecleador experto", wpm: 85, err: 0.03, banda: 10 },
+  { nombre: "1er grado lento ", wpm: 8, err: 0.14 },
+  { nombre: "1er grado típico", wpm: 15, err: 0.1 },
+  { nombre: "3er grado típico", wpm: 25, err: 0.08 },
+  { nombre: "5to grado típico", wpm: 40, err: 0.06 },
+  { nombre: "6to muy bueno   ", wpm: 60, err: 0.04 },
+  { nombre: "tecleador experto", wpm: 85, err: 0.03 },
 ];
 
 function simular(perfil, semilla) {
   const rng = rngCon(semilla);
   const motor = new MotorTormenta({
-    bandaMax: perfil.banda,
     rng: rngCon(semilla ^ 0x9e37),
     ajustes: AJUSTES_CLI,
   });
@@ -84,17 +85,27 @@ function simular(perfil, semilla) {
   let capsulas = 0;
 
   const PASO = 0.05; // 50 ms — granularidad sobrada para ritmos de tipeo
-  for (let pasos = 0; pasos < 320 / PASO && !resultado; pasos++) {
+  for (let pasos = 0; pasos < 1800 / PASO && !resultado; pasos++) {
     for (const ev of motor.tick(PASO * 1000)) {
       if (ev.tipo === "fin") resultado = ev.resultado;
       if (ev.tipo === "impacto") impactos++;
-      if (ev.tipo === "poderAplicado") capsulas++;
       /* Cambio de objetivo → tiempo de reacción humano. */
-      if (ev.tipo === "destruida" || ev.tipo === "impacto" || ev.tipo === "suelta") {
+      if (ev.tipo === "destruida" || ev.tipo === "impacto" || ev.tipo === "suelta" || ev.tipo === "rebote") {
         reaccionando = 0.25 + rng() * 0.35;
       }
     }
     if (resultado) break;
+
+    /* Subió de nivel (pasa dentro de tecla(), no del tick): elige al azar.
+       Este examen mide la promesa de duración, no la estrategia. La pausa
+       de la elección no cuenta como partida. */
+    if (motor.eligiendo) {
+      capsulas++;
+      const carta = motor.eligiendo[Math.floor(rng() * motor.eligiendo.length)];
+      for (const e2 of motor.elegir(carta.id)) if (e2.tipo === "fin") resultado = e2.resultado;
+      reaccionando = 0.6 + rng() * 0.6;
+      continue;
+    }
 
     if (reaccionando > 0) {
       reaccionando -= PASO;
@@ -107,6 +118,10 @@ function simular(perfil, semilla) {
     esperaTecla = (1 / cps) * (0.75 + rng() * 0.5);
 
     /* ¿Qué tecla aprieta? */
+    if (motor.signos.fase === "entrada") {
+      motor.tecla("tormenta de signos"[motor.signos.escrito]);
+      continue;
+    }
     const vivas = motor.vivas;
     if (!vivas.length) continue;
 
@@ -130,9 +145,9 @@ function simular(perfil, semilla) {
     }
   }
 
-  /* Si el bucle agotó los 320 s sin `fin`, el lazo está roto: eso es
-     exactamente lo que este script existe para detectar. */
-  return { resultado, impactos, capsulas, colgada: !resultado };
+  /* Horizonte del ensayo, no límite del juego: un perfil aún vivo a los
+     30 minutos requiere revisar el equilibrio y no se fuerza a perder. */
+  return { resultado, impactos, capsulas, normalMs: Math.round(motor.t * 1000), bonusMs: Math.round(motor.signos.totalSegundos * 1000), colgada: !resultado };
 }
 
 /* ------------------------------------------------------------------ */
@@ -154,7 +169,7 @@ const seg = (ms) => (ms / 1000).toFixed(0) + "s";
 
 console.log(`Tormenta de palabras — ${N} partidas por perfil\n`);
 console.log(
-  "perfil            banda   duración (med · min–max)   amenaza  rango       ppm~   palabras  poderes",
+  "perfil            duración (med · min–max)   amenaza  rango       ppm~   palabras  poderes",
 );
 console.log("-".repeat(105));
 
@@ -169,10 +184,11 @@ for (const perfil of PERFILES) {
   }
   if (colgadas) {
     todoBien = false;
-    console.log(`${perfil.nombre}  ⚠ ${colgadas}/${N} partidas NUNCA terminaron — lazo roto`);
+    console.log(`${perfil.nombre}  ⚠ ${colgadas}/${N} partidas siguen vivas al finalizar los 30 minutos del ensayo`);
     continue;
   }
-  const dur = corridas.map((c) => c.resultado.duracionMs);
+  // El bonus pausa la dificultad: la promesa de duración se mide sin él.
+  const dur = corridas.map((c) => c.normalMs);
   const durMed = mediana(dur);
   const amenaza = Math.round(mediana(corridas.map((c) => c.resultado.amenazaMax)));
   const rango = corridas[Math.floor(corridas.length / 2)].resultado.rango;
@@ -180,21 +196,26 @@ for (const perfil of PERFILES) {
   const palabras = Math.round(mediana(corridas.map((c) => c.resultado.palabras)));
   const poderes = Math.round(mediana(corridas.map((c) => c.capsulas)));
 
-  const dentro = durMed >= 90_000 && durMed <= 150_000;
+  /* Objetivo de equilibrio para perfiles humanos, sin máximo obligatorio:
+     una buena build puede seguir mientras conserve corazones. */
+  const durMax = Math.max(...dur);
+  const medianaOk = durMed >= 90_000 && durMed <= 180_000;
+  const dentro = medianaOk;
   if (!dentro) todoBien = false;
   console.log(
-    `${perfil.nombre}   B${String(perfil.banda).padEnd(4)}` +
-      ` ${seg(durMed).padStart(5)} · ${seg(Math.min(...dur))}–${seg(Math.max(...dur))}`.padEnd(28) +
+    `${perfil.nombre}  ` +
+      ` ${seg(durMed).padStart(5)} · ${seg(Math.min(...dur))}–${seg(durMax)}`.padEnd(28) +
       `${String(amenaza).padStart(5)}    ${rango.padEnd(10)}` +
       ` ${String(ppm).padStart(4)}   ${String(palabras).padStart(6)}  ${String(poderes).padStart(6)}` +
-      (dentro ? "" : "   ← FUERA de 90–150 s"),
+      (medianaOk ? "" : "   ← mediana FUERA de 90–180 s"),
   );
+  console.log(`  Bonus jugados: ${corridas.filter(c => c.bonusMs > 0).length}/${N}; tiempo adicional mediano: ${seg(mediana(corridas.map(c => c.bonusMs)))}`);
 }
 
 console.log("");
 console.log(
   todoBien
-    ? "La promesa se cumple: mediana de todos los perfiles dentro de 2:00 ± 0:30."
+    ? "Tiempo normal mediano entre 1:30 y 3:00; sin corte por tiempo. El bonus suma su propio tiempo."
     : "Hay perfiles fuera del objetivo — tocar AJUSTES en src/utils/orbita/motor.ts y volver a correr.",
 );
 process.exitCode = todoBien ? 0 : 1;

@@ -173,8 +173,9 @@ export function SkinProgressBar({ className = "" }: { className?: string }) {
             para que el color del panel NO cambie según el arte que tiene detrás
             y coincida exactamente con el header de arriba en cualquier isla. */}
         <div
-          className="glass-card skin-bar-panel relative flex items-center gap-2.5 sm:gap-3 rounded-full pl-1.5 pr-3.5 py-1.5 sm:pr-4 border border-white/60 overflow-hidden"
-          style={{ background: "rgba(255,255,255,0.82)" }}
+          /* Sin fondo inline: lo pone la tarjeta de marca (regla estructural
+             al final de global.css); un `background` inline le ganaba. */
+          className="glass-card skin-bar-panel relative flex items-center gap-2.5 sm:gap-3 rounded-full pl-1.5 pr-3.5 py-1.5 sm:pr-4 overflow-hidden"
         >
           {/* Brillo superior que recorre el panel en loop (estilo marca). */}
           <span

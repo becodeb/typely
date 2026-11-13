@@ -40,7 +40,7 @@ import rAs from "./svg/as.svg?raw";
 import rCapitan from "./svg/capitan.svg?raw";
 import rLeyenda from "./svg/leyenda.svg?raw";
 
-import type { PowerupId, RangoId } from "../../utils/orbita/motor";
+import type { MejoraId, PowerupId, RangoId } from "../../utils/orbita/motor";
 
 const ICONOS = {
   "corazon-lleno": corazonLleno,
@@ -168,22 +168,66 @@ export function InsigniaRango({
   );
 }
 
-/** Gema 3D de un poder (o el cristal, la moneda del modo), con el SVG de
- *  respaldo. Se usa donde se ve grande: la revelación sobre la nave, el
- *  saldo, el resultado. En el HUD y en la palabra que vuela siguen los SVG. */
+/* Las mejoras permanentes reusan cuatro gemas de los poderes viejos y la
+   del corazón con la cruz: el id del motor nombra el efecto, el archivo
+   nombra el dibujo (ORBITA.md §7.6). Las demás llevan su propio nombre. */
+const GEMA_DE_MEJORA: Partial<Record<MejoraId, string>> = {
+  vida: "reparacion",
+  viento: "lento",
+  foco: "mira",
+  onda: "pulso",
+};
+/* SVG de respaldo por mejora, mientras la imagen no cargue. Las nuevas
+   no tienen icono propio: caen al cristal genérico, con su color. */
+const ICONO_DE_MEJORA: Partial<Record<MejoraId, NombreIcono>> = {
+  vida: "pw-reparacion",
+  viento: "pw-tiempo",
+  foco: "pw-mira",
+  onda: "pw-pulso",
+  escudo: "pw-escudo",
+  bala: "pw-rayo",
+};
+export const COLOR_DE_MEJORA: Record<MejoraId, string> = {
+  bala: "#ffd552",
+  segunda: "#ffe08a",
+  vida: "#ff6b8a",
+  regeneracion: "#ff9fca",
+  escudo: "#54e8c6",
+  critico: "#9b7cff",
+  viento: "#7c93ff",
+  foco: "#ff9fca",
+  onda: "#25c8df",
+  congelar: "#cfeeff",
+  iman: "#536bff",
+  racha: "#54e8c6",
+  teclas: "#7c71ff",
+};
+
+/** Gema 3D de una mejora, de un poder viejo o del cristal (la moneda del
+ *  modo), con el SVG de respaldo. Se usa donde se ve grande: la carta al
+ *  subir de nivel, la fila de la build en el HUD, el saldo, el resultado. */
 export function Gema({
   nombre,
   className,
   style,
 }: {
-  nombre: PowerupId | "cristal";
+  nombre: PowerupId | MejoraId | "cristal";
   className?: string;
   style?: CSSProperties;
 }) {
-  const src = `${ARTE_GEMAS}/${nombre}.webp`;
+  const archivo = (GEMA_DE_MEJORA as Record<string, string>)[nombre] ?? nombre;
+  const src = `${ARTE_GEMAS}/${archivo}.webp`;
   const { disponible, alFallar } = useImagenConRespaldo(src);
-  const respaldo = nombre === "cristal" ? ICONOS.cristal : ICONOS[ICONO_DE_POWERUP[nombre]];
-  const colorRespaldo = nombre === "cristal" ? "#9b7cff" : COLOR_DE_POWERUP[nombre];
+  const iconoPoder = (ICONO_DE_POWERUP as Record<string, NombreIcono | undefined>)[nombre];
+  const iconoMejora = (ICONO_DE_MEJORA as Record<string, NombreIcono | undefined>)[nombre];
+  const respaldo =
+    nombre === "cristal" ? ICONOS.cristal : ICONOS[iconoMejora ?? iconoPoder ?? "cristal"];
+  const colorRespaldo =
+    nombre === "cristal"
+      ? "#9b7cff"
+      : ((COLOR_DE_MEJORA as Record<string, string | undefined>)[nombre] ??
+        (COLOR_DE_POWERUP as Record<string, string | undefined>)[nombre] ??
+        "#9b7cff");
   if (disponible) {
     return (
       <span className={`orb-ico orb-gema ${className ?? ""}`} style={style} aria-hidden="true">

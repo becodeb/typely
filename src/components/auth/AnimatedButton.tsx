@@ -1,5 +1,8 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
+/* Botones del login (CLAUDE.md §5). `primary` es la barra de caramelo con
+   degradado menta → celeste → azul y brillo arriba; `secondary` es el botón
+   blanco del modo demo. Estilos en `.login-boton` (global.css). */
 interface AnimatedButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   iconLeft?: ReactNode;
   iconRight?: ReactNode;
@@ -7,10 +10,8 @@ interface AnimatedButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<"primary" | "secondary", string> = {
-  primary:
-    "bg-accent bg-gradient-to-br from-white/24 via-transparent to-transparent text-white shadow-btn hover:shadow-btn-hover",
-  secondary:
-    "bg-white/75 text-text shadow hover:bg-white/90",
+  primary: "login-boton login-boton--primario",
+  secondary: "login-boton login-boton--demo",
 };
 
 export function AnimatedButton({
@@ -21,14 +22,8 @@ export function AnimatedButton({
   variant = "primary",
   ...props
 }: AnimatedButtonProps) {
-  const base =
-    "inline-flex items-center justify-center min-h-[3.65rem] px-6 gap-1.5 rounded-xl font-extrabold cursor-pointer transition-transform duration-180 ease hover:-translate-y-0.5 active:scale-[0.985] disabled:opacity-50 disabled:pointer-events-none";
-
   return (
-    <button
-      className={`${base} ${variantClasses[variant]} ${className}`.trim()}
-      {...props}
-    >
+    <button className={`${variantClasses[variant]} ${className}`.trim()} {...props}>
       {iconLeft}
       <span>{children}</span>
       {iconRight}

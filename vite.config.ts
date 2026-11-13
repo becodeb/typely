@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { levelPositionsWriter } from "./scripts/vite-plugin-level-positions";
+import { loginEsquinasWriter } from "./scripts/vite-plugin-login-esquinas";
 
 export default defineConfig(({ mode }) => {
   /* Prefijo vacío: `loadEnv` normalmente solo expone las `VITE_*`, y esta
@@ -25,7 +26,9 @@ export default defineConfig(({ mode }) => {
        al editor visual de niveles un endpoint para escribir
        levelPositions.ts directo, sin copiar y pegar. No existe en el build
        de producción. */
-    plugins: [react(), tailwindcss(), levelPositionsWriter()],
+    /* loginEsquinasWriter hace lo mismo para los adornos de esquina del
+       login (src/data/loginEsquinas.ts), desde /login?editor=1. */
+    plugins: [react(), tailwindcss(), levelPositionsWriter(), loginEsquinasWriter()],
     server: {
       /* Puerto fijo: es el que citan CLAUDE.md y el editor de niveles
          (localhost:5210). Host explícito en IPv4 porque en Windows el

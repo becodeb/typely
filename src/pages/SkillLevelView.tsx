@@ -242,7 +242,7 @@ function CompletionModal({ activity, onRetry, stars = 3 }: { activity: Activity;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/30" />
-      <div className="glass-card-smooth relative z-10 px-8 py-10 flex flex-col items-center gap-4 animate-modal-in w-[min(24rem,90vw)]">
+      <div className="glass-card-smooth tarjeta-marca relative z-10 px-8 py-10 flex flex-col items-center gap-4 animate-modal-in w-[min(24rem,90vw)]">
         <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
           {Array.from({ length: 18 }).map((_, i) => (
             <span
@@ -1204,7 +1204,7 @@ function ScrollLevel({ activity }: { activity: Activity }) {
               </button>
               <button
                 type="button"
-                className="glass-surface rounded-xl w-10 h-10 grid place-items-center text-lg font-bold cursor-pointer border-0 bg-accent text-white"
+                className="rounded-xl w-10 h-10 grid place-items-center text-lg font-bold cursor-pointer border-0 bg-accent text-white shadow-btn"
                 onClick={onZoomIn}
                 aria-label="Acercar"
               >

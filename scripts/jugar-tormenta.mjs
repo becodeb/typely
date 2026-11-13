@@ -28,6 +28,21 @@ import { pathToFileURL } from "node:url";
 const RAIZ = path.resolve(import.meta.dirname, "..");
 const SALIDA = path.join(RAIZ, ".preview-orbita");
 mkdirSync(SALIDA, { recursive: true });
+
+/* Cómo elige cada jugador guionado cuando el motor ofrece tres cartas. Las
+   estrategias existen para calibrar la presión del híbrido sin imponer
+   una duración máxima a las builds defensivas; sin build tiene que
+   seguir durando ~2:00. Un escenario sin `elige` juega al azar. */
+const DEFENSIVAS = ["vida", "regeneracion", "escudo", "segunda", "viento", "iman", "congelar"];
+const OFENSIVAS = ["bala", "critico", "teclas", "racha", "onda", "foco"];
+const alAzar = (cartas, rng) => cartas[Math.floor(rng() * cartas.length)].id;
+const ESTRATEGIAS = {
+  azar: alAzar,
+  defensiva: (cartas, rng) => cartas.find((c) => DEFENSIVAS.includes(c.id))?.id ?? alAzar(cartas, rng),
+  ofensiva: (cartas, rng) => cartas.find((c) => OFENSIVAS.includes(c.id))?.id ?? alAzar(cartas, rng),
+  bala: (cartas, rng) =>
+    cartas.find((c) => c.id === "bala")?.id ?? cartas.find((c) => c.id === "vida")?.id ?? alAzar(cartas, rng),
+};
 const BUNDLE = path.join(SALIDA, "motor.bundle.mjs");
 await build({
   entryPoints: [path.join(RAIZ, "src", "utils", "orbita", "motor.ts")],
@@ -55,33 +70,53 @@ function rngCon(semilla) {
 /* conducta(t) → { wpm, err, activo }. `activo=false` = no toca el teclado.
    `procrastina` = solo tipea cuando hay al menos tantas palabras vivas. */
 const ESCENARIOS = [
-  { nombre: "bueno constante (60 PPM)", banda: 9, conducta: () => ({ wpm: 60, err: 0.04, activo: true }) },
-  { nombre: "malo constante (10 PPM)", banda: 1, conducta: () => ({ wpm: 10, err: 0.15, activo: true }) },
+  { nombre: "bueno constante (60 PPM)", conducta: () => ({ wpm: 60, err: 0.04, activo: true }) },
+  { nombre: "malo constante (10 PPM)", conducta: () => ({ wpm: 10, err: 0.15, activo: true }) },
   {
     nombre: "malo 30 s → muy bueno",
-    banda: 9,
     conducta: (t) => (t < 30 ? { wpm: 10, err: 0.15, activo: true } : { wpm: 70, err: 0.03, activo: true }),
   },
   {
     nombre: "muy bueno 40 s → se distrae",
-    banda: 9,
     conducta: (t) => (t < 40 ? { wpm: 70, err: 0.03, activo: true } : { wpm: 12, err: 0.2, activo: true }),
   },
   {
     nombre: "intermitente 5 s sí / 4 s no",
-    banda: 6,
     conducta: (t) => ({ wpm: 45, err: 0.05, activo: t % 9 < 5 }),
   },
-  { nombre: "no toca nada", banda: 3, conducta: () => ({ wpm: 0, err: 0, activo: false }) },
-  { nombre: "máquina perfecta (130 PPM)", banda: 10, conducta: () => ({ wpm: 130, err: 0, activo: true }) },
-  { nombre: "rápido y torpe (55 PPM, 30 % err)", banda: 6, conducta: () => ({ wpm: 55, err: 0.3, activo: true }) },
+  { nombre: "no toca nada", conducta: () => ({ wpm: 0, err: 0, activo: false }) },
+  /* Sin corte por duración (a8dfece) y con la amenaza topeada en 100, un
+     tipeador perfecto no pierde nunca: seguir viva a los 30 min es lo
+     ESPERADO para este escenario, no una falla. Para cualquier perfil
+     humano sí lo es. */
+  /* Con el TECHO BLANDO (pisos de vida y cadencia que bajan desde los 210 s)
+     hasta la máquina perfecta tiene que caer: seguir viva a los 30 min
+     vuelve a ser falla para TODOS los escenarios. */
+  { nombre: "máquina perfecta (130 PPM)", conducta: () => ({ wpm: 130, err: 0, activo: true }) },
+  { nombre: "rápido y torpe (55 PPM, 30 % err)", conducta: () => ({ wpm: 55, err: 0.3, activo: true }) },
   {
     nombre: "procrastinador (espera 2 vivas)",
-    banda: 6,
     conducta: () => ({ wpm: 50, err: 0.05, activo: true }),
     procrastina: 2,
   },
-  { nombre: "principiante real (8 PPM, B0)", banda: 0, conducta: () => ({ wpm: 8, err: 0.14, activo: true }) },
+  { nombre: "principiante real (8 PPM)", conducta: () => ({ wpm: 8, err: 0.14, activo: true }) },
+  /* Las estrategias de build, sobre un mismo jugador medio: comparan
+     supervivencia sin imponer un corte por tiempo. */
+  {
+    nombre: "build defensiva (45 PPM)",
+    conducta: () => ({ wpm: 45, err: 0.05, activo: true }),
+    elige: ESTRATEGIAS.defensiva,
+  },
+  {
+    nombre: "build ofensiva (45 PPM)",
+    conducta: () => ({ wpm: 45, err: 0.05, activo: true }),
+    elige: ESTRATEGIAS.ofensiva,
+  },
+  {
+    nombre: "cazador de balas (45 PPM)",
+    conducta: () => ({ wpm: 45, err: 0.05, activo: true }),
+    elige: ESTRATEGIAS.bala,
+  },
 ];
 
 const PASO = 0.05;
@@ -90,7 +125,6 @@ const HITOS = [5, 10, 20, 30, 45, 60, 90, 120];
 function jugar(esc, semilla) {
   const rng = rngCon(semilla);
   const motor = new MotorTormenta({
-    bandaMax: esc.banda,
     rng: rngCon(semilla ^ 0x9e37),
     ajustes: AJUSTES_CLI,
   });
@@ -100,12 +134,14 @@ function jugar(esc, semilla) {
     tFinPrueba: null,
     corazonesEn: [],
     roces: 0,
+    rebotes: 0,
     amenazaEn: {},
     maxVivas: 0,
     maxVivasPrueba: 0,
     huecoMax: 0,
     ahogo: 0,
-    poderes: [],
+    niveles: 0,
+    build: [],
     fallas: [],
     ambiguedades: 0,
     errores: 0,
@@ -116,9 +152,29 @@ function jugar(esc, semilla) {
   let reaccionando = 0;
   let corazonesPrev = motor.corazones;
   let hitoIdx = 0;
-  let pendienteVerificar = null; // poder aplicado en el tick anterior
+  const elegirPendiente = () => {
+    const cartas = motor.eligiendo;
+    if (!cartas) return;
+    const nivel = motor.nivel;
+    m.niveles += 1;
+    const ids = cartas.map((c) => c.id);
+    if (cartas.length !== 3) m.fallas.push(`nivel ${nivel} ofreció ${cartas.length} cartas`);
+    if (new Set(ids).size !== ids.length) m.fallas.push(`nivel ${nivel} ofreció cartas repetidas`);
+    for (const c of cartas) {
+      const tope = c.id === "segunda" ? 1 : c.id === "foco" ? 2 : c.id === "bala" || c.id === "vida" ? 99 : 3;
+      if (c.nivelActual >= tope) m.fallas.push(`nivel ${nivel} ofreció ${c.id} ya al tope (${c.nivelActual})`);
+    }
+    const elegida = (esc.elige ?? ESTRATEGIAS.azar)(cartas, rng, motor);
+    m.build.push(elegida);
+    for (const e2 of motor.elegir(elegida)) if (e2.tipo === "fin") m.fin = e2.resultado;
+    if (motor.eligiendo) m.fallas.push(`nivel ${nivel}: eligió ${elegida} y el motor siguió en pausa`);
+    reaccionando = 0.6 + rng() * 0.6; // mirar las cartas lleva un momento
+  };
 
-  for (let paso = 0; paso < 330 / PASO && !m.fin; paso++) {
+  /* Horizonte del ensayo, no límite del juego: desde que se quitó el corte por
+     duración (a8dfece) la partida termina solo al perder el último corazón.
+     30 minutos, igual que simular-tormenta.mjs. */
+  for (let paso = 0; paso < 1800 / PASO && !m.fin; paso++) {
     const antes = { corazones: motor.corazones, escudo: motor.escudo, vivas: motor.vivas.length };
     const eventos = motor.tick(PASO * 1000);
     const t = motor.t;
@@ -126,25 +182,18 @@ function jugar(esc, semilla) {
     for (const ev of eventos) {
       if (ev.tipo === "fin") m.fin = ev.resultado;
       if (ev.tipo === "roce") m.roces++;
+      if (ev.tipo === "rebote") m.rebotes++;
       if (ev.tipo === "impacto" && !ev.escudoAbsorbio) m.corazonesEn.push(Math.round(t));
-      if (ev.tipo === "destruida" || ev.tipo === "impacto" || ev.tipo === "suelta" || ev.tipo === "roce") {
+      if (ev.tipo === "destruida" || ev.tipo === "impacto" || ev.tipo === "suelta" || ev.tipo === "roce" || ev.tipo === "rebote") {
         reaccionando = 0.25 + rng() * 0.35;
       }
-      if (ev.tipo === "poderAplicado") {
-        const p = ev.powerup;
-        const despues = { corazones: motor.corazones, escudo: motor.escudo, vivas: motor.vivas.length };
-        let ok = true;
-        if (p === "reparacion") ok = despues.corazones === Math.min(3, antes.corazones + 1);
-        if (p === "escudo") ok = despues.escudo === Math.min(2, antes.escudo + 1);
-        if (p === "pulso") ok = despues.vivas === 0;
-        if (p === "lento") ok = motor.efectos.lentoHasta > t;
-        if (p === "rayo") ok = motor.efectos.rayoHasta > t;
-        if (p === "cosecha") ok = motor.efectos.cosechaHasta > t;
-        if (p === "mira") ok = motor.efectos.miraHasta > t;
-        m.poderes.push({ t: Math.round(t), p, ok });
-        if (!ok) m.fallas.push(`poder ${p} a los ${Math.round(t)} s no hizo lo que dice`);
-      }
     }
+    /* El nivel sube dentro de tecla(), no del tick: por eso se mira el
+       ESTADO del motor y no un evento. Con cartas ofrecidas el motor está
+       en pausa hasta que alguien elija — el jugador guionado elige con su
+       estrategia, y de paso se verifica el sorteo: tres cartas, distintas,
+       ninguna que ya esté al tope. */
+    if (motor.eligiendo) elegirPendiente();
     if (m.fin) break;
 
     /* --- métricas de sensación --- */
@@ -163,7 +212,7 @@ function jugar(esc, semilla) {
       hitoIdx++;
     }
     /* Invariantes duros. */
-    if (vivas > 8) m.fallas.push(`${vivas} palabras vivas a los ${Math.round(t)} s (tope 8)`);
+    if (vivas > motor.aj.simultaneasMax) m.fallas.push(`${vivas} palabras vivas a los ${Math.round(t)} s (tope ${motor.aj.simultaneasMax})`);
     if (motor.fase === "calibracion" && vivas > 3) m.fallas.push(`${vivas} vivas durante el vuelo de prueba`);
     const iniciales = new Set();
     for (const p of motor.vivas) {
@@ -201,15 +250,23 @@ function jugar(esc, semilla) {
     for (const ev of motor.tecla(seEquivoca ? (esperado === "x" ? "z" : "x") : esperado)) {
       if (ev.tipo === "fin") m.fin = ev.resultado;
     }
+    if (motor.eligiendo) elegirPendiente();
   }
 
-  if (!m.fin) m.fallas.push("la partida NUNCA terminó (330 s)");
+  if (!m.fin) {
+    if (!esc.infinitaEsperable) m.fallas.push("la partida sigue viva al terminar los 30 minutos del ensayo");
+  }
   else {
     const r = m.fin;
-    const esperados = r.palabras + CRISTALES_POR_RANGO[r.rango];
-    if (r.cristales < esperados || r.cristales > r.palabras * 2 + CRISTALES_POR_RANGO[r.rango]) {
-      m.fallas.push(`cristales ${r.cristales} fuera de fórmula (palabras ${r.palabras}, rango ${r.rango})`);
+    /* Los cristales se acuñan sobre lo TIPEADO: lo que cayó por bala o
+       crítico cuenta como palabra pero no paga. */
+    // El agregado incluye signos; el bonus da puntos, no cristales.
+    const esperados = r.palabrasTipeadas - motor.signos.aciertos + CRISTALES_POR_RANGO[r.rango];
+    if (r.cristales !== esperados) {
+      m.fallas.push(`cristales ${r.cristales} fuera de fórmula (tipeadas ${r.palabrasTipeadas}, rango ${r.rango})`);
     }
+    if (r.palabrasTipeadas > r.palabras) m.fallas.push(`tipeadas ${r.palabrasTipeadas} > palabras ${r.palabras}`);
+    if (motor.corazones > 0) m.fallas.push('la partida terminó con corazones disponibles');
     if (r.precision > 100 || r.precision < 0) m.fallas.push(`precisión ${r.precision}`);
     if (r.ppmPico < r.ppmMedio * 0.5) m.fallas.push(`ppm pico ${r.ppmPico} < medio ${r.ppmMedio}`);
   }
@@ -246,24 +303,25 @@ for (const esc of ESCENARIOS) {
   const prueba = med(corridas.map((c) => c.tFinPrueba ?? 0));
   const corazones = corridas[0].corazonesEn.join(", ") || "—";
   const amz = HITOS.map((h) => `${h}s:${corridas[0].amenazaEn[h] ?? "·"}`).join(" ");
-  const poderes = corridas.flatMap((c) => c.poderes);
-  const poderesOk = poderes.filter((p) => p.ok).length;
+  const niveles = med(corridas.map((c) => c.niveles));
+  const durMax = Math.max(...terminadas.map((c) => c.fin.duracionMs / 1000));
   const fallas = [...new Set(corridas.flatMap((c) => c.fallas))];
   fallasTotales += fallas.length;
 
-  console.log(`■ ${esc.nombre}  (banda ${esc.banda})`);
+  console.log(`■ ${esc.nombre}`);
   console.log(
     `    duración ${dur.toFixed(0)} s · amenaza máx ${amenaza} · ${rango} · ${palabras} palabras` +
       ` · vuelo de prueba termina a los ${prueba.toFixed(1)} s`,
   );
   console.log(`    amenaza en el tiempo → ${amz}`);
-  console.log(`    corazones perdidos (semilla 1) en s: ${corazones} · roces en prueba: ${corridas[0].roces}`);
+  console.log(`    corazones perdidos (semilla 1) en s: ${corazones} · roces en prueba: ${corridas[0].roces} · rebotes: ${corridas.reduce((a, c) => a + c.rebotes, 0)}`);
+    console.log(`    niveles (semilla 1): ${corridas[0].niveles} · build: ${corridas[0].build.join(", ") || "—"}`);
   console.log(
     `    hueco máx sin palabras ${hueco.toFixed(1)} s · ahogo (≥6 vivas) ${ahogo.toFixed(1)} s` +
       ` · máx vivas ${Math.max(...corridas.map((c) => c.maxVivas))} (prueba ${Math.max(...corridas.map((c) => c.maxVivasPrueba))})`,
   );
   console.log(
-    `    poderes verificados ${poderesOk}/${poderes.length}` +
+    `    niveles ${niveles.toFixed(0)} (mediana) · duración máx observada ${durMax.toFixed(0)} s` +
       ` · ambigüedades de inicial ${corridas.reduce((a, c) => a + c.ambiguedades, 0)} muestras`,
   );
   if (fallas.length) for (const f of fallas) console.log(`    ✗ ${f}`);

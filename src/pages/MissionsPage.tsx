@@ -174,7 +174,7 @@ export function MissionsPage() {
 
       {/* ── Hero: adventure summary ── */}
       <section
-        className="w-full max-w-3xl glass-card-smooth p-6 flex flex-col sm:flex-row gap-5 animate-card-in"
+        className="w-full max-w-3xl glass-card-smooth tarjeta-marca p-6 flex flex-col sm:flex-row gap-5 animate-card-in"
         aria-label="Resumen de tu aventura"
       >
         <div
@@ -214,7 +214,7 @@ export function MissionsPage() {
 
       {/* ── Featured: mission of the day ── */}
       <section
-        className="w-full max-w-3xl glass-card p-5 rounded-2xl relative overflow-hidden animate-mission-rise"
+        className="w-full max-w-3xl glass-card tarjeta-marca p-5 rounded-2xl relative overflow-hidden animate-mission-rise"
         aria-label="Misión del día"
       >
         {/* Background halo decoration */}
@@ -322,7 +322,7 @@ export function MissionsPage() {
           return (
             <article
               key={world.id}
-              className={`glass-surface p-4 rounded-2xl flex flex-col gap-3 ${stateClasses}`}
+              className={`glass-surface tarjeta-marca p-4 rounded-2xl flex flex-col gap-3 ${stateClasses}`}
             >
               <header className="flex items-center gap-3">
                 <span className={`w-8 h-8 rounded-full grid place-items-center text-white font-extrabold text-sm ${numBg}`}>

@@ -1175,7 +1175,7 @@ export function GameplayPage() {
           aria-labelledby="level-complete-title"
         >
           <div className="modal-overlay" aria-hidden="true" />
-          <div className="glass-card-smooth modal-card px-8 py-10 flex flex-col items-center gap-4 max-w-md w-full mx-4 relative animate-card-pop">
+          <div className="glass-card-smooth modal-card tarjeta-marca px-8 py-10 flex flex-col items-center gap-4 max-w-md w-full mx-4 relative animate-card-pop">
             <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-3xl" aria-hidden="true">
               <span className="absolute top-4 left-8 text-3xl text-amber-400 animate-sparkle-burst" style={{ animationDelay: "0s" }}>★</span>
               <span className="absolute top-12 right-12 text-2xl text-pink-400 animate-sparkle-burst" style={{ animationDelay: "0.1s" }}>✦</span>
